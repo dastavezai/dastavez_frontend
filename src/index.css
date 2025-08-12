@@ -1,0 +1,893 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 15%;
+    --foreground: 0 0% 98%;
+
+    --card: 223 25% 18%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 223 25% 18%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 42 60% 58%;
+    --primary-foreground: 220 20% 15%;
+
+    --secondary: 215 30% 25%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 223 25% 25%;
+    --muted-foreground: 0 0% 80%;
+
+    --accent: 42 40% 40%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 215 25% 27%;
+    --input: 215 25% 22%;
+    --ring: 42 60% 58%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 223 30% 15%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 42 60% 58%;
+    --sidebar-primary-foreground: 220 20% 15%;
+    --sidebar-accent: 215 28% 20%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 215 25% 20%;
+    --sidebar-ring: 42 60% 58%;
+  }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 220 20% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 15%;
+
+    --primary: 42 60% 58%;
+    --primary-foreground: 220 20% 15%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 215 25% 25%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 25% 40%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 215 25% 25%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 42 60% 58%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 220 20% 15%;
+    --sidebar-primary: 42 60% 58%;
+    --sidebar-primary-foreground: 220 20% 15%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 220 20% 15%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 42 60% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
+  }
+  
+  @font-face {
+    font-family: 'Cormorant Garamond';
+    src: url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap');
+    font-weight: 400 700;
+    font-style: normal;
+  }
+
+  /* Responsive typography */
+  h1 {
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold;
+  }
+
+  h2 {
+    @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold;
+  }
+
+  h3 {
+    @apply text-lg sm:text-xl md:text-2xl font-medium;
+  }
+
+  p {
+    @apply text-sm sm:text-base leading-relaxed;
+  }
+
+  /* Responsive spacing */
+  .container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Mobile-first responsive utilities */
+  .mobile-only {
+    @apply block sm:hidden;
+  }
+
+  .desktop-only {
+    @apply hidden sm:block;
+  }
+
+  .tablet-only {
+    @apply hidden md:block lg:hidden;
+  }
+
+  /* Responsive grid utilities */
+  .responsive-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6;
+  }
+
+  .responsive-grid-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6;
+  }
+
+  .responsive-grid-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
+  }
+
+  /* Responsive text utilities */
+  .text-responsive-sm {
+    @apply text-xs sm:text-sm md:text-base;
+  }
+
+  .text-responsive-md {
+    @apply text-sm sm:text-base md:text-lg;
+  }
+
+  .text-responsive-lg {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+
+  .text-responsive-xl {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+
+  /* Responsive padding utilities */
+  .p-responsive {
+    @apply p-3 sm:p-4 md:p-6;
+  }
+
+  .px-responsive {
+    @apply px-3 sm:px-4 md:px-6;
+  }
+
+  .py-responsive {
+    @apply py-3 sm:py-4 md:py-6;
+  }
+
+  /* Responsive margin utilities */
+  .m-responsive {
+    @apply m-3 sm:m-4 md:m-6;
+  }
+
+  .mx-responsive {
+    @apply mx-3 sm:mx-4 md:mx-6;
+  }
+
+  .my-responsive {
+    @apply my-3 sm:my-4 md:my-6;
+  }
+
+  /* Responsive gap utilities */
+  .gap-responsive {
+    @apply gap-3 sm:gap-4 md:gap-6;
+  }
+
+  /* Responsive flex utilities */
+  .flex-responsive {
+    @apply flex flex-col sm:flex-row;
+  }
+
+  .flex-responsive-reverse {
+    @apply flex flex-col-reverse sm:flex-row;
+  }
+
+  /* Responsive width utilities */
+  .w-responsive {
+    @apply w-full sm:w-auto;
+  }
+
+  .max-w-responsive {
+    @apply max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl;
+  }
+
+  /* Responsive height utilities */
+  .h-responsive {
+    @apply h-32 sm:h-40 md:h-48 lg:h-56;
+  }
+
+  /* Responsive border radius */
+  .rounded-responsive {
+    @apply rounded-lg sm:rounded-xl md:rounded-2xl;
+  }
+
+  /* Responsive shadow */
+  .shadow-responsive {
+    @apply shadow-md sm:shadow-lg md:shadow-xl;
+  }
+
+  /* Responsive backdrop blur */
+  .backdrop-responsive {
+    @apply backdrop-blur-sm sm:backdrop-blur-md md:backdrop-blur-lg;
+  }
+
+  /* Responsive animation speeds */
+  .animate-responsive {
+    @apply transition-all duration-200 sm:duration-300 md:duration-500;
+  }
+
+  /* Responsive hover effects */
+  .hover-responsive {
+    @apply hover:scale-105 sm:hover:scale-110 md:hover:scale-125;
+  }
+
+  /* Responsive focus states */
+  .focus-responsive {
+    @apply focus:ring-2 focus:ring-judicial-gold focus:ring-offset-2 focus:ring-offset-judicial-dark;
+  }
+
+  /* Responsive button sizes */
+  .btn-responsive {
+    @apply px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-sm sm:text-base;
+  }
+
+  .btn-responsive-lg {
+    @apply px-4 py-3 sm:px-6 sm:py-4 md:px-8 md:py-5 text-base sm:text-lg;
+  }
+
+  /* Responsive icon sizes */
+  .icon-responsive {
+    @apply h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6;
+  }
+
+  .icon-responsive-lg {
+    @apply h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8;
+  }
+
+  .icon-responsive-xl {
+    @apply h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10;
+  }
+
+  /* Responsive spacing for cards */
+  .card-responsive {
+    @apply p-4 sm:p-6 md:p-8;
+  }
+
+  /* Responsive spacing for sections */
+  .section-responsive {
+    @apply py-8 sm:py-12 md:py-16 lg:py-20;
+  }
+
+  /* Responsive spacing for containers */
+  .container-responsive {
+    @apply px-4 sm:px-6 md:px-8 lg:px-12;
+  }
+
+  /* Responsive aspect ratios */
+  .aspect-responsive {
+    @apply aspect-square sm:aspect-video md:aspect-[4/3] lg:aspect-[16/9];
+  }
+
+  /* Responsive overflow handling */
+  .overflow-responsive {
+    @apply overflow-x-auto sm:overflow-x-visible;
+  }
+
+  /* Responsive text truncation */
+  .truncate-responsive {
+    @apply truncate sm:text-clip;
+  }
+
+  /* Responsive visibility */
+  .visible-responsive {
+    @apply visible sm:visible md:visible lg:visible;
+  }
+
+  .hidden-responsive {
+    @apply hidden sm:hidden md:hidden lg:hidden;
+  }
+
+  /* Responsive positioning */
+  .position-responsive {
+    @apply relative sm:relative md:relative lg:relative;
+  }
+
+  /* Responsive z-index */
+  .z-responsive {
+    @apply z-10 sm:z-20 md:z-30 lg:z-40;
+  }
+
+  /* Responsive transform */
+  .transform-responsive {
+    @apply transform sm:transform md:transform lg:transform;
+  }
+
+  /* Responsive transition */
+  .transition-responsive {
+    @apply transition-all duration-200 sm:duration-300 md:duration-500;
+  }
+
+  /* Responsive animation */
+  .animate-responsive {
+    @apply animate-pulse sm:animate-bounce md:animate-spin;
+  }
+
+  /* Responsive filter */
+  .filter-responsive {
+    @apply filter sm:filter md:filter lg:filter;
+  }
+
+  /* Responsive backdrop */
+  .backdrop-responsive {
+    @apply backdrop-blur-sm sm:backdrop-blur-md md:backdrop-blur-lg;
+  }
+
+  /* Responsive mix blend mode */
+  .blend-responsive {
+    @apply mix-blend-normal sm:mix-blend-multiply md:mix-blend-screen;
+  }
+
+  /* Responsive isolation */
+  .isolation-responsive {
+    @apply isolation-auto sm:isolation-auto md:isolation-auto;
+  }
+
+  /* Responsive object fit */
+  .object-responsive {
+    @apply object-cover sm:object-contain md:object-cover;
+  }
+
+  /* Responsive object position */
+  .object-position-responsive {
+    @apply object-center sm:object-center md:object-center;
+  }
+
+  /* Responsive overflow */
+  .overflow-responsive {
+    @apply overflow-hidden sm:overflow-visible md:overflow-auto;
+  }
+
+  /* Responsive scroll behavior */
+  .scroll-responsive {
+    @apply scroll-smooth sm:scroll-auto md:scroll-smooth;
+  }
+
+  /* Responsive scroll snap */
+  .snap-responsive {
+    @apply snap-none sm:snap-x md:snap-y;
+  }
+
+  /* Responsive scroll snap align */
+  .snap-align-responsive {
+    @apply snap-start sm:snap-center md:snap-end;
+  }
+
+  /* Responsive scroll snap stop */
+  .snap-stop-responsive {
+    @apply snap-normal sm:snap-always md:snap-normal;
+  }
+
+  /* Responsive scroll snap type */
+  .snap-type-responsive {
+    @apply snap-none sm:snap-x md:snap-y lg:snap-both;
+  }
+
+  /* Responsive touch action */
+  .touch-responsive {
+    @apply touch-none sm:touch-auto md:touch-pan-x;
+  }
+
+  /* Responsive select */
+  .select-responsive {
+    @apply select-none sm:select-text md:select-all;
+  }
+
+  /* Responsive resize */
+  .resize-responsive {
+    @apply resize-none sm:resize-y md:resize-x lg:resize;
+  }
+
+  /* Responsive cursor */
+  .cursor-responsive {
+    @apply cursor-pointer sm:cursor-default md:cursor-pointer;
+  }
+
+  /* Responsive pointer events */
+  .pointer-responsive {
+    @apply pointer-events-none sm:pointer-events-auto md:pointer-events-none;
+  }
+
+  /* Responsive user select */
+  .user-select-responsive {
+    @apply select-none sm:select-text md:select-all;
+  }
+
+  /* Responsive appearance */
+  .appearance-responsive {
+    @apply appearance-none sm:appearance-auto md:appearance-none;
+  }
+
+  /* Responsive outline */
+  .outline-responsive {
+    @apply outline-none sm:outline-auto md:outline-none;
+  }
+
+  /* Responsive outline offset */
+  .outline-offset-responsive {
+    @apply outline-offset-0 sm:outline-offset-1 md:outline-offset-2;
+  }
+
+  /* Responsive ring */
+  .ring-responsive {
+    @apply ring-0 sm:ring-1 md:ring-2;
+  }
+
+  /* Responsive ring offset */
+  .ring-offset-responsive {
+    @apply ring-offset-0 sm:ring-offset-1 md:ring-offset-2;
+  }
+
+  /* Responsive box shadow */
+  .shadow-responsive {
+    @apply shadow-sm sm:shadow-md md:shadow-lg;
+  }
+
+  /* Responsive opacity */
+  .opacity-responsive {
+    @apply opacity-0 sm:opacity-50 md:opacity-100;
+  }
+
+  /* Responsive mix blend mode */
+  .mix-blend-responsive {
+    @apply mix-blend-normal sm:mix-blend-multiply md:mix-blend-screen;
+  }
+
+  /* Responsive background blend mode */
+  .bg-blend-responsive {
+    @apply bg-blend-normal sm:bg-blend-multiply md:bg-blend-screen;
+  }
+
+  /* Responsive filter */
+  .filter-responsive {
+    @apply filter sm:filter md:filter lg:filter;
+  }
+
+  /* Responsive backdrop filter */
+  .backdrop-filter-responsive {
+    @apply backdrop-filter sm:backdrop-filter md:backdrop-filter lg:backdrop-filter;
+  }
+
+  /* Responsive blur */
+  .blur-responsive {
+    @apply blur-sm sm:blur-md md:blur-lg;
+  }
+
+  /* Responsive brightness */
+  .brightness-responsive {
+    @apply brightness-0 sm:brightness-50 md:brightness-100;
+  }
+
+  /* Responsive contrast */
+  .contrast-responsive {
+    @apply contrast-0 sm:contrast-50 md:contrast-100;
+  }
+
+  /* Responsive grayscale */
+  .grayscale-responsive {
+    @apply grayscale-0 sm:grayscale-50 md:grayscale-100;
+  }
+
+  /* Responsive hue rotate */
+  .hue-rotate-responsive {
+    @apply hue-rotate-0 sm:hue-rotate-30 md:hue-rotate-60;
+  }
+
+  /* Responsive invert */
+  .invert-responsive {
+    @apply invert-0 sm:invert-50 md:invert-100;
+  }
+
+  /* Responsive saturate */
+  .saturate-responsive {
+    @apply saturate-0 sm:saturate-50 md:saturate-100;
+  }
+
+  /* Responsive sepia */
+  .sepia-responsive {
+    @apply sepia-0 sm:sepia-50 md:sepia-100;
+  }
+
+  /* Responsive drop shadow */
+  .drop-shadow-responsive {
+    @apply drop-shadow-sm sm:drop-shadow-md md:drop-shadow-lg;
+  }
+}
+
+@layer utilities {
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-judicial-gold to-judicial-lightGold bg-clip-text text-transparent;
+  }
+  
+  .glass-card {
+    @apply bg-opacity-20 backdrop-blur-lg border border-white/10 shadow-xl;
+  }
+  
+  .glass-dark {
+    @apply bg-judicial-dark/40 backdrop-blur-xl border border-judicial-gold/20 shadow-xl;
+  }
+
+  /* Custom scrollbar styles */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-thumb-judicial-gold\/30::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scrollbar-thumb-judicial-gold\/30::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+  }
+
+  .scrollbar-thumb-judicial-gold\/30::-webkit-scrollbar-thumb {
+    background-color: rgba(214, 171, 85, 0.3);
+    border-radius: 4px;
+    border: 1px solid rgba(214, 171, 85, 0.1);
+  }
+
+  .scrollbar-thumb-judicial-gold\/50::-webkit-scrollbar-thumb {
+    background-color: rgba(214, 171, 85, 0.5);
+    border: 1px solid rgba(214, 171, 85, 0.2);
+  }
+
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .hover\:scrollbar-thumb-judicial-gold\/50:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(214, 171, 85, 0.5);
+    border: 1px solid rgba(214, 171, 85, 0.2);
+  }
+
+  /* Firefox scrollbar styles */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(214, 171, 85, 0.3) transparent;
+  }
+
+  /* Ensure smooth scrolling */
+  .overflow-y-auto {
+    scroll-behavior: smooth;
+  }
+
+  /* Chat container scrollbar styles */
+  .chat-messages-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .chat-messages-container::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+  }
+
+  .chat-messages-container::-webkit-scrollbar-thumb {
+    background-color: rgba(214, 171, 85, 0.3);
+    border-radius: 4px;
+    border: 1px solid rgba(214, 171, 85, 0.1);
+  }
+
+  .chat-messages-container::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(214, 171, 85, 0.5);
+    border: 1px solid rgba(214, 171, 85, 0.2);
+  }
+
+  /* Firefox scrollbar for chat container */
+  .chat-messages-container {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(214, 171, 85, 0.3) transparent;
+  }
+
+  /* Ensure scrollbar is always visible */
+  .chat-messages-container {
+    overflow-y: scroll !important;
+  }
+
+  /* Force scrollbar to show */
+  .chat-messages-container::-webkit-scrollbar {
+    -webkit-appearance: none;
+    width: 8px;
+  }
+
+  /* Ensure content doesn't overflow */
+  .chat-messages-container > * {
+    max-width: 100%;
+  }
+
+  /* Chat message improvements */
+  .chat-messages-container .space-y-6 > div {
+    animation: fadeInUp 0.3s ease-out;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Better focus states */
+  .chat-messages-container input:focus,
+  .chat-messages-container button:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: rgba(214, 171, 85, 0.5);
+  }
+
+  /* Improved button hover effects */
+  .chat-messages-container button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Better text readability */
+  .chat-messages-container p {
+    line-height: 1.6;
+  }
+
+  /* Enhanced file display */
+  .chat-messages-container .file-display {
+    background: linear-gradient(135deg, rgba(214, 171, 85, 0.1) 0%, rgba(214, 171, 85, 0.05) 100%);
+    border: 1px solid rgba(214, 171, 85, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+  }
+
+  /* Responsive animations */
+  .animate-responsive-fade {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .animate-responsive-slide {
+    animation: slideIn 0.5s ease-out forwards;
+  }
+
+  .animate-responsive-pulse {
+    animation: pulseGlow 2s infinite;
+  }
+
+  /* Responsive feature pills */
+  .feature-pill {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(8px);
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s ease;
+    animation: float 3s ease-in-out infinite;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+  }
+  
+  .feature-pill:hover {
+    transform: scale(1.05) translateY(-5px) rotateX(10deg) rotateY(10deg);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2),
+                0 0 20px rgba(255, 215, 0, 0.2);
+    border-color: rgba(255, 215, 0, 0.5);
+  }
+  
+  .feature-pill span {
+    transition: all 0.3s ease;
+    transform-style: preserve-3d;
+  }
+  
+  .feature-pill:hover span {
+    transform: translateZ(10px);
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+  
+  .feature-pill svg {
+    transition: all 0.3s ease;
+  }
+  
+  .feature-pill:hover svg {
+    transform: scale(1.2) rotate(10deg);
+    filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.5));
+  }
+  
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0) rotateX(0deg) rotateY(0deg);
+    }
+    25% {
+      transform: translateY(-8px) rotateX(5deg) rotateY(5deg);
+    }
+    50% {
+      transform: translateY(0) rotateX(0deg) rotateY(0deg);
+    }
+    75% {
+      transform: translateY(8px) rotateX(-5deg) rotateY(-5deg);
+    }
+  }
+  
+  @keyframes heroScale3D {
+    0%, 100% {
+      transform: rotateY(0deg) rotateX(0deg) translateZ(0) scale(1);
+    }
+    25% {
+      transform: rotateY(20deg) rotateX(-10deg) translateZ(20px) scale(1.1);
+    }
+    50% {
+      transform: rotateY(0deg) rotateX(0deg) translateZ(0) scale(1);
+    }
+    75% {
+      transform: rotateY(-20deg) rotateX(10deg) translateZ(20px) scale(1.1);
+    }
+  }
+  
+  @keyframes letterL3D {
+    0%, 100% {
+      transform: rotateY(0deg) translateZ(0);
+    }
+    25% {
+      transform: rotateY(180deg) translateZ(20px);
+    }
+    50% {
+      transform: rotateY(360deg) translateZ(0);
+    }
+    75% {
+      transform: rotateY(180deg) translateZ(20px);
+    }
+  }
+  
+  .tool-card {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(8px);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    text-align: center;
+    transition: all 0.4s ease;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    animation: toolCardFloat 4s ease-in-out infinite;
+  }
+  
+  .tool-card:hover {
+    transform: translateY(-10px) rotateX(5deg) rotateY(5deg);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3),
+                0 0 30px rgba(255, 215, 0, 0.2);
+    border-color: rgba(255, 215, 0, 0.5);
+  }
+  
+  .tool-icon {
+    background: rgba(255, 215, 0, 0.1);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    transition: all 0.4s ease;
+    transform-style: preserve-3d;
+  }
+  
+  .tool-card:hover .tool-icon {
+    transform: scale(1.1) rotateY(180deg);
+    background: rgba(255, 215, 0, 0.2);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+  }
+  
+  .tool-card h3 {
+    transition: all 0.3s ease;
+  }
+  
+  .tool-card:hover h3 {
+    transform: translateZ(10px);
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+  
+  .tool-card p {
+    transition: all 0.3s ease;
+  }
+  
+  .tool-card:hover p {
+    transform: translateZ(5px);
+  }
+  
+  @keyframes toolCardFloat {
+    0%, 100% {
+      transform: translateY(0) rotateX(0deg) rotateY(0deg);
+    }
+    25% {
+      transform: translateY(-5px) rotateX(2deg) rotateY(2deg);
+    }
+    50% {
+      transform: translateY(0) rotateX(0deg) rotateY(0deg);
+    }
+    75% {
+      transform: translateY(5px) rotateX(-2deg) rotateY(-2deg);
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px 2px rgba(214, 171, 85, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px 5px rgba(214, 171, 85, 0.5);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s infinite;
+}
+
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
