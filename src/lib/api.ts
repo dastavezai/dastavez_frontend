@@ -251,7 +251,6 @@ export const subscriptionAPI = {
   getPrice: async (): Promise<{ price: number }> => {
     // Try multiple endpoints and normalize response shape
     const tryEndpoints = [
-      '/api/suscription/price', // backend variant
       '/api/subscription/price',
     ];
 
@@ -315,7 +314,7 @@ export const profileAPI = {
 
   // Update profile
   updateInfo: async (data: { firstName?: string; lastName?: string }) => {
-    return apiFetch('/api/profile/info', {
+    return apiFetch('/api/profile/update', {
       method: 'PUT',
       body: JSON.stringify(data)
     });
@@ -367,14 +366,9 @@ export const adminAPI = {
     return apiFetch('/api/admin/users');
   },
 
-  // Get financial stats
-  getStats: async () => {
-    return apiFetch('/api/admin/stats');
-  },
-
   // Update subscription price
   updateSubscriptionPrice: async (amount: number) => {
-    return apiFetch('/api/admin/subscription-price', {
+    return apiFetch('/api/subscription/price', {
       method: 'PUT',
       body: JSON.stringify({ amount })
     });
@@ -388,7 +382,7 @@ export const adminAPI = {
     validFrom: string;
     validUntil: string;
   }) => {
-    return apiFetch('/api/admin/coupons', {
+    return apiFetch('/api/subscription/coupons', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -398,9 +392,7 @@ export const adminAPI = {
   listCoupons: async (): Promise<AdminCoupon[]> => {
     // Normalize different coupon list endpoints and response shapes
     const tryEndpoints = [
-      '/api/admin/coupons',
       '/api/subscription/coupons',
-      '/api/suscription/coupens',
     ];
 
     const normalize = (raw: any): AdminCoupon | null => {
@@ -455,14 +447,14 @@ export const adminAPI = {
   updateCoupon: async (id: string, payload: Partial<{
     code: string; discountPercentage: number; maxUses: number; validFrom: string; validUntil: string;
   }>): Promise<AdminCoupon> => {
-    return apiFetch(`/api/admin/coupons/${id}`, {
+    return apiFetch(`/api/subscription/coupons/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
   },
 
   deleteCoupon: async (id: string): Promise<{ success: boolean }> => {
-    return apiFetch(`/api/admin/coupons/${id}`, {
+    return apiFetch(`/api/subscription/coupons/${id}`, {
       method: 'DELETE',
     });
   },
