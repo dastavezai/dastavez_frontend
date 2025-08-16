@@ -475,7 +475,7 @@ export const adminAPI = {
 export const lawyerAPI = {
   // List all lawyers
   list: async (): Promise<Lawyer[]> => {
-    return apiFetch('/api/admin/lawyers');
+    return apiFetch('/api/lawyers');
   },
 
   // Create a new lawyer

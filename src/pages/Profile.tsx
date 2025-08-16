@@ -147,14 +147,16 @@ const Profile = () => {
       const token = localStorage.getItem('jwt');
       
       // Step 1: Initiate password change (this will send OTP to email)
-      const initiateResponse = await fetch('/api/profile/password/initiate-change', {
+      const initiateResponse = await fetch('/api/api/profile/password/change', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          currentPassword: formData.currentPassword
+          currentPassword: formData.currentPassword,
+	  newPassword: formData.newPassword,
+	  confirmPassword: formData.confirmPassword
         })
       });
 
@@ -170,9 +172,10 @@ const Profile = () => {
         });
         setErrors({});
         // You should show a message asking user to check email for OTP
-        alert('Password change initiated. Please check your email for OTP to complete the process.');
+        alert('Password changed successfully.');
       } else {
         const errorData = await initiateResponse.json();
+	alert(errorData.message);
         setErrors({ currentPassword: errorData.message || 'Failed to initiate password change' });
       }
     } catch (error) {
