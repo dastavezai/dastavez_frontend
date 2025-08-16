@@ -144,7 +144,7 @@ const Admin = () => {
       const [usersRes, filesRes, statsRes, lawyersRes, meRes, couponsRes, priceRes] = await Promise.allSettled([
         usersPromise,
         filesPromise,
-        statsPromise,
+	statsPromise,
         lawyersPromise,
         mePromise,
         couponsPromise,
@@ -199,8 +199,8 @@ const Admin = () => {
           : usersData.filter((u: any) => u.subscriptionStatus === 'premium').length;
 
         const priceRupees = normalizeCurrency(priceData?.price ?? 0);
-        let totalRevenue = normalizeCurrency(statsData.totalRevenue);
-        let monthlyRevenue = normalizeCurrency(statsData.monthlyRevenue);
+        let totalRevenue = premiumCount * priceRupees;
+        let monthlyRevenue = premiumCount * priceRupees;
 
         // Fallbacks: compute revenue from subscription price × premium users when API doesn't provide totals
         if (!monthlyRevenue && priceRupees) {

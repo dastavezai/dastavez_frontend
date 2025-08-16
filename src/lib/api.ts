@@ -365,6 +365,10 @@ export const adminAPI = {
   getAllUsers: async () => {
     return apiFetch('/api/admin/users');
   },
+  //GET financial stats
+  getStats: async () => {
+	  return apiFetch('/api/admin/stats');
+  },
 
   // Update subscription price
   updateSubscriptionPrice: async (amount: number) => {
