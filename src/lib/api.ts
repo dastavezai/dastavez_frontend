@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'http://34.68.115.157:5000';
+const API_BASE_URL = '/api';
 
 // Types
 export interface User {
@@ -208,7 +208,7 @@ export const fileAPI = {
     formData.append('file', file);
     
     const token = localStorage.getItem('jwt');
-    const response = await fetch(`${API_BASE_URL}/api/files/upload`, {
+    const response = await fetch(`/api/files/upload`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`
@@ -327,7 +327,7 @@ export const profileAPI = {
     formData.append('image', image);
     
     const token = localStorage.getItem('jwt');
-    const response = await fetch(`${API_BASE_URL}/api/profile/upload-image`, {
+    const response = await fetch(`/api/profile/upload-image`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`

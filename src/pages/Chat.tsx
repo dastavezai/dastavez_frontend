@@ -44,6 +44,16 @@ const Chat = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  // Drafting wizard state (NyayGuru-style)
+  const [showDraftWizard, setShowDraftWizard] = useState(false);
+  const [draftStep, setDraftStep] = useState(0); // 0: type, 1: parties, 2: facts, 3: instructions
+  const [draftDocType, setDraftDocType] = useState('');
+  const [draftParties, setDraftParties] = useState('');
+  const [draftFacts, setDraftFacts] = useState('');
+  const [draftInstructions, setDraftInstructions] = useState('');
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [generatedDraftText, setGeneratedDraftText] = useState<string | null>(null);
+
   // Function to format text by converting asterisks to bold for main points only
   const formatMessageText = (text: string) => {
     // Check if text is undefined, null, or empty
@@ -120,6 +130,80 @@ const Chat = () => {
     } catch (error) {
       console.error('Error loading chat history:', error);
     }
+  };
+
+  // ----- Drafting helpers -----
+  const resetDraftWizard = () => {
+    setDraftStep(0);
+    setDraftDocType('');
+    setDraftParties('');
+    setDraftFacts('');
+    setDraftInstructions('');
+    setGeneratedDraftText(null);
+  };
+
+  const startDraftWizard = () => {
+    resetDraftWizard();
+    setShowDraftWizard(true);
+  };
+
+  const closeDraftWizard = () => {
+    setShowDraftWizard(false);
+  };
+
+  const goNextDraftStep = () => setDraftStep((s) => Math.min(3, s + 1));
+  const goPrevDraftStep = () => setDraftStep((s) => Math.max(0, s - 1));
+
+  const buildDraftPrompt = () => {
+    return (
+      `Generate a formal ${draftDocType || 'legal document'} using the following details. ` +
+      `Structure with clear headings and clauses. Keep language professional and India-specific when relevant.\n` +
+      `Parties: ${draftParties}\n` +
+      `Facts: ${draftFacts}\n` +
+      `Instructions/Demands: ${draftInstructions}\n` +
+      `Return the full draft text in plain paragraphs (no markdown).`
+    );
+  };
+
+  const generateDraft = async () => {
+    if (!draftDocType || !draftParties || !draftFacts || !draftInstructions) return;
+    setIsGeneratingDraft(true);
+    try {
+      const prompt = buildDraftPrompt();
+      // Send as a regular chat message so it uses existing backend flow
+      const response = await chatAPI.sendMessage(prompt);
+      const content = response.response || 'No draft generated';
+      setGeneratedDraftText(content);
+      // Also append to chat for continuity
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, {
+        role: 'user',
+        content: `Draft request: ${draftDocType}`,
+        timestamp: new Date().toISOString(),
+      }, assistantMessage]);
+    } catch (err: any) {
+      setGeneratedDraftText(err?.message || 'Failed to generate draft.');
+    } finally {
+      setIsGeneratingDraft(false);
+    }
+  };
+
+  const downloadDraft = () => {
+    if (!generatedDraftText) return;
+    const blob = new Blob([generatedDraftText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = (draftDocType || 'legal_draft').toLowerCase().replace(/\s+/g, '_');
+    a.href = url;
+    a.download = `${safeName}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -347,6 +431,25 @@ const Chat = () => {
           <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base lg:text-lg mb-4 px-4 sm:px-0">
             Get instant answers to your legal questions. Our AI assistant is trained on extensive legal databases to provide accurate and helpful responses.
           </p>
+
+          {/* Quick actions like NyayGuru */}
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-3">
+            <button
+              type="button"
+              onClick={() => setMessages([])}
+              className="px-3 py-2 bg-judicial-navy/50 border border-judicial-gold/20 text-judicial-gold rounded-lg text-xs sm:text-sm hover:bg-judicial-navy/70"
+              title="Start a new chat"
+            >
+              New Chat
+            </button>
+            <button
+              type="button"
+              onClick={startDraftWizard}
+              className="px-3 py-2 bg-judicial-gold text-judicial-dark rounded-lg text-xs sm:text-sm font-semibold hover:bg-judicial-lightGold"
+            >
+              Start Legal Draft
+            </button>
+          </div>
           
           {/* Subscription Status */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm">
@@ -362,6 +465,95 @@ const Chat = () => {
             )}
           </div>
         </div>
+
+        {/* Drafting wizard panel */}
+        {showDraftWizard && (
+          <div className="max-w-3xl mx-auto mb-6 sm:mb-8 p-4 sm:p-6 rounded-xl bg-judicial-navy/40 border border-judicial-gold/20">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-white">Legal Drafting</h3>
+              <button className="text-gray-300 hover:text-white" onClick={closeDraftWizard} title="Close">✕</button>
+            </div>
+
+            {/* Steps */}
+            <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
+              {[0,1,2,3].map((s) => (
+                <div key={s} className={`px-2 py-1 rounded ${draftStep === s ? 'bg-judicial-gold text-judicial-dark' : 'bg-judicial-navy/60 border border-judicial-gold/20 text-gray-300'}`}>
+                  {s === 0 ? 'Type' : s === 1 ? 'Parties' : s === 2 ? 'Facts' : 'Instructions'}
+                </div>
+              ))}
+            </div>
+
+            {draftStep === 0 && (
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Document Type</label>
+                <input
+                  value={draftDocType}
+                  onChange={(e) => setDraftDocType(e.target.value)}
+                  placeholder="e.g., Legal Notice, Rent Agreement, Affidavit"
+                  className="w-full p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
+                />
+              </div>
+            )}
+
+            {draftStep === 1 && (
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Parties (names, addresses, roles)</label>
+                <textarea
+                  value={draftParties}
+                  onChange={(e) => setDraftParties(e.target.value)}
+                  rows={4}
+                  className="w-full p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
+                />
+              </div>
+            )}
+
+            {draftStep === 2 && (
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Key Facts and Background</label>
+                <textarea
+                  value={draftFacts}
+                  onChange={(e) => setDraftFacts(e.target.value)}
+                  rows={5}
+                  className="w-full p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
+                />
+              </div>
+            )}
+
+            {draftStep === 3 && (
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Instructions / Demands</label>
+                <textarea
+                  value={draftInstructions}
+                  onChange={(e) => setDraftInstructions(e.target.value)}
+                  rows={4}
+                  className="w-full p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
+                />
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center justify-between">
+              <div className="flex gap-2">
+                <button onClick={goPrevDraftStep} disabled={draftStep === 0} className="px-3 py-2 bg-judicial-navy/50 border border-judicial-gold/20 text-gray-200 rounded disabled:opacity-50">Back</button>
+                {draftStep < 3 ? (
+                  <button onClick={goNextDraftStep} disabled={(draftStep===0 && !draftDocType) || (draftStep===1 && !draftParties) || (draftStep===2 && !draftFacts)} className="px-3 py-2 bg-judicial-gold text-judicial-dark rounded font-semibold disabled:opacity-50">Next</button>
+                ) : (
+                  <button onClick={generateDraft} disabled={isGeneratingDraft || !draftInstructions} className="px-3 py-2 bg-judicial-gold text-judicial-dark rounded font-semibold disabled:opacity-50">
+                    {isGeneratingDraft ? 'Generating…' : 'Generate Draft'}
+                  </button>
+                )}
+              </div>
+              {generatedDraftText && (
+                <button onClick={downloadDraft} className="px-3 py-2 bg-judicial-navy/50 border border-judicial-gold/20 text-judicial-gold rounded">Download Draft (.txt)</button>
+              )}
+            </div>
+
+            {generatedDraftText && (
+              <div className="mt-4 p-3 rounded bg-judicial-navy/50 border border-judicial-gold/20 text-sm text-gray-100 whitespace-pre-wrap">
+                {generatedDraftText}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Chat Interface */}
         <div className="max-w-4xl lg:max-w-5xl mx-auto">

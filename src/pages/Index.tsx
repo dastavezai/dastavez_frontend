@@ -6,6 +6,7 @@ import { TestimonialSection } from "@/components/TestimonialSection";
 import { Footer } from "@/components/Footer";
 import { Quote, Star } from "lucide-react";
 import StarField from "@/components/StarField";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   return (
@@ -13,7 +14,26 @@ const Index = () => {
       <StarField />
       <Navbar />
       
-      <HeroSection />
+      {/* NyayGuru-like Hero with CTA and badges */}
+      <section className="relative">
+        <HeroSection />
+        <div className="container mx-auto px-4 -mt-6 md:-mt-10">
+          <div className="mx-auto max-w-3xl text-center bg-judicial-navy/40 border border-judicial-gold/20 rounded-2xl p-4 md:p-6 backdrop-blur">
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-300 mb-3">
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Ask Your Legal Query</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Be Specific</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Ask in Any Language</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Upload PDFs</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Find Case Laws</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Legal Draftings</span>
+              <span className="px-2 py-1 rounded bg-judicial-gold text-judicial-dark font-semibold">It’s Free!</span>
+            </div>
+            <Link to="/chat" className="inline-block px-5 py-3 rounded-lg bg-judicial-gold text-judicial-dark font-semibold hover:bg-judicial-lightGold transition-colors">
+              Start Chatting
+            </Link>
+          </div>
+        </div>
+      </section>
       
       <FeatureCards />
       

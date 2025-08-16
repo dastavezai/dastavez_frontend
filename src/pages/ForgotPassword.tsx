@@ -22,7 +22,7 @@ export default function ForgotPassword() {
     setStatus('loading');
     setMessage("");
     try {
-      const res = await fetch('http://34.68.115.157:5000/auth/forgot-password', {
+      const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

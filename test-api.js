@@ -1,5 +1,5 @@
 // Test API integration
-const API_BASE_URL = 'http://34.68.115.157:5000';
+const API_BASE_URL = '/api';
 
 // Test authentication
 async function testAuth() {

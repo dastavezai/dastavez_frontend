@@ -4,7 +4,7 @@ This document explains how the frontend is integrated with the Law AI backend AP
 
 ## Overview
 
-The frontend application is now fully integrated with the backend API at `http://34.68.115.157:5000`. All API calls are centralized in the `src/lib/api.ts` file for easy maintenance and consistency.
+The frontend application is now fully integrated with the backend API using relative paths. All API calls are centralized in the `src/lib/api.ts` file for easy maintenance and consistency.
 
 ## API Service Structure
 
@@ -270,7 +270,7 @@ authAPI.logout();
 The API base URL is configured in `src/lib/api.ts`:
 
 ```typescript
-const API_BASE_URL = 'http://34.68.115.157:5000';
+const API_BASE_URL = '/api';
 ```
 
 ## Testing

@@ -14,7 +14,7 @@ export default function VerifyResetOtp() {
     setStatus('loading');
     setMessage("");
     try {
-      const res = await fetch('http://34.68.115.157:5000/auth/verify-reset-otp', {
+      const res = await fetch('/api/auth/verify-reset-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp }),

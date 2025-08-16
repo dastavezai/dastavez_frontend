@@ -80,7 +80,7 @@ export default function Signup() {
     if (!validate()) return;
     setIsLoading(true);
     try {
-      await fetch('http://34.68.115.157:5000/auth/signup', {
+              await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
