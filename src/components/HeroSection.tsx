@@ -41,7 +41,7 @@ export function HeroSection() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4 animate-fade-in stagger-5 w-full sm:w-auto">
-            <Button size="lg" className="bg-judicial-gold hover:bg-judicial-gold/90 text-judicial-dark transition-transform duration-300 hover:scale-105 w-full sm:w-auto" onClick={() => navigate('/auth')}>
+            <Button size="lg" className="bg-judicial-gold hover:bg-judicial-gold/90 text-judicial-dark transition-transform duration-300 hover:scale-105 w-full sm:w-auto" onClick={() => navigate('/chat')}>
               <MessageSquare className="mr-2 h-5 w-5" />
               Try AI Assistant
             </Button>
@@ -124,7 +124,7 @@ export function HeroSection() {
               Join thousands of legal professionals who are already using Dastavez AI to streamline their workflow and achieve better outcomes.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="bg-judicial-gold hover:bg-judicial-gold/90 text-judicial-dark transition-transform duration-300 hover:scale-105 w-full sm:w-auto" onClick={() => navigate('/auth')}>
+              <Button size="lg" className="bg-judicial-gold hover:bg-judicial-gold/90 text-judicial-dark transition-transform duration-300 hover:scale-105 w-full sm:w-auto" onClick={() => navigate('/chat')}>
                 <Rocket className="mr-2 h-5 w-5" />
                 Get Started Today
               </Button>

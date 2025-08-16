@@ -209,11 +209,11 @@ const Auth = () => {
           if (isAdmin && isVerified) {
             window.location.href = '/admin';
           } else {
-            window.location.href = '/profile';
+            window.location.href = '/chat';
           }
         } catch {
           // Fallback if user fetch fails
-          window.location.href = '/profile';
+          window.location.href = '/chat';
         }
       } else {
         setErrors({ ...errors, password: data?.message || 'Login failed' });
@@ -248,7 +248,7 @@ const Auth = () => {
       
       if (data.token) {
         localStorage.setItem('jwt', data.token);
-        window.location.href = '/profile';
+        window.location.href = '/chat';
       } else {
         setErrors({ ...errors, otp: data.message || 'Registration failed' });
       }
