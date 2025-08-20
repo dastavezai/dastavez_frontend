@@ -335,7 +335,40 @@ const Admin = () => {
     }
   };
 
-  const handleDeleteCoupon = async (id: string) => {
+  const handleUpdateCoupon = async (id: string) => {
+  try {
+    // 1. Construct the payload from your state (e.g., couponDraft)
+    // Your API expects a Partial payload, so you only send the fields to be updated.
+    const payload = {
+      code: couponDraft.code,
+      discountPercentage: couponDraft.discountPercentage,
+      maxUses: couponDraft.maxUses,
+      validFrom: new Date(couponDraft.validFrom).toISOString(),
+      validUntil: new Date(couponDraft.validUntil).toISOString(),
+    };
+
+    // 2. Call the updateCoupon method from your API service
+    const updatedCoupon = await adminAPI.updateCoupon(id, payload);
+
+    // 3. Update the coupons array in your local state
+    // This finds the old coupon by its ID and replaces it with the updated one
+    setCoupons(prevCoupons =>
+      prevCoupons.map(coupon =>
+        coupon._id === id ? updatedCoupon : coupon
+      )
+    );
+
+    // 4. Show a success toast and clean up the UI
+    toast({ title: 'Updated', description: 'Coupon details saved successfully' });
+    // setIsEditModalOpen(false); // You'll likely want to close your edit modal here
+
+  } catch (error) {
+    console.error('Error updating coupon:', error);
+    toast({ title: 'Error', description: 'Failed to update coupon', variant: 'destructive' });
+  }
+ };
+
+   const handleDeleteCoupon = async (id: string) => {
     try {
       await adminAPI.deleteCoupon(id);
       setCoupons(coupons.filter(c => c._id !== id));

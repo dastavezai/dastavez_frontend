@@ -42,7 +42,7 @@ const inputClasses = `
   backdrop-blur-lg
   focus:outline-none focus:ring-2 focus:ring-judicial-lightGold focus:border-transparent
   transition-all duration-300
-  hover:bg-judicial-blue/40
+  bg-judicial-blue/40
   transform hover:translate-y-[-2px]
   placeholder-judicial-lightGold/50
 `;
