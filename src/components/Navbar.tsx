@@ -149,9 +149,6 @@ export function Navbar() {
             <span className="hidden xl:inline">Search</span>
           </Button>
           
-          <Button onClick={toggleTheme} variant="ghost" size="icon" className="text-judicial-gold">
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </Button>
 
           {isLoggedIn ? (
             <div className="flex items-center space-x-2">
@@ -184,9 +181,6 @@ export function Navbar() {
             <Search className="h-4 w-4" />
           </Button>
           
-          <Button onClick={toggleTheme} variant="ghost" size="icon" className="text-judicial-gold">
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </Button>
 
           {isLoggedIn ? (
             <Button
@@ -230,9 +224,6 @@ export function Navbar() {
                 Search
               </Button>
               
-              <Button onClick={toggleTheme} variant="ghost" size="icon" className="text-judicial-gold">
-                {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              </Button>
             </div>
             
             {isLoggedIn && (
