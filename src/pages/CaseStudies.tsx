@@ -1,5 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import StarField from "@/components/StarField";
 
 const CaseStudies = () => {
@@ -45,6 +47,7 @@ const CaseStudies = () => {
   return (
     <div className="min-h-screen bg-judicial-dark relative overflow-hidden">
       <StarField />
+      <Navbar />
       
       <div className="relative z-10 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -137,6 +140,7 @@ const CaseStudies = () => {
               </motion.div>
             ))}
           </div>
+	 <Footer />
         </div>
       </div>
     </div>
