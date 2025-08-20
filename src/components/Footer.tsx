@@ -63,7 +63,7 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start">
                 <MapPin className="h-5 w-5 text-judicial-gold mr-2 mt-0.5" />
-                <span className="text-gray-400">100 Legal Avenue, Justice District, CA 94103</span>
+                <span className="text-gray-400">304 Haweli Vishwashanti Appartment, Mouryapath, Khajpura, Ashiananagar, Patna, Phulwari, Bihar, India - 800025</span>
               </li>
               <li className="flex items-center">
                 <Phone className="h-5 w-5 text-judicial-gold mr-2" />
@@ -71,7 +71,7 @@ export function Footer() {
               </li>
               <li className="flex items-center">
                 <Mail className="h-5 w-5 text-judicial-gold mr-2" />
-                <span className="text-gray-400">contact@dastavez-ai.com</span>
+                <span className="text-gray-400">info@dastavezai.org</span>
               </li>
             </ul>
           </div>
