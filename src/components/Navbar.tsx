@@ -1,4 +1,4 @@
-import { Menu, X, Search, Sun, Moon, User, LogOut } from "lucide-react";
+import { Menu, X, Search, Sun, Moon, User, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -71,8 +71,7 @@ export function Navbar() {
     navigate('/');
   };
 
-  // Only show login icon on home page
-  const showLoginIcon = location.pathname === "/";
+  
 
   // Search options
   const searchOptions = [
@@ -171,7 +170,7 @@ export function Navbar() {
               </Button>
             </div>
           ) : (
-            showLoginIcon && <LoginIcon />
+            <LoginIcon />
           )}
         </div>
 
@@ -192,7 +191,7 @@ export function Navbar() {
               <User className="h-4 w-4" />
             </Button>
           ) : (
-            showLoginIcon && <LoginIcon />
+            <LoginIcon />
           )}
         </div>
 
@@ -226,7 +225,7 @@ export function Navbar() {
               
             </div>
             
-            {isLoggedIn && (
+            {isLoggedIn ? (
               <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/10">
                 <Link to="/profile" className="text-sm hover:text-judicial-gold transition-colors flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-judicial-gold/10">
                   <User className="h-4 w-4" />
@@ -239,6 +238,13 @@ export function Navbar() {
                   <LogOut className="h-4 w-4" />
                   Logout
                 </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/10">
+                <Link to="/auth" className="text-sm hover:text-judicial-gold transition-colors flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-judicial-gold/10">
+                  <LogIn className="h-4 w-4" />
+                  Log in
+                </Link>
               </div>
             )}
           </div>
