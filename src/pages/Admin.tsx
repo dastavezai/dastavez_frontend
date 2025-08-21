@@ -888,7 +888,7 @@ const Admin = () => {
                     <Input
                       id="free-message-limit"
                       type="number"
-                      min={0}
+		      min={0}
                       value={freeMessageLimit}
                       onChange={(e) => setFreeMessageLimit(Number(e.target.value))}
                       className="bg-slate-700 border-slate-600 text-white"

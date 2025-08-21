@@ -393,13 +393,13 @@ export const adminAPI = {
   },
   
   // Settings: free daily message limit
-  getFreeMessageLimit: async (): Promise<{ limit: number }> => {
+  getFreeMessageLimit: async (): Promise<{ value: number }> => {
     return apiFetch('/api/admin/settings/free-message-limit');
   },
-  setFreeMessageLimit: async (limit: number): Promise<{ success: boolean; limit: number }> => {
+  setFreeMessageLimit: async (value: number): Promise<{ success: boolean; value: number }> => {
     return apiFetch('/api/admin/settings/free-message-limit', {
       method: 'PUT',
-      body: JSON.stringify({ limit })
+      body: JSON.stringify({ value })
     });
   },
 
