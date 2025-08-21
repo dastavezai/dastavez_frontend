@@ -391,6 +391,17 @@ export const adminAPI = {
       body: JSON.stringify(data)
     });
   },
+  
+  // Settings: free daily message limit
+  getFreeMessageLimit: async (): Promise<{ limit: number }> => {
+    return apiFetch('/api/settings/free-message-limit');
+  },
+  setFreeMessageLimit: async (limit: number): Promise<{ success: boolean; limit: number }> => {
+    return apiFetch('/api/settings/free-message-limit', {
+      method: 'PUT',
+      body: JSON.stringify({ limit })
+    });
+  },
 
   // List, update, delete coupons (admin)
   listCoupons: async (): Promise<AdminCoupon[]> => {

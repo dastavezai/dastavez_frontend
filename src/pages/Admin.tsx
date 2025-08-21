@@ -107,6 +107,8 @@ const Admin = () => {
   const [couponDraft, setCouponDraft] = useState({ code: '', discountPercentage: 0, maxUses: 1, validFrom: '', validUntil: '' });
   const [isCouponEditModalOpen, setIsCouponEditModalOpen] = useState(false);
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
+  const [freeMessageLimit, setFreeMessageLimit] = useState<number>(0);
+  const [isSavingFreeLimit, setIsSavingFreeLimit] = useState<boolean>(false);
 
   const normalizeCurrency = (value: any): number => {
     const n = Number(value);
@@ -142,8 +144,9 @@ const Admin = () => {
       const mePromise = authAPI.getCurrentUser();
       const couponsPromise = adminAPI.listCoupons();
       const pricePromise = subscriptionAPI.getPrice();
+      const freeLimitPromise = adminAPI.getFreeMessageLimit();
 
-      const [usersRes, filesRes, statsRes, lawyersRes, meRes, couponsRes, priceRes] = await Promise.allSettled([
+      const [usersRes, filesRes, statsRes, lawyersRes, meRes, couponsRes, priceRes, freeLimitRes] = await Promise.allSettled([
         usersPromise,
         filesPromise,
 	statsPromise,
@@ -151,6 +154,7 @@ const Admin = () => {
         mePromise,
         couponsPromise,
         pricePromise,
+        freeLimitPromise,
       ]);
 
       if (usersRes.status === 'fulfilled') {
@@ -188,6 +192,12 @@ const Admin = () => {
 
       const priceOk = priceRes.status === 'fulfilled';
       const statsOk = statsRes.status === 'fulfilled';
+      if (freeLimitRes.status === 'fulfilled') {
+        const limitVal = (freeLimitRes as PromiseFulfilledResult<{ limit: number }>).value?.limit;
+        if (limitVal != null) setFreeMessageLimit(Number(limitVal));
+      } else {
+        console.warn('Failed to load free message limit:', (freeLimitRes as PromiseRejectedResult).reason);
+      }
       if (statsOk || priceOk) {
         const statsData = statsOk ? (statsRes as PromiseFulfilledResult<any>).value : ({} as any);
         const usersData = usersRes.status === 'fulfilled' ? usersRes.value : [];
@@ -868,6 +878,42 @@ const Admin = () => {
                   <Button onClick={handleUpdateSubscriptionPrice} className="mt-6">
                     <IndianRupee className="w-4 h-4 mr-2" />
                     Update Price
+                  </Button>
+                </div>
+
+                {/* Free Daily Message Limit */}
+                <div className="flex items-center space-x-4 pt-4 border-t border-slate-700">
+                  <div className="flex-1">
+                    <Label htmlFor="free-message-limit" className="text-white">Free Daily Message Limit</Label>
+                    <Input
+                      id="free-message-limit"
+                      type="number"
+                      min={0}
+                      value={freeMessageLimit}
+                      onChange={(e) => setFreeMessageLimit(Number(e.target.value))}
+                      className="bg-slate-700 border-slate-600 text-white"
+                      placeholder="e.g. 10"
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Number of free messages allowed per day for non-subscribed users.</p>
+                  </div>
+                  <Button
+                    disabled={isSavingFreeLimit}
+                    onClick={async () => {
+                      try {
+                        setIsSavingFreeLimit(true);
+                        const res = await adminAPI.setFreeMessageLimit(Number(freeMessageLimit) || 0);
+                        setFreeMessageLimit(res?.limit ?? freeMessageLimit);
+                        toast({ title: 'Saved', description: 'Free message limit updated successfully' });
+                      } catch (error) {
+                        console.error('Error updating free message limit:', error);
+                        toast({ title: 'Error', description: 'Failed to update limit', variant: 'destructive' });
+                      } finally {
+                        setIsSavingFreeLimit(false);
+                      }
+                    }}
+                    className="mt-6"
+                  >
+                    {isSavingFreeLimit ? 'Saving...' : 'Save Limit'}
                   </Button>
                 </div>
               </CardContent>
