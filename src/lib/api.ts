@@ -394,10 +394,10 @@ export const adminAPI = {
   
   // Settings: free daily message limit
   getFreeMessageLimit: async (): Promise<{ limit: number }> => {
-    return apiFetch('/api/settings/free-message-limit');
+    return apiFetch('/api/admin/settings/free-message-limit');
   },
   setFreeMessageLimit: async (limit: number): Promise<{ success: boolean; limit: number }> => {
-    return apiFetch('/api/settings/free-message-limit', {
+    return apiFetch('/api/admin/settings/free-message-limit', {
       method: 'PUT',
       body: JSON.stringify({ limit })
     });
