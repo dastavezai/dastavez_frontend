@@ -105,6 +105,8 @@ const Admin = () => {
   const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   const [couponDraft, setCouponDraft] = useState({ code: '', discountPercentage: 0, maxUses: 1, validFrom: '', validUntil: '' });
+  const [isCouponEditModalOpen, setIsCouponEditModalOpen] = useState(false);
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
 
   const normalizeCurrency = (value: any): number => {
     const n = Number(value);
@@ -333,6 +335,18 @@ const Admin = () => {
       console.error('Error creating coupon:', error);
       toast({ title: 'Error', description: 'Failed to create coupon', variant: 'destructive' });
     }
+  };
+
+  const openEditCoupon = (c: AdminCoupon) => {
+    setEditingCouponId(c._id);
+    setCouponDraft({
+      code: c.code,
+      discountPercentage: Number(c.discountPercentage || 0),
+      maxUses: Number(c.maxUses || 0),
+      validFrom: c.validFrom ? new Date(c.validFrom).toISOString().split('T')[0] : '',
+      validUntil: c.validUntil ? new Date(c.validUntil).toISOString().split('T')[0] : '',
+    });
+    setIsCouponEditModalOpen(true);
   };
 
   const handleUpdateCoupon = async (id: string) => {
@@ -898,7 +912,7 @@ const Admin = () => {
                             </td>
                             <td className="p-2">
                               <div className="flex gap-2">
-                                <Button size="sm" variant="secondary">Edit</Button>
+                                <Button size="sm" variant="secondary" onClick={() => openEditCoupon(c)}>Edit</Button>
                                 <Button size="sm" variant="destructive" onClick={() => handleDeleteCoupon(c._id)}>Delete</Button>
                               </div>
                             </td>
@@ -947,6 +961,46 @@ const Admin = () => {
                   <div className="flex justify-end gap-2 pt-2">
                     <Button variant="ghost" onClick={() => setIsCouponModalOpen(false)}>Cancel</Button>
                     <Button onClick={handleCreateCoupon}>Create</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Coupon Modal */}
+            {isCouponEditModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/80" onClick={() => setIsCouponEditModalOpen(false)} />
+                <div className="relative z-50 w-full max-w-md bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
+                  <div className="text-lg font-semibold text-white">Edit Coupon</div>
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-white">Coupon Code</Label>
+                      <Input className="bg-slate-700 border-slate-600 text-white" value={couponDraft.code} onChange={(e) => setCouponDraft({ ...couponDraft, code: e.target.value })} placeholder="Enter coupon code" />
+                    </div>
+                    <div>
+                      <Label className="text-white">Discount Percentage</Label>
+                      <Input type="number" className="bg-slate-700 border-slate-600 text-white" value={couponDraft.discountPercentage} onChange={(e) => setCouponDraft({ ...couponDraft, discountPercentage: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label className="text-white">Maximum Uses</Label>
+                      <Input type="number" className="bg-slate-700 border-slate-600 text-white" value={couponDraft.maxUses} onChange={(e) => setCouponDraft({ ...couponDraft, maxUses: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label className="text-white">Valid From</Label>
+                      <Input type="date" className="bg-slate-700 border-slate-600 text-white" value={couponDraft.validFrom} onChange={(e) => setCouponDraft({ ...couponDraft, validFrom: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label className="text-white">Valid Until</Label>
+                      <Input type="date" className="bg-slate-700 border-slate-600 text-white" value={couponDraft.validUntil} onChange={(e) => setCouponDraft({ ...couponDraft, validUntil: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="ghost" onClick={() => setIsCouponEditModalOpen(false)}>Cancel</Button>
+                    <Button onClick={async () => {
+                      if (!editingCouponId) return;
+                      await handleUpdateCoupon(editingCouponId);
+                      setIsCouponEditModalOpen(false);
+                    }}>Save</Button>
                   </div>
                 </div>
               </div>
