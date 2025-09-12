@@ -1,0 +1,7 @@
+# Serve sitemap and robots directly (preempt SPA fallback)
+/sitemap.xml   /sitemap.xml   200
+/robots.txt    /robots.txt    200
+
+# SPA fallback for everything else
+/*   /index.html   200
+
