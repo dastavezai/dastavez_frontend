@@ -4,9 +4,9 @@ import { Footer } from "@/components/Footer";
 
 const MMRY: React.FC = () => {
   useEffect(() => {
-    const title = "मुख्यमंत्री महिला रोजगार योजना | Fill Form Information";
+    const title = "मुख्यमंत्री महिला रोजगार योजना | आवेदन/फॉर्म भरने की जानकारी";
     const description =
-      "बिहार सरकार की ‘मुख्यमंत्री महिला रोजगार योजना’ के बारे में आधिकारिक जानकारी, पात्रता, आवेदन प्रक्रिया व सहायता राशि विवरण।";
+      "इस पेज पर मुख्यमंत्री महिला रोजगार योजना के आवेदन/फॉर्म भरने से संबंधित आधिकारिक जानकारी, पात्रता, सहायता राशि और प्रक्रिया दी गई है। यह केवल जानकारी हेतु है—आधिकारिक आवेदन लिंक यहाँ उपलब्ध है।";
     const canonicalUrl = "https://dastavez.ai/mukhya-mantri-mahila-rojgar-yojana-fill-form";
 
     document.title = title;
@@ -33,6 +33,7 @@ const MMRY: React.FC = () => {
 
     // Basic SEO
     setMeta("description", description);
+    setMeta("robots", "index,follow");
 
     // Canonical
     let linkCanonical = document.querySelector("link[rel=canonical]") as HTMLLinkElement | null;
@@ -48,11 +49,46 @@ const MMRY: React.FC = () => {
     setProperty("og:description", description);
     setProperty("og:type", "website");
     setProperty("og:url", canonicalUrl);
+    setProperty("og:image", "https://dastavezai.org/placeholder.svg");
 
     // Twitter
     setMeta("twitter:card", "summary");
     setMeta("twitter:title", title);
     setMeta("twitter:description", description);
+    setMeta("twitter:image", "https://dastavezai.org/placeholder.svg");
+
+    // JSON-LD Structured Data
+    const breadcrumbLd = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dastavezai.org/' },
+        { '@type': 'ListItem', position: 2, name: 'मुख्यमंत्री महिला रोजगार योजना (फॉर्म जानकारी)', item: canonicalUrl }
+      ]
+    };
+    const articleLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: 'मुख्यमंत्री महिला रोजगार योजना — आवेदन/फॉर्म जानकारी',
+      description,
+      mainEntityOfPage: canonicalUrl,
+      image: ['https://dastavezai.org/placeholder.svg'],
+      author: { '@type': 'Organization', name: 'Dastavez AI' },
+      publisher: { '@type': 'Organization', name: 'Dastavez AI' },
+      datePublished: new Date().toISOString()
+    };
+    const addJsonLd = (json: object, id: string) => {
+      let script = document.getElementById(id) as HTMLScriptElement | null;
+      if (!script) {
+        script = document.createElement('script');
+        script.type = 'application/ld+json';
+        script.id = id;
+        document.head.appendChild(script);
+      }
+      script.text = JSON.stringify(json);
+    };
+    addJsonLd(breadcrumbLd, 'ld-breadcrumb-mmry');
+    addJsonLd(articleLd, 'ld-article-mmry');
   }, []);
 
   return (

@@ -140,6 +140,8 @@ export function Navbar() {
             <Link to="/case-studies" className="text-sm hover:text-judicial-gold transition-colors">Case Studies</Link>
           )}
           <Link to="/smart-analysis" className="text-sm hover:text-judicial-gold transition-colors">Smart Analysis</Link>
+          <Link to="/mukhya-mantri-mahila-rojgar-yojana-fill-form" className="text-sm hover:text-judicial-gold transition-colors">MM Mahila Rojgar</Link>
+          <Link to="/mukhya-mantri-rojgar-yojana" className="text-sm hover:text-judicial-gold transition-colors">MM Rojgar Yojana</Link>
           <Link to="/about" className="text-sm hover:text-judicial-gold transition-colors">About</Link>
           <a href="#contact" className="text-sm hover:text-judicial-gold transition-colors">Contact</a>
           
