@@ -23,6 +23,7 @@ import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import RequireAdmin from "./components/RequireAdmin";
 import MMRY from "./pages/MMRY";
+import MMRYojana from "./pages/MMRYojana";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/smart-analysis" element={<SmartAnalysis />} />
             <Route path="/about" element={<About />} />
             <Route path="/mukhya-mantri-mahila-rojgar-yojana-fill-form" element={<MMRY />} />
+            <Route path="/mukhya-mantri-rojgar-yojana" element={<MMRYojana />} />
             <Route path="/profile" element={<Profile />} />
             <Route
               path="/admin"

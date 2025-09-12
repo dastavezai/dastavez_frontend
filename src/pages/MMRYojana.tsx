@@ -1,0 +1,129 @@
+import React, { useEffect } from "react";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+
+const MMRYojana: React.FC = () => {
+  useEffect(() => {
+    const title = "मुख्यमंत्री रोजगार योजना | Information & How to Apply";
+    const description =
+      "मुख्यमंत्री रोजगार योजना (राज्य/केंद्र की विविध योजनाएँ) के उद्देश्य, पात्रता, सहायता राशि और आवेदन प्रक्रिया की जानकारी।";
+    const canonicalUrl = "https://dastavezai.org/mukhya-mantri-rojgar-yojana";
+
+    document.title = title;
+
+    const setMeta = (name: string, content: string) => {
+      let tag = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+      if (!tag) {
+        tag = document.createElement("meta");
+        tag.setAttribute("name", name);
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute("content", content);
+    };
+
+    const setProperty = (property: string, content: string) => {
+      let tag = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
+      if (!tag) {
+        tag = document.createElement("meta");
+        tag.setAttribute("property", property);
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute("content", content);
+    };
+
+    setMeta("description", description);
+
+    let linkCanonical = document.querySelector("link[rel=canonical]") as HTMLLinkElement | null;
+    if (!linkCanonical) {
+      linkCanonical = document.createElement("link");
+      linkCanonical.setAttribute("rel", "canonical");
+      document.head.appendChild(linkCanonical);
+    }
+    linkCanonical.setAttribute("href", canonicalUrl);
+
+    setProperty("og:title", title);
+    setProperty("og:description", description);
+    setProperty("og:type", "article");
+    setProperty("og:url", canonicalUrl);
+
+    setMeta("twitter:card", "summary");
+    setMeta("twitter:title", title);
+    setMeta("twitter:description", description);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-judicial-dark text-gray-100">
+      <Navbar />
+      <main className="container mx-auto px-4 py-10 md:py-16">
+        <div className="max-w-4xl mx-auto bg-judicial-navy/40 border border-judicial-gold/20 rounded-2xl p-6 md:p-10 backdrop-blur">
+          <h1 className="text-3xl md:text-4xl font-bold mb-6 text-center">
+            मुख्यमंत्री रोजगार योजना (Information)
+          </h1>
+          <p className="text-center text-sm md:text-base text-gray-300 mb-8">
+            यह पृष्ठ सूचना हेतु है। आवेदन के लिए अपने राज्य/केंद्र की आधिकारिक वेबसाइट देखें।
+          </p>
+
+          <section className="space-y-6 leading-relaxed">
+            <h2 className="text-2xl font-semibold text-judicial-gold">उद्देश्य</h2>
+            <p>
+              युवा एवं महिला उद्यमिता को बढ़ावा देना, स्वरोज़गार के अवसर उपलब्ध कराना और सूक्ष्म एवं लघु उद्यमों को प्रारंभिक पूंजी/अनुदान/सबसिडी प्रदान करना।
+            </p>
+
+            <h2 className="text-2xl font-semibold text-judicial-gold">संभावित सहायता</h2>
+            <ul className="list-disc list-inside space-y-2">
+              <li>प्रारंभिक अनुदान/ब्याज अनुदान/मार्जिन मनी सहायता (राज्य अनुसार भिन्न)।</li>
+              <li>परियोजना लागत के अनुपात में सब्सिडी/क्रेडिट-लिंक्ड सुविधा।</li>
+              <li>प्रशिक्षण, मेंटरशिप एवं बाज़ार से जोड़ने का सहयोग।</li>
+            </ul>
+
+            <h2 className="text-2xl font-semibold text-judicial-gold">पात्रता (सामान्य)</h2>
+            <ul className="list-disc list-inside space-y-2">
+              <li>राज्य/केंद्र सरकार द्वारा अधिसूचित आयु सीमा के भीतर भारतीय नागरिक।</li>
+              <li>न्यूनतम शैक्षणिक योग्यता (यदि योजना दिशा-निर्देश में निर्दिष्ट हो)।</li>
+              <li>प्राथमिकता: महिलाएँ, दिव्यांगजन, अनुसूचित जाति/जनजाति, अल्पसंख्यक, बेरोज़गार युवा आदि (योजना अनुसार)।</li>
+            </ul>
+
+            <h2 className="text-2xl font-semibold text-judicial-gold">आवेदन प्रक्रिया (सामान्य)</h2>
+            <ol className="list-decimal list-inside space-y-2">
+              <li>आधिकारिक पोर्टल पर ऑनलाइन पंजीकरण/आवेदन।</li>
+              <li>आवश्यक दस्तावेज़ अपलोड: पहचान, निवास, शैक्षणिक/कौशल प्रमाण, परियोजना रिपोर्ट आदि।</li>
+              <li>भौतिक सत्यापन/साक्षात्कार/स्क्रीनिंग के उपरांत स्वीकृति।</li>
+              <li>स्वीकृति के पश्चात बैंक/विभाग के माध्यम से वित्तीय सहायता का निर्गमन।</li>
+            </ol>
+
+            <h2 className="text-2xl font-semibold text-judicial-gold">महत्वपूर्ण नोट</h2>
+            <div className="p-4 rounded-lg bg-judicial-navy/60 border border-judicial-gold/20">
+              <p className="font-medium">
+                विभिन्न राज्यों/केंद्र की योजनाओं के नाम, पात्रता और सहायता राशि अलग हो सकती है। सही एवं अद्यतन जानकारी हेतु संबंधित सरकार की आधिकारिक वेबसाइट देखें।
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-4">
+              <a
+                href="https://www.india.gov.in/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-block px-5 py-3 rounded-lg bg-judicial-gold text-judicial-dark font-semibold hover:bg-judicial-lightGold transition-colors text-center w-full sm:w-auto"
+              >
+                सरकारी योजनाएँ देखें
+              </a>
+              <a
+                href="https://www.myscheme.gov.in/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-block px-5 py-3 rounded-lg bg-transparent border border-judicial-gold text-judicial-gold font-semibold hover:bg-judicial-gold/10 transition-colors text-center w-full sm:w-auto"
+              >
+                MyScheme पोर्टल
+              </a>
+            </div>
+          </section>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
+export default MMRYojana;
+
+
