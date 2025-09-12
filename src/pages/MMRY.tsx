@@ -7,7 +7,7 @@ const MMRY: React.FC = () => {
     const title = "मुख्यमंत्री महिला रोजगार योजना | आवेदन/फॉर्म भरने की जानकारी";
     const description =
       "इस पेज पर मुख्यमंत्री महिला रोजगार योजना के आवेदन/फॉर्म भरने से संबंधित आधिकारिक जानकारी, पात्रता, सहायता राशि और प्रक्रिया दी गई है। यह केवल जानकारी हेतु है—आधिकारिक आवेदन लिंक यहाँ उपलब्ध है।";
-    const canonicalUrl = "https://dastavez.ai/mukhya-mantri-mahila-rojgar-yojana-fill-form";
+    const canonicalUrl = "https://dastavezai.org/mukhya-mantri-mahila-rojgar-yojana-fill-form";
 
     document.title = title;
 
@@ -89,6 +89,47 @@ const MMRY: React.FC = () => {
     };
     addJsonLd(breadcrumbLd, 'ld-breadcrumb-mmry');
     addJsonLd(articleLd, 'ld-article-mmry');
+
+    // FAQ Schema
+    const faqLd = {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: [
+        {
+          '@type': 'Question',
+          name: 'क्या यह आधिकारिक आवेदन पेज है?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'नहीं। यह पेज केवल जानकारी हेतु है। आधिकारिक आवेदन लिंक mmry.brlps.in पर उपलब्ध है।'
+          }
+        },
+        {
+          '@type': 'Question',
+          name: 'आवेदन कहाँ करें?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'आप आधिकारिक वेबसाइट mmry.brlps.in पर ऑनलाइन आवेदन कर सकते हैं।'
+          }
+        },
+        {
+          '@type': 'Question',
+          name: 'प्रथम किस्त में कितनी राशि मिलती है?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'योजना के तहत ₹10,000 की राशि प्रथम किस्त के रूप में दी जाती है।'
+          }
+        },
+        {
+          '@type': 'Question',
+          name: 'अतिरिक्त वित्तीय सहायता कितनी मिल सकती है?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'आवश्यकतानुसार आकलन के बाद ₹2 लाख तक की अतिरिक्त सहायता मिल सकती है।'
+          }
+        }
+      ]
+    };
+    addJsonLd(faqLd, 'ld-faq-mmry');
   }, []);
 
   return (
@@ -189,6 +230,28 @@ const MMRY: React.FC = () => {
               >
                 और जानें
               </a>
+            </div>
+
+            <div className="mt-10">
+              <h2 className="text-2xl font-semibold text-judicial-gold mb-3">अक्सर पूछे जाने वाले प्रश्न (FAQ)</h2>
+              <div className="space-y-4">
+                <div>
+                  <p className="font-medium">क्या यह आधिकारिक आवेदन पेज है?</p>
+                  <p className="text-gray-300">नहीं। यह पेज केवल जानकारी हेतु है। आधिकारिक आवेदन लिंक mmry.brlps.in पर उपलब्ध है।</p>
+                </div>
+                <div>
+                  <p className="font-medium">आवेदन कहाँ करें?</p>
+                  <p className="text-gray-300">आधिकारिक वेबसाइट <a className="text-judicial-gold hover:underline" href="https://mmry.brlps.in/" target="_blank" rel="noopener noreferrer">mmry.brlps.in</a> पर ऑनलाइन आवेदन करें।</p>
+                </div>
+                <div>
+                  <p className="font-medium">प्रथम किस्त में कितनी राशि मिलती है?</p>
+                  <p className="text-gray-300">₹10,000 प्रथम किस्त के रूप में।</p>
+                </div>
+                <div>
+                  <p className="font-medium">अतिरिक्त वित्तीय सहायता कितनी मिल सकती है?</p>
+                  <p className="text-gray-300">आवश्यकतानुसार ₹2 लाख तक की अतिरिक्त सहायता।</p>
+                </div>
+              </div>
             </div>
           </section>
         </div>

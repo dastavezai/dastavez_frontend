@@ -54,6 +54,8 @@ export function Footer() {
               <li><a href="#" className="text-gray-400 hover:text-judicial-gold">Legal Database</a></li>
               <li><a href="#" className="text-gray-400 hover:text-judicial-gold">Case Studies</a></li>
               <li><a href="#" className="text-gray-400 hover:text-judicial-gold">Blog</a></li>
+              <li><a href="/mukhya-mantri-mahila-rojgar-yojana-fill-form" className="text-gray-400 hover:text-judicial-gold">MM Mahila Rojgar (Form Info)</a></li>
+              <li><a href="/mukhya-mantri-rojgar-yojana" className="text-gray-400 hover:text-judicial-gold">Mukhya Mantri Rojgar Yojana</a></li>
             </ul>
           </div>
           
