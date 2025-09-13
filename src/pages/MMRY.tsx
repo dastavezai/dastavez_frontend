@@ -4,9 +4,9 @@ import { Footer } from "@/components/Footer";
 
 const MMRY: React.FC = () => {
   useEffect(() => {
-    const title = "मुख्यमंत्री महिला रोजगार योजना | आवेदन/फॉर्म भरने की जानकारी";
+    const title = "मुख्यमंत्री महिला रोजगार योजना 2025 | बिहार | आवेदन फॉर्म, पात्रता, ₹10,000 अनुदान";
     const description =
-      "इस पेज पर मुख्यमंत्री महिला रोजगार योजना के आवेदन/फॉर्म भरने से संबंधित आधिकारिक जानकारी, पात्रता, सहायता राशि और प्रक्रिया दी गई है। यह केवल जानकारी हेतु है—आधिकारिक आवेदन लिंक यहाँ उपलब्ध है।";
+      "बिहार मुख्यमंत्री महिला रोजगार योजना 2025: ₹10,000 प्रथम किस्त + ₹2 लाख तक अतिरिक्त सहायता। पात्रता, आवेदन प्रक्रिया, ऑनलाइन फॉर्म भरने की पूरी जानकारी। आधिकारिक लिंक mmry.brlps.in पर उपलब्ध।";
     const canonicalUrl = "https://dastavezai.org/mukhya-mantri-mahila-rojgar-yojana-fill-form";
 
     document.title = title;
@@ -34,6 +34,11 @@ const MMRY: React.FC = () => {
     // Basic SEO
     setMeta("description", description);
     setMeta("robots", "index,follow");
+    setMeta("keywords", "मुख्यमंत्री महिला रोजगार योजना, बिहार सरकार योजना, महिला रोजगार अनुदान, ₹10000 अनुदान, जीविका योजना, महिला सशक्तिकरण, बिहार रोजगार योजना, ऑनलाइन आवेदन, mmry.brlps.in");
+    setMeta("author", "Dastavez AI");
+    setMeta("language", "hi");
+    setMeta("geo.region", "IN-BR");
+    setMeta("geo.placename", "Bihar");
 
     // Canonical
     let linkCanonical = document.querySelector("link[rel=canonical]") as HTMLLinkElement | null;
@@ -130,6 +135,36 @@ const MMRY: React.FC = () => {
       ]
     };
     addJsonLd(faqLd, 'ld-faq-mmry');
+
+    // Government Scheme Schema
+    const schemeLd = {
+      '@context': 'https://schema.org',
+      '@type': 'GovernmentService',
+      name: 'मुख्यमंत्री महिला रोजगार योजना',
+      description: 'बिहार सरकार की महिला सशक्तिकरण योजना - ₹10,000 प्रथम किस्त + ₹2 लाख तक अतिरिक्त सहायता',
+      provider: {
+        '@type': 'GovernmentOrganization',
+        name: 'बिहार सरकार',
+        url: 'https://mmry.brlps.in/'
+      },
+      serviceType: 'Government Scheme',
+      areaServed: {
+        '@type': 'State',
+        name: 'Bihar',
+        containedInPlace: {
+          '@type': 'Country',
+          name: 'India'
+        }
+      },
+      offers: {
+        '@type': 'Offer',
+        price: '10000',
+        priceCurrency: 'INR',
+        description: 'प्रथम किस्त ₹10,000'
+      },
+      url: canonicalUrl
+    };
+    addJsonLd(schemeLd, 'ld-scheme-mmry');
   }, []);
 
   return (

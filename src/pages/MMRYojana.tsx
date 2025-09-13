@@ -4,9 +4,9 @@ import { Footer } from "@/components/Footer";
 
 const MMRYojana: React.FC = () => {
   useEffect(() => {
-    const title = "मुख्यमंत्री रोजगार योजना | Information & How to Apply";
+    const title = "मुख्यमंत्री रोजगार योजना 2025 | सभी राज्यों की योजनाएं | पात्रता, अनुदान, आवेदन";
     const description =
-      "मुख्यमंत्री रोजगार योजना (राज्य/केंद्र की विविध योजनाएँ) के उद्देश्य, पात्रता, सहायता राशि और आवेदन प्रक्रिया की जानकारी।";
+      "भारत के सभी राज्यों की मुख्यमंत्री रोजगार योजनाएं 2025: पात्रता मानदंड, अनुदान राशि, आवेदन प्रक्रिया की पूरी जानकारी। युवा एवं महिला उद्यमिता को बढ़ावा देने वाली सरकारी योजनाएं।";
     const canonicalUrl = "https://dastavezai.org/mukhya-mantri-rojgar-yojana";
 
     document.title = title;
@@ -33,6 +33,11 @@ const MMRYojana: React.FC = () => {
 
     setMeta("description", description);
     setMeta("robots", "index,follow");
+    setMeta("keywords", "मुख्यमंत्री रोजगार योजना, सरकारी योजना, रोजगार अनुदान, युवा उद्यमिता, महिला सशक्तिकरण, स्वरोजगार योजना, सरकारी अनुदान, माइक्रो फाइनेंस, क्रेडिट लिंक्ड सब्सिडी, मार्जिन मनी सहायता");
+    setMeta("author", "Dastavez AI");
+    setMeta("language", "hi");
+    setMeta("geo.region", "IN");
+    setMeta("geo.placename", "India");
 
     let linkCanonical = document.querySelector("link[rel=canonical]") as HTMLLinkElement | null;
     if (!linkCanonical) {
@@ -85,6 +90,25 @@ const MMRYojana: React.FC = () => {
       script.text = JSON.stringify(json);
     };
     addJsonLd(faqLd, 'ld-faq-mmryojana');
+
+    // Government Services Schema
+    const servicesLd = {
+      '@context': 'https://schema.org',
+      '@type': 'GovernmentService',
+      name: 'मुख्यमंत्री रोजगार योजना (सभी राज्य)',
+      description: 'भारत के सभी राज्यों की मुख्यमंत्री रोजगार योजनाएं - युवा एवं महिला उद्यमिता को बढ़ावा',
+      provider: {
+        '@type': 'GovernmentOrganization',
+        name: 'भारत सरकार एवं राज्य सरकारें'
+      },
+      serviceType: 'Employment Scheme',
+      areaServed: {
+        '@type': 'Country',
+        name: 'India'
+      },
+      url: canonicalUrl
+    };
+    addJsonLd(servicesLd, 'ld-services-mmryojana');
   }, []);
 
   return (
