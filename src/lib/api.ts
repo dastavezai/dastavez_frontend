@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
 
 // Types
 export interface User {
