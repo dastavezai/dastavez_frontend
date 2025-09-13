@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+const API_BASE_URL = 'https://dastavezai-backend-797326917118.asia-south2.run.app/api';
 
 // Types
 export interface User {
@@ -208,7 +208,7 @@ export const fileAPI = {
     formData.append('file', file);
     
     const token = localStorage.getItem('jwt');
-    const response = await fetch(`/api/files/upload`, {
+    const response = await fetch(`${API_BASE_URL}/files/upload`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`
@@ -326,7 +326,7 @@ export const profileAPI = {
     formData.append('image', image);
     
     const token = localStorage.getItem('jwt');
-    const response = await fetch(`/api/profile/upload-image`, {
+    const response = await fetch(`${API_BASE_URL}/profile/upload-image`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`
