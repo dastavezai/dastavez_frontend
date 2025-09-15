@@ -1,5 +1,5 @@
-// API Configuration
-const API_BASE_URL = 'https://dastavezai-backend-797326917118.asia-south2.run.app/api';
+// API Configuration - Connected to Cloud Run Backend
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'https://api.dastavez.org/api';
 
 // Types
 export interface User {
@@ -181,7 +181,7 @@ export const authAPI = {
 export const chatAPI = {
   // Send message
   sendMessage: async (message: string) => {
-    return apiFetch('/api/chat/message', {
+    return apiFetch('/chat/message', {
       method: 'POST',
       body: JSON.stringify({ message })
     });
@@ -189,12 +189,12 @@ export const chatAPI = {
 
   // Get chat history
   getHistory: async (): Promise<ChatMessage[]> => {
-    return apiFetch('/api/chat/history');
+    return apiFetch('/chat/history');
   },
 
   // Clear chat history
   clearHistory: async () => {
-    return apiFetch('/api/chat/clear', {
+    return apiFetch('/chat/clear', {
       method: 'DELETE'
     });
   }
@@ -226,12 +226,12 @@ export const fileAPI = {
 
   // Get all files
   getAllFiles: async (): Promise<FileUpload[]> => {
-    return apiFetch('/api/files/all');
+    return apiFetch('/files/all');
   },
 
   // Analyze file
   analyzeFile: async (fileId: string, question: string) => {
-    return apiFetch(`/api/files/analyze/${fileId}`, {
+    return apiFetch(`/files/analyze/${fileId}`, {
       method: 'POST',
       body: JSON.stringify({ question })
     });
@@ -239,7 +239,7 @@ export const fileAPI = {
 
   // Delete file
   deleteFile: async (fileId: string) => {
-    return apiFetch(`/api/files/${fileId}`, {
+    return apiFetch(`/files/${fileId}`, {
       method: 'DELETE'
     });
   }
@@ -251,7 +251,7 @@ export const subscriptionAPI = {
   getPrice: async (): Promise<{ price: number }> => {
     // Try multiple endpoints and normalize response shape
     const tryEndpoints = [
-      '/api/subscription/price',
+      '/subscription/price',
     ];
 
     let lastError: unknown = undefined;
@@ -275,7 +275,7 @@ export const subscriptionAPI = {
 
   // Create payment order
   createOrder: async (amount: number, currency: string = 'INR', couponCode?: string) => {
-    return apiFetch('/api/subscription/order', {
+    return apiFetch('/subscription/order', {
       method: 'POST',
       body: JSON.stringify({ amount, currency, couponCode })
     });
@@ -283,7 +283,7 @@ export const subscriptionAPI = {
 
   // Verify payment
   verifyPayment: async (paymentId: string, orderId: string, signature: string) => {
-    return apiFetch('/api/subscription/verify', {
+    return apiFetch('/subscription/verify', {
       method: 'POST',
       body: JSON.stringify({ paymentId, orderId, signature })
     });
@@ -291,12 +291,12 @@ export const subscriptionAPI = {
 
   // Get subscription status
   getStatus: async (): Promise<{ subscription: Subscription }> => {
-    return apiFetch('/api/subscription/status');
+    return apiFetch('/subscription/status');
   },
 
   // Validate coupon
   validateCoupon: async (code: string): Promise<{ coupon: Coupon }> => {
-    return apiFetch('/api/subscription/validate-coupon', {
+    return apiFetch('/subscription/validate-coupon', {
       method: 'POST',
       body: JSON.stringify({ code })
     });
@@ -307,14 +307,14 @@ export const subscriptionAPI = {
 export const profileAPI = {
   // Get profile info
   getInfo: async (): Promise<User> => {
-    const data = await apiFetch('/api/profile/info');
+    const data = await apiFetch('/profile/info');
     const user = (data && typeof data === 'object' && 'user' in data) ? (data as any).user : data;
     return user as User;
   },
 
   // Update profile
   updateInfo: async (data: { firstName?: string; lastName?: string }) => {
-    return apiFetch('/api/profile/update', {
+    return apiFetch('/profile/update', {
       method: 'PUT',
       body: JSON.stringify(data)
     });
@@ -352,7 +352,7 @@ export const contactAPI = {
     subject: string;
     message: string;
   }) => {
-    return apiFetch('/api/contact', {
+    return apiFetch('/contact', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -363,16 +363,16 @@ export const contactAPI = {
 export const adminAPI = {
   // Get all users
   getAllUsers: async () => {
-    return apiFetch('/api/admin/users');
+    return apiFetch('/admin/users');
   },
   //GET financial stats
   getStats: async () => {
-	  return apiFetch('/api/admin/stats');
+	  return apiFetch('/admin/stats');
   },
 
   // Update subscription price
   updateSubscriptionPrice: async (amount: number) => {
-    return apiFetch('/api/subscription/price', {
+    return apiFetch('/subscription/price', {
       method: 'PUT',
       body: JSON.stringify({ amount })
     });
@@ -386,7 +386,7 @@ export const adminAPI = {
     validFrom: string;
     validUntil: string;
   }) => {
-    return apiFetch('/api/subscription/coupons', {
+    return apiFetch('/subscription/coupons', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -407,7 +407,7 @@ export const adminAPI = {
   listCoupons: async (): Promise<AdminCoupon[]> => {
     // Normalize different coupon list endpoints and response shapes
     const tryEndpoints = [
-      '/api/subscription/coupons',
+      '/subscription/coupons',
     ];
 
     const normalize = (raw: any): AdminCoupon | null => {
@@ -462,21 +462,21 @@ export const adminAPI = {
   updateCoupon: async (id: string, payload: Partial<{
     code: string; discountPercentage: number; maxUses: number; validFrom: string; validUntil: string;
   }>): Promise<AdminCoupon> => {
-    return apiFetch(`/api/subscription/coupons/${id}`, {
+    return apiFetch(`/subscription/coupons/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
   },
 
   deleteCoupon: async (id: string): Promise<{ success: boolean }> => {
-    return apiFetch(`/api/subscription/coupons/${id}`, {
+    return apiFetch(`/subscription/coupons/${id}`, {
       method: 'DELETE',
     });
   },
 
   // Delete a user (admin)
   deleteUser: async (id: string): Promise<{ success: boolean }> => {
-    return apiFetch(`/api/admin/users/${id}`, {
+    return apiFetch(`/admin/users/${id}`, {
       method: 'DELETE',
     });
   },
@@ -486,12 +486,12 @@ export const adminAPI = {
 export const lawyerAPI = {
   // List all lawyers
   list: async (): Promise<Lawyer[]> => {
-    return apiFetch('/api/lawyers');
+    return apiFetch('/lawyers');
   },
 
   // Create a new lawyer
   create: async (payload: { name: string; phone: string; email: string; address: string }): Promise<Lawyer> => {
-    return apiFetch('/api/admin/lawyers', {
+    return apiFetch('/admin/lawyers', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -499,7 +499,7 @@ export const lawyerAPI = {
 
   // Update lawyer
   update: async (id: string, payload: Partial<{ name: string; phone: string; email: string; address: string }>): Promise<Lawyer> => {
-    return apiFetch(`/api/admin/lawyers/${id}`, {
+    return apiFetch(`/admin/lawyers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
@@ -507,7 +507,7 @@ export const lawyerAPI = {
 
   // Delete lawyer
   delete: async (id: string): Promise<{ success: boolean }> => {
-    return apiFetch(`/api/admin/lawyers/${id}`, {
+    return apiFetch(`/admin/lawyers/${id}`, {
       method: 'DELETE',
     });
   },
