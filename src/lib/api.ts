@@ -367,7 +367,7 @@ export const adminAPI = {
   },
   //GET financial stats
   getStats: async () => {
-	  return apiFetch('/admin/stats');
+	  return apiFetch('/admin/financial-stats');
   },
 
   // Update subscription price
@@ -394,10 +394,10 @@ export const adminAPI = {
   
   // Settings: free daily message limit
   getFreeMessageLimit: async (): Promise<{ value: number }> => {
-    return apiFetch('/api/admin/settings/free-message-limit');
+    return apiFetch('/admin/settings/free-message-limit');
   },
   setFreeMessageLimit: async (value: number): Promise<{ success: boolean; value: number }> => {
-    return apiFetch('/api/admin/settings/free-message-limit', {
+    return apiFetch('/admin/settings/free-message-limit', {
       method: 'PUT',
       body: JSON.stringify({ value })
     });
