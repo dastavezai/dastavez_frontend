@@ -1,5 +1,5 @@
 // API Configuration - Connected to Cloud Run Backend
-const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'https://api.dastavez.org/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'https://api.dastavezai.org/api';
 
 // Types
 export interface User {
