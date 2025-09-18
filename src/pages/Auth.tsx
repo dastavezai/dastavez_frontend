@@ -4,7 +4,11 @@ import ScalesAnimation from '../components/ScalesAnimation';
 import GavelAnimation from '../components/GavelAnimation';
 import FloatingCard from '../components/FloatingCard';
 import LoginIcon from '../components/LoginIcon';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+
+declare global {
+  interface Window { google?: any }
+}
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../lib/api';
 
@@ -72,7 +76,48 @@ const Auth = () => {
 
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirm, setShowRegConfirm] = useState(false);
   const navigate = useNavigate();
+  const [googleReady, setGoogleReady] = useState(false);
+
+  useEffect(() => {
+    // Load Google Identity script if not present
+    if (!window.google) {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true; s.defer = true;
+      s.onload = () => setGoogleReady(true);
+      document.body.appendChild(s);
+    } else {
+      setGoogleReady(true);
+    }
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    if (!googleReady) return;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
+    if (!clientId) {
+      alert('Google login not configured.');
+      return;
+    }
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: async (resp: any) => {
+        try {
+          const data: any = await authAPI.googleAuth(resp.credential);
+          if (data?.token) {
+            localStorage.setItem('jwt', data.token);
+            window.location.href = '/chat';
+          }
+        } catch (err: any) {
+          alert(err?.message || 'Google login failed');
+        }
+      },
+    });
+    window.google.accounts.id.prompt();
+  };
 
   const validateEmail = () => {
     try {
@@ -360,7 +405,7 @@ const Auth = () => {
             <GavelAnimation />
           </div>
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-judicial-gold to-judicial-lightGold bg-clip-text text-transparent">
-            Dastavez AI
+            Dastaez AI
           </h1>
           <p className="text-judicial-lightGold/80 text-lg">
             Legal Intelligence Platform
@@ -382,6 +427,7 @@ const Auth = () => {
           </div>
 
           {state.step === 'email' && (
+            <div>
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               <div>
                 <input
@@ -403,13 +449,25 @@ const Auth = () => {
                 {isLoading ? 'Checking...' : 'Continue'}
               </button>
             </form>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className="w-full py-3 px-4 rounded-lg bg-white text-black font-semibold hover:bg-gray-100 transition-all"
+              disabled={!googleReady}
+            >
+              Continue with Google
+            </button>
+          </div>
+          </div>
           )}
 
           {state.step === 'login' && (
+            <div>
             <form onSubmit={handleLogin} className="space-y-4">
-              <div>
+              <div className="relative">
                 <input
-                  type="password"
+                  type={showLoginPassword ? 'text' : 'password'}
                   placeholder="Password"
                   value={state.password}
                   onChange={(e) => {
@@ -418,6 +476,14 @@ const Auth = () => {
                   }}
                   className={inputClasses}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-judicial-lightGold/80 hover:text-judicial-gold"
+                  aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
                 {errors.password && (
                   <p className="mt-1 text-sm text-red-500">{errors.password}</p>
                 )}
@@ -454,6 +520,17 @@ const Auth = () => {
                 </button>
               </div>
             </form>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className="w-full py-3 px-4 rounded-lg bg-white text-black font-semibold hover:bg-gray-100 transition-all"
+              disabled={!googleReady}
+            >
+              Continue with Google
+            </button>
+          </div>
+          </div>
           )}
 
           {state.step === 'register' && (
@@ -477,7 +554,7 @@ const Auth = () => {
                   error: errors.lastName
                 },
                 {
-                  type: 'password',
+                  type: showRegPassword ? 'text' : 'password',
                   placeholder: 'Password',
                   value: state.password,
                   onChange: (e: React.ChangeEvent<HTMLInputElement>) => 
@@ -485,7 +562,7 @@ const Auth = () => {
                   error: errors.password
                 },
                 {
-                  type: 'password',
+                  type: showRegConfirm ? 'text' : 'password',
                   placeholder: 'Confirm Password',
                   value: state.confirmPassword,
                   onChange: (e: React.ChangeEvent<HTMLInputElement>) => 
@@ -511,13 +588,35 @@ const Auth = () => {
                     animationDelay: `${index * 50}ms`
                   }}
                 >
-                  <input
-                    type={field.type}
-                    placeholder={field.placeholder}
-                    value={field.value}
-                    onChange={field.onChange}
-                    className={inputClasses}
-                  />
+                  <div className="relative">
+                    <input
+                      type={field.type}
+                      placeholder={field.placeholder}
+                      value={field.value}
+                      onChange={field.onChange}
+                      className={inputClasses}
+                    />
+                    {field.placeholder === 'Password' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-judicial-lightGold/80 hover:text-judicial-gold"
+                        aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showRegPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    )}
+                    {field.placeholder === 'Confirm Password' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowRegConfirm((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-judicial-lightGold/80 hover:text-judicial-gold"
+                        aria-label={showRegConfirm ? 'Hide password' : 'Show password'}
+                      >
+                        {showRegConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    )}
+                  </div>
                   {field.error && (
                     <p className="mt-1 text-sm text-red-500">{field.error}</p>
                   )}

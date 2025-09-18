@@ -171,6 +171,14 @@ export const authAPI = {
     });
   },
 
+  // Google OAuth login/signup
+  googleAuth: async (idToken: string) => {
+    return apiFetch('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ idToken })
+    });
+  },
+
   // Logout
   logout: () => {
     localStorage.removeItem('jwt');

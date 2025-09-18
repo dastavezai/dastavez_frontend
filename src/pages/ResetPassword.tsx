@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { authAPI } from '@/lib/api';
 
 export default function ResetPassword() {
   const location = useLocation();
@@ -16,13 +17,8 @@ export default function ResetPassword() {
     setStatus('loading');
     setMessage("");
     try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp, newPassword, confirmPassword }),
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await authAPI.resetPassword(email, otp, newPassword, confirmPassword);
+      if (data) {
         setStatus('success');
         setMessage(data.message || 'Password reset successfully.');
         setTimeout(() => {
@@ -30,11 +26,11 @@ export default function ResetPassword() {
         }, 1500);
       } else {
         setStatus('error');
-        setMessage(data.message || 'Failed to reset password.');
+        setMessage('Failed to reset password.');
       }
-    } catch (err) {
+    } catch (err: any) {
       setStatus('error');
-      setMessage('An error occurred. Please try again.');
+      setMessage(err?.message || 'An error occurred. Please try again.');
     }
   };
 
