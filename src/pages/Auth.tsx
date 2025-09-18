@@ -118,16 +118,37 @@ const Auth = () => {
 
     const mount = (id: string) => {
       const el = document.getElementById(id);
-      if (el && el.childElementCount === 0) {
-        try {
-          window.google.accounts.id.renderButton(el, { theme: 'outline', size: 'large', width: 360 });
-        } catch {}
-      }
+      if (!el) return;
+      // Ensure container can grow to full width
+      el.style.width = '100%';
+      // Clear existing rendered button (so we can re-render responsively)
+      while (el.firstChild) el.removeChild(el.firstChild);
+      // Compute responsive width (Google API requires a numeric width in px)
+      const parent = el.parentElement as HTMLElement | null;
+      const maxWidth = Math.min(400, Math.max(220, (parent?.clientWidth || el.clientWidth || 360)));
+      try {
+        window.google.accounts.id.renderButton(el, {
+          theme: 'outline',
+          size: 'large',
+          width: maxWidth,
+          text: 'continue_with', // Replace label: Continue with Google
+          logo_alignment: 'left',
+          shape: 'rectangular',
+        });
+      } catch {}
     };
     mount('google-btn-email');
     mount('google-btn-login');
 
+    // Re-render on resize for better mobile fit
+    const onResize = () => {
+      mount('google-btn-email');
+      mount('google-btn-login');
+    };
+    window.addEventListener('resize', onResize);
+
     try { window.google.accounts.id.prompt(); } catch {}
+    return () => { window.removeEventListener('resize', onResize); };
   }, [googleReady]);
 
   const validateEmail = () => {
@@ -460,7 +481,7 @@ const Auth = () => {
                 {isLoading ? 'Checking...' : 'Continue'}
               </button>
             </form>
-            <div id="google-btn-email" className="mt-3 flex justify-center" />
+            <div id="google-btn-email" className="mt-3 w-full" />
             </div>
           )}
 
@@ -522,7 +543,7 @@ const Auth = () => {
                 </button>
               </div>
             </form>
-            <div id="google-btn-login" className="mt-3 flex justify-center" />
+            <div id="google-btn-login" className="mt-3 w-full" />
             </div>
           )}
 
