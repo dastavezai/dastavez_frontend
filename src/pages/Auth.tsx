@@ -360,7 +360,7 @@ const Auth = () => {
             <GavelAnimation />
           </div>
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-judicial-gold to-judicial-lightGold bg-clip-text text-transparent">
-            Dastawez AI
+            Dastavez AI
           </h1>
           <p className="text-judicial-lightGold/80 text-lg">
             Legal Intelligence Platform
