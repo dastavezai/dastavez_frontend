@@ -95,13 +95,12 @@ const Auth = () => {
     }
   }, []);
 
-  const handleGoogleSignIn = async () => {
+  // Initialize GIS, render official button, and prompt One Tap (fallback)
+  useEffect(() => {
     if (!googleReady) return;
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
-    if (!clientId) {
-      alert('Google login not configured.');
-      return;
-    }
+    if (!clientId || !window.google?.accounts?.id) return;
+
     window.google.accounts.id.initialize({
       client_id: clientId,
       callback: async (resp: any) => {
@@ -116,8 +115,20 @@ const Auth = () => {
         }
       },
     });
-    window.google.accounts.id.prompt();
-  };
+
+    const mount = (id: string) => {
+      const el = document.getElementById(id);
+      if (el && el.childElementCount === 0) {
+        try {
+          window.google.accounts.id.renderButton(el, { theme: 'outline', size: 'large', width: 360 });
+        } catch {}
+      }
+    };
+    mount('google-btn-email');
+    mount('google-btn-login');
+
+    try { window.google.accounts.id.prompt(); } catch {}
+  }, [googleReady]);
 
   const validateEmail = () => {
     try {
@@ -449,17 +460,8 @@ const Auth = () => {
                 {isLoading ? 'Checking...' : 'Continue'}
               </button>
             </form>
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="w-full py-3 px-4 rounded-lg bg-white text-black font-semibold hover:bg-gray-100 transition-all"
-              disabled={!googleReady}
-            >
-              Continue with Google
-            </button>
-          </div>
-          </div>
+            <div id="google-btn-email" className="mt-3 flex justify-center" />
+            </div>
           )}
 
           {state.step === 'login' && (
@@ -520,17 +522,8 @@ const Auth = () => {
                 </button>
               </div>
             </form>
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="w-full py-3 px-4 rounded-lg bg-white text-black font-semibold hover:bg-gray-100 transition-all"
-              disabled={!googleReady}
-            >
-              Continue with Google
-            </button>
-          </div>
-          </div>
+            <div id="google-btn-login" className="mt-3 flex justify-center" />
+            </div>
           )}
 
           {state.step === 'register' && (
