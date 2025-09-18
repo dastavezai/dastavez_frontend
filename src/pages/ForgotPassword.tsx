@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { authAPI } from '@/lib/api';
 
 export default function ForgotPassword() {
   const location = useLocation();
@@ -22,25 +23,15 @@ export default function ForgotPassword() {
     setStatus('loading');
     setMessage("");
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStatus('success');
-        setMessage(data.message || 'Password reset instructions sent to your email.');
-        setTimeout(() => {
-          navigate('/verify-reset-otp', { state: { email } });
-        }, 1000);
-      } else {
-        setStatus('error');
-        setMessage(data.message || 'Failed to send reset instructions.');
-      }
-    } catch (err) {
+      const data = await authAPI.forgotPassword(email);
+      setStatus('success');
+      setMessage(data.message || 'Password reset instructions sent to your email.');
+      setTimeout(() => {
+        navigate('/verify-reset-otp', { state: { email } });
+      }, 1000);
+    } catch (err: any) {
       setStatus('error');
-      setMessage('An error occurred. Please try again.');
+      setMessage(err?.message || 'Failed to send reset instructions.');
     }
   };
 
