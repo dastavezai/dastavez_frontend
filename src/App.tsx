@@ -4,6 +4,8 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 //import { ThemeProvider } from "./components/ThemeProvider";
+import { useEffect, useState } from "react";
+import { useToast } from "./hooks/use-toast";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -27,11 +29,96 @@ import MMRYojana from "./pages/MMRYojana";
 
 const queryClient = new QueryClient();
 
+const FeedbackPopup = () => {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const enabled = String(import.meta.env.VITE_FEEDBACK_ENABLED || "") === "true";
+    const formUrl = String(import.meta.env.VITE_FEEDBACK_FORM_URL || "");
+    const storageKey = "feedback_popup_shown_v1";
+    const params = new URLSearchParams(window.location.search);
+    const debug = params.get("debugFeedback") === "1";
+
+    try { console.log("[FeedbackPopup] enabled=", enabled, "debug=", debug); } catch {}
+
+    if ((!enabled || !formUrl) && !debug) return;
+    if (localStorage.getItem(storageKey) === "true" && !debug) return;
+
+    const delayMs = debug ? 100 : 3000;
+    const t = setTimeout(() => setVisible(true), delayMs);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!visible) return null;
+
+  const formUrl = String(import.meta.env.VITE_FEEDBACK_FORM_URL || "");
+  const storageKey = "feedback_popup_shown_v1";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        right: 16,
+        bottom: 16,
+        zIndex: 99999,
+        background: "rgba(13,17,23,0.98)",
+        border: "1px solid rgba(212,175,55,0.4)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        backdropFilter: "blur(8px)",
+        borderRadius: 12,
+        padding: 16,
+        maxWidth: 360,
+        color: "#e5e7eb",
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 6, color: "#f9fafb" }}>We value your feedback</div>
+      <div style={{ fontSize: 14, lineHeight: 1.5, marginBottom: 12 }}>
+        Hello from the Dastavez team! We’re actively improving the site. Would you share quick feedback?
+      </div>
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <button
+          onClick={() => {
+            localStorage.setItem(storageKey, "true");
+            setVisible(false);
+          }}
+          style={{
+            background: "transparent",
+            color: "#e5e7eb",
+            border: "1px solid rgba(229,231,235,0.3)",
+            padding: "6px 10px",
+            borderRadius: 8,
+            fontWeight: 600,
+          }}
+        >
+          Dismiss
+        </button>
+        <button
+          onClick={() => {
+            window.open(formUrl, "_blank", "noopener,noreferrer");
+            localStorage.setItem(storageKey, "true");
+            setVisible(false);
+          }}
+          style={{
+            background: "#d4af37",
+            color: "#0b0f16",
+            padding: "6px 10px",
+            borderRadius: 8,
+            fontWeight: 700,
+          }}
+        >
+          Give Feedback
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <FeedbackPopup />
         <ShootingStars />
         <CursorFollower />
         <BrowserRouter>

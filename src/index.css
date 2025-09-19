@@ -693,23 +693,17 @@
     border-radius: 9999px;
     display: flex;
     align-items: center;
-    transition: all 0.3s ease;
-    animation: float 3s ease-in-out infinite;
-    transform-style: preserve-3d;
     perspective: 1000px;
     border: 1px solid rgba(255, 215, 0, 0.2);
   }
   
   .feature-pill:hover {
-    transform: scale(1.05) translateY(-5px) rotateX(10deg) rotateY(10deg);
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2),
                 0 0 20px rgba(255, 215, 0, 0.2);
     border-color: rgba(255, 215, 0, 0.5);
   }
   
   .feature-pill span {
-    transition: all 0.3s ease;
-    transform-style: preserve-3d;
   }
   
   .feature-pill:hover span {
@@ -726,6 +720,11 @@
     filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.5));
   }
   
+  /* Hide visually but preserve layout for the gold message-square */
+  .lucide-message-square.text-judicial-gold {
+    display: none;
+  }
+
   @keyframes float {
     0%, 100% {
       transform: translateY(0) rotateX(0deg) rotateY(0deg);
@@ -781,7 +780,6 @@
     transform-style: preserve-3d;
     perspective: 1000px;
     border: 1px solid rgba(255, 215, 0, 0.2);
-    animation: toolCardFloat 4s ease-in-out infinite;
   }
   
   .tool-card:hover {
@@ -841,6 +839,22 @@
       transform: translateY(5px) rotateX(-2deg) rotateY(-2deg);
     }
   }
+}
+
+/* Overrides for specific utility classes */
+@media (min-width: 640px) {
+  .sm\:p-3 {
+    padding: 1.75rem !important;
+  }
+}
+
+.bg-judicial-gold\/10 {
+  background-color: transparent !important;
+}
+
+/* Global override: add top margin to elements with text-center */
+.text-center {
+  margin-top: 40px !important;
 }
 
 @keyframes fadeIn {
