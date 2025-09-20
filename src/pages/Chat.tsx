@@ -18,6 +18,15 @@ interface ChatMessage {
     fileId: string;
     fileName: string;
   };
+  // Draft response fields
+  mode?: string;
+  preview?: string;
+  fileUrl?: string;
+  displayTitle?: string;
+  progress?: {
+    done: number;
+    total: number;
+  };
 }
 
 interface UploadedFile {
@@ -257,7 +266,13 @@ const Chat = () => {
             fileId: currentFileId,
             fileName: uploadedFiles.find(f => f.id === currentFileId)?.name || 'Uploaded File'
           }
-        })
+        }),
+        // Include draft response fields
+        ...(response.mode && { mode: response.mode }),
+        ...(response.preview && { preview: response.preview }),
+        ...(response.fileUrl && { fileUrl: response.fileUrl }),
+        ...(response.displayTitle && { displayTitle: response.displayTitle }),
+        ...(response.progress && { progress: response.progress })
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -617,6 +632,56 @@ const Chat = () => {
                                       <p className="text-xs text-blue-500/70">
                                         File ID: {message.fileAnalysis.fileId}
                                       </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {message.mode === 'draft_ready' && message.preview && (
+                                <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-judicial-gold/10 rounded-lg border border-judicial-gold/20">
+                                  <div className="flex items-center gap-2 sm:gap-3 mb-3">
+                                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-judicial-gold flex-shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm sm:text-base text-judicial-gold font-semibold">
+                                        {message.displayTitle || 'Legal Document'}
+                                      </p>
+                                      <p className="text-xs text-judicial-gold/70">
+                                        Document ready for download
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="bg-judicial-dark/40 rounded-lg p-3 mb-3 max-h-60 overflow-y-auto">
+                                    <pre className="text-xs sm:text-sm text-gray-200 whitespace-pre-wrap font-mono">
+                                      {message.preview}
+                                    </pre>
+                                  </div>
+                                  {message.fileUrl && (
+                                    <div className="flex gap-2">
+                                      <a
+                                        href={`http://localhost:5000${message.fileUrl}`}
+                                        download
+                                        className="px-3 py-2 bg-judicial-gold text-judicial-dark rounded-lg hover:bg-judicial-gold/90 transition-colors text-sm font-medium flex items-center gap-2"
+                                      >
+                                        <FileText className="h-4 w-4" />
+                                        Download Word Document
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {message.mode === 'draft' && message.progress && (
+                                <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-judicial-gold/10 rounded-lg border border-judicial-gold/20">
+                                  <div className="flex items-center gap-2 sm:gap-3">
+                                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-judicial-gold flex-shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs sm:text-sm text-judicial-gold font-medium">
+                                        Draft Progress: {message.progress.done}/{message.progress.total} fields completed
+                                      </p>
+                                      <div className="w-full bg-judicial-dark/40 rounded-full h-2 mt-1">
+                                        <div 
+                                          className="bg-judicial-gold h-2 rounded-full transition-all duration-300"
+                                          style={{ width: `${(message.progress.done / message.progress.total) * 100}%` }}
+                                        ></div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
