@@ -322,7 +322,7 @@ export const profileAPI = {
 
   // Update profile
   updateInfo: async (data: { firstName?: string; lastName?: string }) => {
-    return apiFetch('/profile/update', {
+    return apiFetch('/profile/info', {
       method: 'PUT',
       body: JSON.stringify(data)
     });
@@ -334,7 +334,7 @@ export const profileAPI = {
     formData.append('image', image);
     
     const token = localStorage.getItem('jwt');
-    const response = await fetch(`${API_BASE_URL}/profile/upload-image`, {
+    const response = await fetch(`${API_BASE_URL}/profile/profile-image`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`
