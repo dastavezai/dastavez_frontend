@@ -202,7 +202,7 @@ export const chatAPI = {
 
   // Clear chat history
   clearHistory: async () => {
-    return apiFetch('/chat/clear', {
+    return apiFetch('/chat/clear?soft=true', {
       method: 'DELETE'
     });
   }

@@ -156,6 +156,46 @@ const Chat = () => {
     setShowDraftWizard(true);
   };
 
+  // Send a backend-driven draft intent to trigger choose/confirm/collect flow
+  const sendDraftIntent = async (intentLabel: string, customDetails?: string) => {
+    const phrase = customDetails
+      ? `${intentLabel}: ${customDetails}`
+      : `generate a ${intentLabel.toLowerCase()} draft`;
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: phrase,
+      timestamp: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+    setShowDraftWizard(false);
+    setIsLoading(true);
+    try {
+      const response = await chatAPI.sendMessage(phrase);
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: response.response || 'No response available',
+        timestamp: new Date().toISOString(),
+        ...(response.mode && { mode: response.mode }),
+        ...(response.preview && { preview: response.preview }),
+        ...(response.fileUrl && { fileUrl: response.fileUrl }),
+        ...(response.displayTitle && { displayTitle: response.displayTitle }),
+        ...(response.progress && { progress: response.progress })
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      setRemainingMessages(response.remainingMessages);
+      setSubscriptionStatus(response.subscriptionStatus);
+    } catch (err: any) {
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: err?.message || 'Failed to start drafting. Please try again.',
+        timestamp: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const closeDraftWizard = () => {
     setShowDraftWizard(false);
   };
@@ -488,85 +528,49 @@ const Chat = () => {
               <h3 className="text-lg font-semibold text-white">Legal Drafting</h3>
               <button className="text-gray-300 hover:text-white" onClick={closeDraftWizard} title="Close">✕</button>
             </div>
-
-            {/* Steps */}
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
-              {[0,1,2,3].map((s) => (
-                <div key={s} className={`px-2 py-1 rounded ${draftStep === s ? 'bg-judicial-gold text-judicial-dark' : 'bg-judicial-navy/60 border border-judicial-gold/20 text-gray-300'}`}>
-                  {s === 0 ? 'Type' : s === 1 ? 'Parties' : s === 2 ? 'Facts' : 'Instructions'}
-                </div>
+            {/* Quick draft categories (backend-driven workflow) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-4">
+              {[
+                'Adoption',
+                'Affidavit',
+                'Legal Notice',
+                'Agreement',
+                'Power of Attorney',
+                'Will',
+                'Lease',
+                'Sale Deed'
+              ].map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => sendDraftIntent(label)}
+                  className="px-3 py-2 bg-judicial-gold/10 text-judicial-gold border border-judicial-gold/30 rounded hover:bg-judicial-gold/20 text-xs sm:text-sm"
+                >
+                  {label}
+                </button>
               ))}
             </div>
 
-            {draftStep === 0 && (
-              <div>
-                <label className="block text-sm text-gray-300 mb-2">Document Type</label>
+            {/* Custom request input */}
+            <div className="mt-3">
+              <label className="block text-sm text-gray-300 mb-2">Custom request</label>
+              <div className="flex gap-2">
                 <input
                   value={draftDocType}
                   onChange={(e) => setDraftDocType(e.target.value)}
-                  placeholder="e.g., Legal Notice, Rent Agreement, Affidavit"
-                  className="w-full p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
+                  placeholder="e.g., Partnership Agreement, Reply to Legal Notice, etc."
+                  className="flex-1 p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
                 />
+                <button
+                  type="button"
+                  onClick={() => draftDocType && sendDraftIntent('draft request', draftDocType)}
+                  disabled={!draftDocType}
+                  className="px-3 py-2 bg-judicial-gold text-judicial-dark rounded font-semibold disabled:opacity-50"
+                >
+                  Start
+                </button>
               </div>
-            )}
-
-            {draftStep === 1 && (
-              <div>
-                <label className="block text-sm text-gray-300 mb-2">Parties (names, addresses, roles)</label>
-                <textarea
-                  value={draftParties}
-                  onChange={(e) => setDraftParties(e.target.value)}
-                  rows={4}
-                  className="w-full p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
-                />
-              </div>
-            )}
-
-            {draftStep === 2 && (
-              <div>
-                <label className="block text-sm text-gray-300 mb-2">Key Facts and Background</label>
-                <textarea
-                  value={draftFacts}
-                  onChange={(e) => setDraftFacts(e.target.value)}
-                  rows={5}
-                  className="w-full p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
-                />
-              </div>
-            )}
-
-            {draftStep === 3 && (
-              <div>
-                <label className="block text-sm text-gray-300 mb-2">Instructions / Demands</label>
-                <textarea
-                  value={draftInstructions}
-                  onChange={(e) => setDraftInstructions(e.target.value)}
-                  rows={4}
-                  className="w-full p-3 rounded-lg bg-judicial-navy/50 border border-judicial-gold/20 text-white placeholder-gray-400"
-                />
-              </div>
-            )}
-
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex gap-2">
-                <button onClick={goPrevDraftStep} disabled={draftStep === 0} className="px-3 py-2 bg-judicial-navy/50 border border-judicial-gold/20 text-gray-200 rounded disabled:opacity-50">Back</button>
-                {draftStep < 3 ? (
-                  <button onClick={goNextDraftStep} disabled={(draftStep===0 && !draftDocType) || (draftStep===1 && !draftParties) || (draftStep===2 && !draftFacts)} className="px-3 py-2 bg-judicial-gold text-judicial-dark rounded font-semibold disabled:opacity-50">Next</button>
-                ) : (
-                  <button onClick={generateDraft} disabled={isGeneratingDraft || !draftInstructions} className="px-3 py-2 bg-judicial-gold text-judicial-dark rounded font-semibold disabled:opacity-50">
-                    {isGeneratingDraft ? 'Generating…' : 'Generate Draft'}
-                  </button>
-                )}
-              </div>
-              {generatedDraftText && (
-                <button onClick={downloadDraft} className="px-3 py-2 bg-judicial-navy/50 border border-judicial-gold/20 text-judicial-gold rounded">Download Draft (.txt)</button>
-              )}
             </div>
-
-            {generatedDraftText && (
-              <div className="mt-4 p-3 rounded bg-judicial-navy/50 border border-judicial-gold/20 text-sm text-gray-100 whitespace-pre-wrap">
-                {generatedDraftText}
-              </div>
-            )}
           </div>
         )}
 
