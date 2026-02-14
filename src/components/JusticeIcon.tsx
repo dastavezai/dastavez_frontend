@@ -5,7 +5,7 @@ const JusticeIcon: React.FC = () => {
   return (
     <div className="relative perspective-1000">
       <div className="relative preserve-3d" style={{
-        animation: 'scale3D 4s ease-in-out infinite'
+        animation: 'scale3D 3s ease-in-out infinite'
       }}>
         <Scale className="h-10 w-10 text-judicial-gold" />
         <div className="absolute inset-0 bg-judicial-gold/20 blur-lg -z-10" />

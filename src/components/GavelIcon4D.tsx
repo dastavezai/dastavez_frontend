@@ -14,7 +14,7 @@ const GavelIcon4D: React.FC = () => {
     <div className="relative w-12 h-12">
       {/* Time dimension wrapper */}
       <div className="absolute inset-0 time-wrapper" style={{
-        animation: 'timeDimension 8s linear infinite',
+        animation: 'timeDimension 4s linear infinite',
         transform: `perspective(1000px) rotateX(${Math.sin(timePhase * 0.02) * 15}deg)`
       }}>
         {/* Main gavel icon with multiple layers */}
@@ -25,7 +25,7 @@ const GavelIcon4D: React.FC = () => {
               key={i}
               className="absolute inset-0 gavel-echo"
               style={{
-                animation: `echo${i} 3s ease-in-out infinite`,
+                animation: `echo${i} 10s ease-in-out infinite`,
                 animationDelay: `${i * 0.2}s`,
                 opacity: 0.2 - i * 0.03
               }}
@@ -120,10 +120,14 @@ const GavelIcon4D: React.FC = () => {
           0%, 100% {
             transform: translateZ(0) rotate(0deg);
           }
+          45%{
+            transform: translateZ(10px) rotate(170deg);
+            }  
           50% {
-            transform: translateZ(20px) rotate(180deg);
+            transform: translateZ(30px) rotate(180deg);
           }
-        }
+          55% {
+        }    transform: translateZ(10px) rotate(190deg);
 
         @keyframes drawPath {
           0% {

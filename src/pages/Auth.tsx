@@ -37,18 +37,24 @@ interface ValidationErrors {
   otp?: string;
 }
 
+// input class for light/dark mode
 const inputClasses = `
   w-full p-3 rounded-lg
-  bg-gradient-to-br from-judicial-blue/30 to-judicial-blue/10
-  text-white
-  border border-judicial-gold/30
-  shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]
-  backdrop-blur-lg
-  focus:outline-none focus:ring-2 focus:ring-judicial-lightGold focus:border-transparent
   transition-all duration-300
-  bg-judicial-blue/40
   transform hover:translate-y-[-2px]
-  placeholder-judicial-lightGold/50
+  focus:outline-none focus:ring-2 focus:ring-judicial-lightGold focus:border-transparent
+
+  /* light mode styles */
+  bg-white text-black border border-gray-300
+  placeholder-gray-400 shadow-sm
+
+  /* Dark mode styles */
+  dark:bg-gradient-to-br dark:from-judicial-blue/30 dark:to-judicial-blue/10
+  dark:text-black
+  dark:border-judicial-gold/30
+  dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]
+  dark:backdrop-blur-lg
+  dark:placeholder-judicial-lightGold/50
 `;
 
 const buttonClasses = `
@@ -135,7 +141,7 @@ const Auth = () => {
           logo_alignment: 'left',
           shape: 'rectangular',
         });
-      } catch {}
+      } catch { }
     };
     mount('google-btn-email');
     mount('google-btn-login');
@@ -147,7 +153,7 @@ const Auth = () => {
     };
     window.addEventListener('resize', onResize);
 
-    try { window.google.accounts.id.prompt(); } catch {}
+    try { window.google.accounts.id.prompt(); } catch { }
     return () => { window.removeEventListener('resize', onResize); };
   }, [googleReady]);
 
@@ -258,6 +264,7 @@ const Auth = () => {
       const data: any = await authAPI.login(emailToUse, state.password);
       if (data && (data.token || data.jwt || data.accessToken)) {
         const token = data.token || data.jwt || data.accessToken;
+        localStorage.removeItem('jwt');
         localStorage.setItem('jwt', token);
 
         // If backend directly signals admin access with boolean/success flags
@@ -322,7 +329,7 @@ const Auth = () => {
         confirmPassword: state.confirmPassword,
         otp: state.otp,
       });
-      
+
       if (data.token) {
         localStorage.setItem('jwt', data.token);
         window.location.href = '/chat';
@@ -383,7 +390,7 @@ const Auth = () => {
 
     const drawParticles = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       particles.forEach((particle) => {
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
@@ -415,18 +422,19 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden pb-20">
       {/* Removed <LoginIcon /> from login page */}
       {/* Background Image with Overlay */}
-      <div 
+      <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: `url('/courthouse.jpg')`,
           filter: 'brightness(0.3)'
         }}
       />
-      
+
       {/* Decorative Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-judicial-dark to-transparent" />
-        <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-judicial-dark to-transparent" />
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="hidden dark:block absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-judicial-dark to-transparent" />
+        <div className="hidden dark:block absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-judicial-dark to-transparent" />
+        <div className="dark:hidden absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-gray-200/50 to-transparent" />
       </div>
 
       {/* Content */}
@@ -437,9 +445,9 @@ const Auth = () => {
             <GavelAnimation />
           </div>
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-judicial-gold to-judicial-lightGold bg-clip-text text-transparent">
-            Dastaez AI
+            Dastavez AI
           </h1>
-          <p className="text-judicial-lightGold/80 text-lg">
+          <p className="text-judicial-blue/80 dark:text-judicial-lightGold/80 text-lg font-medium">
             Legal Intelligence Platform
           </p>
         </div>
@@ -449,101 +457,101 @@ const Auth = () => {
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-bold text-judicial-gold mb-2">
               {state.step === 'email' ? 'Welcome' :
-               state.step === 'login' ? 'Login' : 'Create Account'}
+                state.step === 'login' ? 'Login' : 'Create Account'}
             </h2>
             <p className="text-judicial-lightGold/80">
               {state.step === 'email' ? 'Enter your email to continue' :
-               state.step === 'login' ? 'Enter your password to login' :
-               'Complete your registration'}
+                state.step === 'login' ? 'Enter your password to login' :
+                  'Complete your registration'}
             </p>
           </div>
 
           {state.step === 'email' && (
             <div>
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <div>
-                <input
-                  type="email"
-                  placeholder="Email address"
-                  value={state.email}
-                  onChange={(e) => setState({ ...state, email: e.target.value })}
-                  className={inputClasses}
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-500">{errors.email}</p>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className={buttonClasses}
-              >
-                {isLoading ? 'Checking...' : 'Continue'}
-              </button>
-            </form>
-            <div id="google-btn-email" className="mt-3 w-full" />
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Email address"
+                    value={state.email}
+                    onChange={(e) => setState({ ...state, email: e.target.value })}
+                    className={inputClasses}
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={buttonClasses}
+                >
+                  {isLoading ? 'Checking...' : 'Continue'}
+                </button>
+              </form>
+              <div id="google-btn-email" className="mt-3 w-full" />
             </div>
           )}
 
           {state.step === 'login' && (
             <div>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="relative">
-                <input
-                  type={showLoginPassword ? 'text' : 'password'}
-                  placeholder="Password"
-                  value={state.password}
-                  onChange={(e) => {
-                    console.log('Password changed:', e.target.value.length, 'characters');
-                    setState({ ...state, password: e.target.value });
-                  }}
-                  className={inputClasses}
-                />
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="relative">
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    placeholder="Password"
+                    value={state.password}
+                    onChange={(e) => {
+                      console.log('Password changed:', e.target.value.length, 'characters');
+                      setState({ ...state, password: e.target.value });
+                    }}
+                    className={inputClasses}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-judicial-lightGold/80 hover:text-judicial-gold"
+                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-500">{errors.password}</p>
+                  )}
+                  {/* Debug info - remove in production */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <p className="mt-1 text-xs text-gray-400">
+                      Password length: {state.password.length}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={buttonClasses}
+                >
+                  {isLoading ? 'Logging in...' : 'Login'}
+                </button>
                 <button
                   type="button"
-                  onClick={() => setShowLoginPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-judicial-lightGold/80 hover:text-judicial-gold"
-                  aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setState({ ...state, step: 'email', password: '' })}
+                  className="w-full py-2 mt-2 rounded-lg bg-transparent border border-judicial-gold text-judicial-gold font-semibold hover:bg-judicial-gold/10 transition flex items-center justify-center gap-2"
                 >
-                  {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Back
                 </button>
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-500">{errors.password}</p>
-                )}
-                {/* Debug info - remove in production */}
-                {process.env.NODE_ENV === 'development' && (
-                  <p className="mt-1 text-xs text-gray-400">
-                    Password length: {state.password.length}
-                  </p>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className={buttonClasses}
-              >
-                {isLoading ? 'Logging in...' : 'Login'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setState({ ...state, step: 'email', password: '' })}
-                className="w-full py-2 mt-2 rounded-lg bg-transparent border border-judicial-gold text-judicial-gold font-semibold hover:bg-judicial-gold/10 transition flex items-center justify-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" /> Back
-              </button>
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigate('/forgot-password', { state: { email: state.email } });
-                  }}
-                  className="text-judicial-lightGold/80 hover:text-judicial-gold text-sm transition-all duration-300 hover:scale-105"
-                >
-                  Forgot password
-                </button>
-              </div>
-            </form>
-            <div id="google-btn-login" className="mt-3 w-full" />
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigate('/forgot-password', { state: { email: state.email } });
+                    }}
+                    className="text-judicial-lightGold/80 hover:text-judicial-gold text-sm transition-all duration-300 hover:scale-105"
+                  >
+                    Forgot password
+                  </button>
+                </div>
+              </form>
+              <div id="google-btn-login" className="mt-3 w-full" />
             </div>
           )}
 
@@ -555,7 +563,7 @@ const Auth = () => {
                   type: 'text',
                   placeholder: 'First Name',
                   value: state.firstName,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => 
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                     setState({ ...state, firstName: e.target.value }),
                   error: errors.firstName
                 },
@@ -563,7 +571,7 @@ const Auth = () => {
                   type: 'text',
                   placeholder: 'Last Name',
                   value: state.lastName,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => 
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                     setState({ ...state, lastName: e.target.value }),
                   error: errors.lastName
                 },
@@ -571,7 +579,7 @@ const Auth = () => {
                   type: showRegPassword ? 'text' : 'password',
                   placeholder: 'Password',
                   value: state.password,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => 
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                     setState({ ...state, password: e.target.value }),
                   error: errors.password
                 },
@@ -579,7 +587,7 @@ const Auth = () => {
                   type: showRegConfirm ? 'text' : 'password',
                   placeholder: 'Confirm Password',
                   value: state.confirmPassword,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => 
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                     setState({ ...state, confirmPassword: e.target.value }),
                   error: errors.confirmPassword
                 },
@@ -594,9 +602,9 @@ const Auth = () => {
                   error: errors.otp
                 }
               ].map((field, index) => (
-                <div 
+                <div
                   key={field.placeholder}
-                  style={{ 
+                  style={{
                     opacity: 0,
                     animation: 'fadeInUp 0.5s forwards',
                     animationDelay: `${index * 50}ms`

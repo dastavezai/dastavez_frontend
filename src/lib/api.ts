@@ -80,17 +80,17 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     'Content-Type': 'application/json',
   };
-  
-  const response = await fetch(`${API_BASE_URL}${url}`, { 
-    ...options, 
-    headers 
+
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    ...options,
+    headers
   });
-  
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
   }
-  
+
   return response.json();
 }
 
@@ -110,11 +110,11 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
-    
+
     if (response.token) {
       localStorage.setItem('jwt', response.token);
     }
-    
+
     return response;
   },
 
@@ -131,11 +131,11 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify(userData)
     });
-    
+
     if (response.token) {
       localStorage.setItem('jwt', response.token);
     }
-    
+
     return response;
   },
 
@@ -214,7 +214,7 @@ export const fileAPI = {
   uploadFile: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const token = localStorage.getItem('jwt');
     const response = await fetch(`${API_BASE_URL}/files/upload`, {
       method: 'POST',
@@ -223,12 +223,12 @@ export const fileAPI = {
       },
       body: formData
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
-    
+
     return response.json();
   },
 
@@ -332,7 +332,7 @@ export const profileAPI = {
   uploadImage: async (image: File) => {
     const formData = new FormData();
     formData.append('image', image);
-    
+
     const token = localStorage.getItem('jwt');
     const response = await fetch(`${API_BASE_URL}/profile/profile-image`, {
       method: 'POST',
@@ -341,13 +341,27 @@ export const profileAPI = {
       },
       body: formData
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
-    
+
     return response.json();
+  },
+
+  initiatePasswordChange: async (currentPassword: string) => {
+    return apiFetch('/profile/password/initiate-change', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword })
+    });
+  },
+
+  completePasswordChange: async (otp: string, newPassword: string, confirmPassword: string) => {
+    return apiFetch('/profile/password/complete-change', {
+      method: 'POST',
+      body: JSON.stringify({ otp, newPassword, confirmPassword })
+    });
   }
 };
 
@@ -357,6 +371,7 @@ export const contactAPI = {
   sendContact: async (data: {
     name: string;
     email: string;
+    phone?: string;
     subject: string;
     message: string;
   }) => {
@@ -375,7 +390,7 @@ export const adminAPI = {
   },
   //GET financial stats
   getStats: async () => {
-	  return apiFetch('/admin/financial-stats');
+    return apiFetch('/admin/financial-stats');
   },
 
   // Update subscription price
@@ -399,7 +414,7 @@ export const adminAPI = {
       body: JSON.stringify(data)
     });
   },
-  
+
   // Settings: free daily message limit
   getFreeMessageLimit: async (): Promise<{ value: number }> => {
     return apiFetch('/admin/settings/free-message-limit');

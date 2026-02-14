@@ -10,41 +10,41 @@ import { Link } from "react-router-dom";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-judicial-dark">
+    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
       <StarField />
       <Navbar />
       
       {/* NyayGuru-like Hero with CTA and badges */}
       <section className="relative">
         <HeroSection />
-        <div className="container mx-auto px-4 -mt-6 md:-mt-10">
-          <div className="mx-auto max-w-3xl text-center bg-judicial-navy/40 border border-judicial-gold/20 rounded-2xl p-4 md:p-6 backdrop-blur">
-            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-300 mb-3">
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Ask Your Legal Query</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Be Specific</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Ask in Any Language</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Upload PDFs</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Find Case Laws</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 border border-judicial-gold/20">Legal Draftings</span>
+        {/* <div className="container mx-auto px-4 -mt-6 md:-mt-10">
+          <div className="mx-auto max-w-3xl text-center bg-judicial-navy/40 dark:bg-judicial-navy/40 light:bg-white/60 border border-judicial-gold/20 rounded-2xl p-4 md:p-6 backdrop-blur">
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-300 light:text-judicial-navy/70 mb-3">
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Ask Your Legal Query</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Be Specific</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Ask in Any Language</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Upload PDFs</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Find Case Laws</span>
+              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Legal Draftings</span>
               <span className="px-2 py-1 rounded bg-judicial-gold text-judicial-dark font-semibold">It’s Free!</span>
             </div>
             <Link to="/chat" className="inline-block px-5 py-3 rounded-lg bg-judicial-gold text-judicial-dark font-semibold hover:bg-judicial-lightGold transition-colors">
               Start Chatting
             </Link>
-          </div>
-        </div>
+          </div> */}
+        {/* </div> */}
       </section>
       
       <FeatureCards />
       
       {/* Demo Section */}
-      <div className="py-16 bg-judicial-navy/30" id="cases">
+      <div className="py-16 bg-judicial-navy/30 dark:bg-judicial-navy/30 light:bg-judicial-navy/10" id="cases">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               See <span className="text-judicial-gold">Dastavez AI</span> in Action
             </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
+            <p className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 max-w-2xl mx-auto">
               Experience our powerful legal AI tools through interactive demos of our core features.
             </p>
           </div>
@@ -62,39 +62,44 @@ const Index = () => {
       </div>
 
       {/* Trusted by Legal Professionals Section */}
-      <div className="py-16 relative overflow-hidden">
+      <div className="py-16 md:py-20 relative overflow-hidden bg-white dark:bg-judicial-dark light:bg-white transition-colors duration-300">
         {/* Background Elements */}
-        <div className="absolute inset-0 z-0 opacity-30">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-judicial-gold/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-judicial-blue/10 rounded-full blur-3xl"></div>
+        <div className="absolute inset-0 z-0">
+          {/* Dark mode background */}
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-judicial-gold/5 dark:bg-judicial-gold/5 rounded-full blur-3xl dark:block hidden"></div>
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-judicial-blue/10 dark:bg-judicial-blue/10 rounded-full blur-3xl dark:block hidden"></div>
+          
+          {/* Light mode background */}
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-judicial-gold/10 light:bg-judicial-gold/10 rounded-full blur-3xl light:block hidden"></div>
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-judicial-blue/5 light:bg-judicial-blue/5 rounded-full blur-3xl light:block hidden"></div>
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              <span className="text-gradient-gold">Trusted by</span>{' '}
-              <span className="text-white">Legal Professionals</span>
+              <span className="text-gradient-hero dark:text-judicial-gold light:text-judicial-navy">Trusted by</span>{' '}
+              <span className="text-judicial-gold dark:text-judicial-gold light:text-judicial-navy">Legal Professionals</span>
             </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
+            <p className="text-gray-500 dark:text-gray-400 light:text-gray-600 max-w-2xl mx-auto">
               See what attorneys and legal teams are saying about Dastavez AI Oracle's impact on their practice.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="testimonial-card" style={{ animationDelay: '0.2s' }}>
-              <div className="testimonial-content">
-                <div className="testimonial-icon-container">
-                  <Quote className="h-8 w-8 text-judicial-gold testimonial-icon" />
+            <div className="trusted-card" style={{ animationDelay: '0.2s' }}>
+              <div className="trusted-content">
+                <div className="trusted-icon-container">
+                  <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
                 </div>
-                <p className="text-gray-300 mb-6 testimonial-text">
+                <p className="text-gray-700 dark:text-gray-300 light:text-gray-700 mb-6 trusted-text">
                   "Dastavez AI has completely transformed our legal research process. We've reduced preparation time by 60% while discovering more relevant precedents for our cases."
                 </p>
-                <div className="testimonial-footer">
-                  <div className="testimonial-author">
-                    <h4 className="font-semibold text-white">Priyanshu Singh</h4>
-                    <p className="text-sm text-gray-400">Senior Partner, Richardson & Associates</p>
+                <div className="trusted-footer">
+                  <div className="trusted-author">
+                    <h4 className="font-semibold text-gray-900 dark:text-white light:text-gray-900">Priyanshu Singh</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 light:text-gray-600">Senior Partner, Richardson & Associates</p>
                   </div>
-                  <div className="testimonial-stars">
+                  <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
                       <Star key={i} className="h-5 w-5 text-judicial-gold fill-current star-icon" />
                     ))}
@@ -103,20 +108,20 @@ const Index = () => {
               </div>
             </div>
 
-            <div className="testimonial-card" style={{ animationDelay: '0.4s' }}>
-              <div className="testimonial-content">
-                <div className="testimonial-icon-container">
-                  <Quote className="h-8 w-8 text-judicial-gold testimonial-icon" />
+            <div className="trusted-card" style={{ animationDelay: '0.4s' }}>
+              <div className="trusted-content">
+                <div className="trusted-icon-container">
+                  <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
                 </div>
-                <p className="text-gray-300 mb-6 testimonial-text">
-                  "The AI-powered case analysis has been a game-changer for our firm. We're now able to identify key patterns and precedents that we would have otherwise missed."
+                <p className="text-gray-700 dark:text-gray-300 light:text-gray-700 mb-6 trusted-text">
+                  "In high-stakes property and civil matters, documentation quality cannot be compromised. Dastavez AI delivers structured, court-ready drafts that align with procedural standards and significantly reduce turnaround time"
                 </p>
-                <div className="testimonial-footer">
-                  <div className="testimonial-author">
-                    <h4 className="font-semibold text-white">Rishav Prakash</h4>
-                    <p className="text-sm text-gray-400">Managing Partner, Chen & Associates</p>
+                <div className="trusted-footer">
+                  <div className="trusted-author">
+                    <h4 className="font-semibold text-gray-900 dark:text-white light:text-gray-900">Rishav Prakash</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 light:text-gray-600">Managing Partner, Chen & Associates</p>
                   </div>
-                  <div className="testimonial-stars">
+                  <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
                       <Star key={i} className="h-5 w-5 text-judicial-gold fill-current star-icon" />
                     ))}
@@ -125,20 +130,20 @@ const Index = () => {
               </div>
             </div>
 
-            <div className="testimonial-card" style={{ animationDelay: '0.6s' }}>
-              <div className="testimonial-content">
-                <div className="testimonial-icon-container">
-                  <Quote className="h-8 w-8 text-judicial-gold testimonial-icon" />
+            <div className="trusted-card" style={{ animationDelay: '0.6s' }}>
+              <div className="trusted-content">
+                <div className="trusted-icon-container">
+                  <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
                 </div>
-                <p className="text-gray-300 mb-6 testimonial-text">
-                  "The predictive analytics feature has helped us make more informed decisions about case strategy. It's like having an expert consultant available 24/7."
+                <p className="text-gray-700 dark:text-gray-300 light:text-gray-700 mb-6 trusted-text">
+                  "For lease agreements and commercial property documentation, the platform provides clear clause organization and ready-to-edit drafts. It has improved our firm’s efficiency in handling client documentation."
                 </p>
-                <div className="testimonial-footer">
-                  <div className="testimonial-author">
-                    <h4 className="font-semibold text-white">Fahim Ahmed</h4>
-                    <p className="text-sm text-gray-400">Legal Director, Rodriguez Law Group</p>
+                <div className="trusted-footer">
+                  <div className="trusted-author">
+                    <h4 className="font-semibold text-gray-900 dark:text-white light:text-gray-900">Fahim Ahmed</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 light:text-gray-600">Legal Director, Rodriguez Law Group</p>
                   </div>
-                  <div className="testimonial-stars">
+                  <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
                       <Star key={i} className="h-5 w-5 text-judicial-gold fill-current star-icon" />
                     ))}
@@ -151,7 +156,7 @@ const Index = () => {
 
         <style>
           {`
-            .testimonial-card {
+            .trusted-card {
               background: rgba(30, 41, 59, 0.7);
               backdrop-filter: blur(8px);
               border-radius: 1.5rem;
@@ -161,10 +166,16 @@ const Index = () => {
               transform-style: preserve-3d;
               perspective: 1000px;
               border: 1px solid rgba(255, 215, 0, 0.2);
-              animation: testimonialFloat 5s ease-in-out infinite;
+              animation: trustedFloat 5s ease-in-out infinite;
+              transition: all 0.3s ease;
             }
             
-            .testimonial-card::before {
+            .light .trusted-card {
+              background: rgba(255, 255, 255, 0.8);
+              border: 1px solid rgba(255, 215, 0, 0.3);
+            }
+            
+            .trusted-card::before {
               content: '';
               position: absolute;
               top: 0;
@@ -176,13 +187,17 @@ const Index = () => {
               animation: gradientPulse 4s ease-in-out infinite;
             }
             
-            .testimonial-content {
+            .light .trusted-card::before {
+              background: radial-gradient(circle at top left, rgba(255, 215, 0, 0.05) 0%, transparent 70%);
+            }
+            
+            .trusted-content {
               position: relative;
               z-index: 1;
               transform-style: preserve-3d;
             }
             
-            .testimonial-icon-container {
+            .trusted-icon-container {
               width: 60px;
               height: 60px;
               background: rgba(255, 215, 0, 0.1);
@@ -193,19 +208,24 @@ const Index = () => {
               margin: 0 auto 1.5rem;
               transform-style: preserve-3d;
               animation: iconContainerFloat 3s ease-in-out infinite;
+              transition: all 0.3s ease;
             }
             
-            .testimonial-icon {
+            .light .trusted-icon-container {
+              background: rgba(255, 215, 0, 0.15);
+            }
+            
+            .trusted-icon {
               animation: iconSpin 3s ease-in-out infinite;
               transform-style: preserve-3d;
             }
             
-            .testimonial-text {
+            .trusted-text {
               transition: all 0.3s ease;
               transform-style: preserve-3d;
             }
             
-            .testimonial-footer {
+            .trusted-footer {
               display: flex;
               justify-content: space-between;
               align-items: center;
@@ -213,11 +233,11 @@ const Index = () => {
               transform-style: preserve-3d;
             }
             
-            .testimonial-author {
+            .trusted-author {
               transform-style: preserve-3d;
             }
             
-            .testimonial-stars {
+            .trusted-stars {
               display: flex;
               gap: 0.25rem;
               transform-style: preserve-3d;
@@ -228,34 +248,48 @@ const Index = () => {
               transform-style: preserve-3d;
             }
             
-            .testimonial-card:hover {
-              transform: translateY(-10px) rotateX(5deg) rotateY(5deg);
-              box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3),
-                          0 0 30px rgba(255, 215, 0, 0.2);
-              border-color: rgba(255, 215, 0, 0.5);
+            .trusted-card:hover {
+              transform: translateY(-5px) rotateX(2deg) rotateY(2deg);
+              box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15),
+                          0 0 15px rgba(255, 215, 0, 0.1);
+              border-color: rgba(255, 215, 0, 0.35);
             }
             
-            .testimonial-card:hover .testimonial-icon {
-              transform: rotateY(180deg) scale(1.2);
+            .light .trusted-card:hover {
+              box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08),
+                          0 0 15px rgba(255, 215, 0, 0.1);
+              border-color: rgba(255, 215, 0, 0.4);
+            }
+            
+            .trusted-card:hover .trusted-icon {
+              transform: rotateY(90deg) scale(1.1);
               color: #FFD700;
             }
             
-            .testimonial-card:hover .testimonial-text {
-              transform: translateZ(10px);
-              text-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+            .trusted-card:hover .trusted-text {
+              transform: translateZ(5px);
+              text-shadow: 0 0 8px rgba(255, 215, 0, 0.1);
             }
             
-            .testimonial-card:hover .testimonial-author h4 {
-              transform: translateZ(15px);
-              text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            .light .trusted-card:hover .trusted-text {
+              text-shadow: 0 0 8px rgba(255, 215, 0, 0.08);
             }
             
-            .testimonial-card:hover .star-icon {
-              transform: translateZ(5px) scale(1.2);
+            .trusted-card:hover .trusted-author h4 {
+              transform: translateZ(8px);
+              text-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
+            }
+            
+            .light .trusted-card:hover .trusted-author h4 {
+              text-shadow: 0 0 8px rgba(255, 215, 0, 0.15);
+            }
+            
+            .trusted-card:hover .star-icon {
+              transform: translateZ(3px) scale(1.1);
               animation: starPulse 1s ease-in-out infinite;
             }
             
-            @keyframes testimonialFloat {
+            @keyframes trustedFloat {
               0%, 100% {
                 transform: translateY(0) rotateX(0deg) rotateY(0deg);
               }

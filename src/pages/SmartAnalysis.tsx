@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 const SmartAnalysis = () => {
   return (
-    <div className="min-h-screen bg-judicial-dark">
+    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
       <StarField />
       <Navbar />
       
@@ -20,12 +20,11 @@ const SmartAnalysis = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
             >
-              <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                <span className="bg-gradient-to-r from-judicial-gold to-judicial-lightGold bg-clip-text text-transparent">
-                  Smart Analysis
-                </span>
-              </h1>
-              <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+              <h1 className="text-4xl font-bold mb-6 text-black dark:text-white sm:text-5xl md:text-6xl">
+              Smart <span className="text-judicial-gold">Analysis</span>
+            </h1>
+          
+              <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
                 Advanced AI-powered legal analysis that transforms complex legal data into actionable insights.
               </p>
             </motion.div>
@@ -41,7 +40,7 @@ const SmartAnalysis = () => {
             >
               <Brain className="w-12 h-12 text-judicial-gold mb-4" />
               <h3 className="text-xl font-semibold mb-2">Natural Language Processing</h3>
-              <p className="text-gray-400">
+              <p className="text-gray-600 dark:text-gray-400">
                 Advanced NLP algorithms understand and analyze legal documents with human-like comprehension.
               </p>
             </motion.div>
@@ -54,7 +53,7 @@ const SmartAnalysis = () => {
             >
               <Zap className="w-12 h-12 text-judicial-gold mb-4" />
               <h3 className="text-xl font-semibold mb-2">Pattern Recognition</h3>
-              <p className="text-gray-400">
+              <p className="text-gray-600 dark:text-gray-400">
                 Identify key patterns and trends across case law, statutes, and legal precedents.
               </p>
             </motion.div>
@@ -67,7 +66,7 @@ const SmartAnalysis = () => {
             >
               <Cpu className="w-12 h-12 text-judicial-gold mb-4" />
               <h3 className="text-xl font-semibold mb-2">Machine Learning</h3>
-              <p className="text-gray-400">
+              <p className="text-gray-600 dark:text-gray-400">
                 Continuously learns from legal data to improve analysis accuracy and relevance.
               </p>
             </motion.div>
@@ -131,7 +130,7 @@ const SmartAnalysis = () => {
               transition={{ duration: 0.8, delay: 1 }}
             >
               <h2 className="text-2xl font-bold mb-6">Ready to Experience Smart Analysis?</h2>
-              <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
+              <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
                 Transform your legal practice with our advanced AI-powered analysis tools.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">

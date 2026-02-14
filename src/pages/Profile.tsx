@@ -7,17 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  Shield, 
-  Settings, 
-  LogOut, 
-  Edit, 
-  Save, 
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Shield,
+  Settings,
+  LogOut,
+  Edit,
+  Save,
   X,
   Key,
   Globe,
@@ -144,49 +144,28 @@ const Profile = () => {
     }
 
     try {
-      const token = localStorage.getItem('jwt');
-      
       // Step 1: Initiate password change (this will send OTP to email)
-      const initiateResponse = await fetch('/api/api/profile/password/change', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          currentPassword: formData.currentPassword,
-	  newPassword: formData.newPassword,
-	  confirmPassword: formData.confirmPassword
-        })
-      });
+      await profileAPI.initiatePasswordChange(formData.currentPassword);
 
-      if (initiateResponse.ok) {
-        // Step 2: Complete password change with OTP
-        // Note: You'll need to add an OTP input field to your form
-        // For now, we'll just show a success message for the initiation
-        setFormData({
-          ...formData,
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-        setErrors({});
-        // You should show a message asking user to check email for OTP
-        alert('Password changed successfully.');
-      } else {
-        const errorData = await initiateResponse.json();
-	alert(errorData.message);
-        setErrors({ currentPassword: errorData.message || 'Failed to initiate password change' });
-      }
-    } catch (error) {
+      // TODO: Implement UI for Step 2 (OTP entry and completePasswordChange call)
+      alert(`OTP sent to your email. Please check your inbox.\n\n(Note: Complete password change UI is not yet implemented in this view)`);
+
+      setFormData({
+        ...formData,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setErrors({});
+    } catch (error: any) {
       console.error('Error changing password:', error);
-      setErrors({ currentPassword: 'An error occurred while changing password' });
+      setErrors({ currentPassword: error.message || 'An error occurred while changing password' });
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-judicial-dark flex items-center justify-center">
+      <div className="min-h-screen bg-white dark:bg-judicial-dark flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
           <GavelAnimation />
           <p className="text-judicial-gold mt-4">Loading profile...</p>
@@ -197,7 +176,7 @@ const Profile = () => {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-judicial-dark flex items-center justify-center">
+      <div className="min-h-screen bg-white dark:bg-judicial-dark flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
           <p className="text-red-500">Failed to load profile</p>
           <Button onClick={() => navigate('/auth')} className="mt-4">
@@ -209,7 +188,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-judicial-dark">
+    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
       {/* Header */}
       <div className="bg-judicial-navy/50 backdrop-blur-sm border-b border-judicial-gold/20">
         <div className="container mx-auto px-4 py-6">
@@ -259,16 +238,16 @@ const Profile = () => {
                   {profile.firstName} {profile.lastName}
                 </h2>
                 <p className="text-judicial-lightGold mb-4">{profile.email}</p>
-                
+
                 <div className="space-y-2 mb-6">
-                  <Badge 
+                  <Badge
                     variant={profile.verified ? "default" : "secondary"}
                     className={profile.verified ? "bg-green-500" : "bg-gray-500"}
                   >
                     {profile.verified ? "Verified" : "Unverified"}
                   </Badge>
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="border-judicial-gold text-judicial-gold"
                   >
                     {profile.subscription.charAt(0).toUpperCase() + profile.subscription.slice(1)} Plan
@@ -278,11 +257,11 @@ const Profile = () => {
                 <div className="text-left space-y-3 text-sm">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-judicial-gold" />
-                    <span className="text-gray-400">Joined: {new Date(profile.joinDate).toLocaleDateString()}</span>
+                    <span className="text-gray-600 dark:text-gray-400">Joined: {new Date(profile.joinDate).toLocaleDateString()}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Shield className="h-4 w-4 text-judicial-gold" />
-                    <span className="text-gray-400">Last login: {new Date(profile.lastLogin).toLocaleString()}</span>
+                    <span className="text-gray-600 dark:text-gray-400">Last login: {new Date(profile.lastLogin).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -304,7 +283,7 @@ const Profile = () => {
                     <div className="flex justify-between items-center">
                       <div>
                         <CardTitle className="text-white">Personal Information</CardTitle>
-                        <CardDescription className="text-gray-400">
+                        <CardDescription className="text-gray-600 dark:text-gray-400">
                           Update your personal details and contact information
                         </CardDescription>
                       </div>
@@ -342,16 +321,16 @@ const Profile = () => {
                         />
                       </div>
                     </div>
-                    
-                                         <div>
-                       <Label htmlFor="email" className="text-judicial-gold">Email</Label>
-                       <Input
-                         id="email"
-                         value={formData.email}
-                         disabled
-                         className="bg-judicial-navy/50 border-judicial-gold/30 text-gray-400"
-                       />
-                     </div>
+
+                    <div>
+                      <Label htmlFor="email" className="text-judicial-gold">Email</Label>
+                      <Input
+                        id="email"
+                        value={formData.email}
+                        disabled
+                        className="bg-judicial-navy/50 border-judicial-gold/30 text-gray-500 dark:text-gray-400"
+                      />
+                    </div>
 
                     {isEditing && (
                       <div className="flex gap-2 pt-4">
@@ -369,7 +348,7 @@ const Profile = () => {
                 <FloatingCard>
                   <CardHeader>
                     <CardTitle className="text-white">Security Settings</CardTitle>
-                    <CardDescription className="text-gray-400">
+                    <CardDescription className="text-gray-600 dark:text-gray-400">
                       Manage your password and security preferences
                     </CardDescription>
                   </CardHeader>
@@ -421,7 +400,7 @@ const Profile = () => {
                       )}
                     </div>
 
-                    <Button 
+                    <Button
                       onClick={handleChangePassword}
                       className="bg-judicial-gold text-judicial-dark hover:bg-judicial-lightGold"
                     >
@@ -436,36 +415,36 @@ const Profile = () => {
                 <FloatingCard>
                   <CardHeader>
                     <CardTitle className="text-white">Preferences</CardTitle>
-                    <CardDescription className="text-gray-400">
+                    <CardDescription className="text-gray-600 dark:text-gray-400">
                       Customize your experience and notification settings
                     </CardDescription>
                   </CardHeader>
-                                     <CardContent className="space-y-6">
-                     <div>
-                       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                         <Globe className="h-5 w-5 text-judicial-gold" />
-                         Language & Region
-                       </h3>
-                       <div className="space-y-3">
-                         <div>
-                           <Label className="text-judicial-gold">Language</Label>
-                           <select className="w-full mt-1 p-2 bg-judicial-navy/50 border border-judicial-gold/30 text-white rounded">
-                             <option>English</option>
-                             <option>Spanish</option>
-                             <option>French</option>
-                           </select>
-                         </div>
-                         <div>
-                           <Label className="text-judicial-gold">Time Zone</Label>
-                           <select className="w-full mt-1 p-2 bg-judicial-navy/50 border border-judicial-gold/30 text-white rounded">
-                             <option>UTC-5 (Eastern Time)</option>
-                             <option>UTC-8 (Pacific Time)</option>
-                             <option>UTC+0 (GMT)</option>
-                           </select>
-                         </div>
-                       </div>
-                     </div>
-                   </CardContent>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <Globe className="h-5 w-5 text-judicial-gold" />
+                        Language & Region
+                      </h3>
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-judicial-gold">Language</Label>
+                          <select className="w-full mt-1 p-2 bg-judicial-navy/50 border border-judicial-gold/30 text-white rounded">
+                            <option>English</option>
+                            <option>Spanish</option>
+                            <option>French</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label className="text-judicial-gold">Time Zone</Label>
+                          <select className="w-full mt-1 p-2 bg-judicial-navy/50 border border-judicial-gold/30 text-white rounded">
+                            <option>UTC-5 (Eastern Time)</option>
+                            <option>UTC-8 (Pacific Time)</option>
+                            <option>UTC+0 (GMT)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
                 </FloatingCard>
               </TabsContent>
             </Tabs>

@@ -45,7 +45,7 @@ const CaseStudies = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-judicial-dark relative overflow-hidden">
+    <div className="min-h-screen bg-white dark:bg-judicial-dark relative overflow-hidden transition-colors duration-300">
       <StarField />
       <Navbar />
       
@@ -66,7 +66,7 @@ const CaseStudies = () => {
                   type: "spring",
                   stiffness: 100
                 }}
-                className="text-4xl font-bold text-white sm:text-5xl md:text-6xl"
+                className="text-4xl font-bold text-black dark:text-white sm:text-5xl md:text-6xl"
               >
                 Case
               </motion.h1>
@@ -93,7 +93,7 @@ const CaseStudies = () => {
                 type: "spring",
                 stiffness: 100
               }}
-              className="mt-3 max-w-md mx-auto text-base text-gray-400 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl"
+              className="mt-3 max-w-md mx-auto text-base text-gray-600 dark:text-gray-400 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl"
             >
               Discover how legal professionals are transforming their practice with our AI solutions
             </motion.p>
@@ -106,7 +106,7 @@ const CaseStudies = () => {
                 initial={{ opacity: 0, y: 20, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ 
-                  duration: 0.5, 
+                  duration: 0.2, 
                   delay: index * 0.1,
                   type: "spring",
                   stiffness: 100
@@ -114,7 +114,7 @@ const CaseStudies = () => {
                 whileHover={{ 
                   scale: 1.05,
                   y: -5,
-                  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px rgba(255, 215, 0, 0.2)"
+                  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.2), 0 0 30px rgba(255, 215, 0, 0.2)"
                 }}
                 className="bg-judicial-navy/70 backdrop-blur-md rounded-lg p-6 border border-judicial-gold/20 hover:border-judicial-gold/50 transition-all duration-300"
               >
@@ -131,18 +131,19 @@ const CaseStudies = () => {
                   </span>
                 </div>
                 
-                <h3 className="text-xl font-semibold text-white mb-2">
+                <h3 className="text-xl font-semibold text-black dark:text-white mb-2">
                   {study.title}
                 </h3>
-                <p className="text-gray-400">
+                <p className="text-gray-600 dark:text-gray-400">
                   {study.description}
                 </p>
               </motion.div>
             ))}
           </div>
-	 <Footer />
+	 
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

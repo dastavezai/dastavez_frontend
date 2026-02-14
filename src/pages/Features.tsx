@@ -40,7 +40,7 @@ const Features = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-judicial-dark relative overflow-hidden">
+    <div className="min-h-screen bg-white dark:bg-judicial-dark relative overflow-hidden transition-colors duration-300">
       <StarField />
       <Navbar />
       <div className="relative z-10 py-12 px-4 sm:px-6 lg:px-8">
@@ -51,10 +51,10 @@ const Features = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <h1 className="text-4xl font-bold text-white sm:text-5xl md:text-6xl">
+            <h1 className="text-4xl font-bold text-black dark:text-white sm:text-5xl md:text-6xl">
               Our <span className="text-judicial-gold">Features</span>
             </h1>
-            <p className="mt-3 max-w-md mx-auto text-base text-gray-400 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+            <p className="mt-3 max-w-md mx-auto text-base text-gray-600 dark:text-gray-400 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
               Discover the powerful features that make our platform the ultimate legal AI assistant
             </p>
           </motion.div>
@@ -72,23 +72,19 @@ const Features = () => {
                   stiffness: 100
                 }}
                 whileHover={{ 
-                  scale: 1.05,
-                  y: -5,
-                  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px rgba(255, 215, 0, 0.2)"
+                  scale: 1.01,
+                  y: -2,
+                  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3), 0 0 30px rgba(255, 215, 0, 0.1)"
                 }}
                 className="bg-judicial-navy/70 backdrop-blur-md rounded-lg p-6 border border-judicial-gold/20 hover:border-judicial-gold/50 transition-all duration-300"
               >
-                <motion.div 
-                  className="text-4xl mb-4"
-                  whileHover={{ scale: 1.2, rotate: 5 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
+                <div className="text-4xl mb-4">
                   {feature.icon}
-                </motion.div>
-                <h3 className="text-xl font-semibold text-white mb-2">
+                </div>
+                <h3 className="text-xl font-semibold text-black dark:text-white mb-2">
                   {feature.title}
                 </h3>
-                <p className="text-gray-400">
+                <p className="text-gray-600 dark:text-gray-400">
                   {feature.description}
                 </p>
               </motion.div>
@@ -103,10 +99,13 @@ const Features = () => {
             className="mt-16"
           >
             
-	    <Footer />
+	    {/* <Footer /> */}
           </motion.div>
+
         </div>
-      </div>
+        </div>
+
+      <Footer />
     </div>
   );
 };

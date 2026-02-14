@@ -61,12 +61,12 @@ export default {
 					foreground: 'hsl(var(--card-foreground))'
 				},
 				judicial: {
-					dark: '#1A1F2C',
-					navy: '#203354',
-					blue: '#304B7A',
-					gold: '#D6AB55',
-					lightGold: '#F2D694',
-					accent: '#A87D35'
+					dark: 'hsl(var(--judicial-dark, 26 20 44))',
+					navy: 'hsl(var(--judicial-navy, 32 51 84))',
+					blue: 'hsl(var(--judicial-blue, 48 71 122))',
+					gold: 'hsl(var(--judicial-gold, 42 60 58))',
+					lightGold: 'hsl(var(--judicial-lightGold, 45 65 75))',
+					accent: 'hsl(var(--judicial-accent, 42 50 45))'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',

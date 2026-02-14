@@ -78,8 +78,9 @@ export function Navbar() {
     { label: "Features", value: "features", path: "/features" },
     { label: "Case Studies", value: "case-studies", path: "/case-studies" },
     { label: "Smart Analysis", value: "smart-analysis", path: "/smart-analysis" },
-    { label: "About", value: "about", path: "#about" },
-    { label: "Contact", value: "contact", path: "#contact" },
+    { label: "About", value: "about", path: "/about" },
+    { label: "Contact", value: "contact", path: "/contact" },
+    { label: "Blog", value: "blog", path: "/blog" },
   ];
 
   const handleSelect = (value) => {
@@ -100,10 +101,9 @@ export function Navbar() {
       className={cn(
         "fixed top-0 w-full z-50 transition-all duration-300",
         scrolled
-          ? "bg-judicial-navy/90 backdrop-blur-md py-2 shadow-md"
-          : "bg-transparent py-4"
-      )}
-    >
+          ? "bg-white/90 dark:bg-slate-950/95 backdrop-blur-md py-2 shadow-md border-b border-gray-200 dark:border-judicial-gold/10 text-slate-900 dark:text-white"
+          : "bg-transparent py-4 text-white dark:text-white"
+      )}>
       <div className="container mx-auto px-4 flex justify-between items-center">
         {/* Logo */}
         <Link to="/" className="flex items-center space-x-2 sm:space-x-4">
@@ -113,41 +113,53 @@ export function Navbar() {
           <div className="hidden sm:block">
             <span className="text-xl sm:text-2xl font-bold tracking-tight">
               <span className="text-judicial-gold">Dastavez</span>{" "}
-              <span className="text-white">AI</span>
-              <span className="block text-xs sm:text-sm font-normal text-gray-400">Powered Legal Intelligence</span>
+              <span className="text-slate-900 dark:text-white">AI</span>
+              <span className="block text-xs sm:text-sm font-normal text-slate-500 dark:text-gray-400">Powered Legal Intelligence</span>
             </span>
           </div>
           <div className="sm:hidden">
             <span className="text-lg font-bold tracking-tight">
               <span className="text-judicial-gold">Dastavez</span>{" "}
-              <span className="text-white">AI</span>
+              <span className="text-black dark:text-white">AI</span>
             </span>
           </div>
         </Link>
 
         {/* Desktop Navigation */}
         <div className="hidden lg:flex items-center space-x-6 xl:space-x-8">
-          <Link to="/features" className="text-sm hover:text-judicial-gold transition-colors">Features</Link>
+          <Link to="/features" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Features</Link>
           {location.pathname !== '/chat' ? (
             <div className="relative flex flex-col items-center">
-              <Link to="/case-studies" className="text-sm hover:text-judicial-gold transition-colors">Case Studies</Link>
+              <Link to="/case-studies" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Case Studies</Link>
               {/* Icon/highlight here, only if not on /chat */}
               <span className="absolute top-6 left-1/2 -translate-x-1/2">
                 {/* If you have a custom icon/highlight, put it here. If not, remove this span. */}
               </span>
             </div>
           ) : (
-            <Link to="/case-studies" className="text-sm hover:text-judicial-gold transition-colors">Case Studies</Link>
+            <Link to="/case-studies" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Case Studies</Link>
           )}
-          <Link to="/smart-analysis" className="text-sm hover:text-judicial-gold transition-colors">Smart Analysis</Link>
-          <Link to="/mukhya-mantri-mahila-rojgar-yojana-fill-form" className="text-sm hover:text-judicial-gold transition-colors">MM Mahila Rojgar</Link>
-          <Link to="/mukhya-mantri-rojgar-yojana" className="text-sm hover:text-judicial-gold transition-colors">MM Rojgar Yojana</Link>
-          <Link to="/about" className="text-sm hover:text-judicial-gold transition-colors">About</Link>
-          <a href="#contact" className="text-sm hover:text-judicial-gold transition-colors">Contact</a>
+          <Link to="/smart-analysis" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Smart Analysis</Link>
+
+          <Link to="/about" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">About</Link>
+          <Link to="/contact" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Contact</Link>
+          <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Blog</Link>
           
           <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10" onClick={() => setSearchOpen(true)}>
             <Search className="h-4 w-4 mr-2" />
             <span className="hidden xl:inline">Search</span>
+          </Button>
+
+          {/* Theme Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-9 w-9 rounded-lg border border-judicial-gold/30 dark:border-judicial-gold/20 bg-transparent dark:bg-judicial-navy/50 light:bg-white/50 hover:bg-judicial-gold/10 hover:border-judicial-gold/50 transition-all duration-300"
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-judicial-gold" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-judicial-gold"/>
+            <span className="sr-only">Toggle theme</span>
           </Button>
           
 
@@ -166,7 +178,7 @@ export function Navbar() {
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className="text-red-500 hover:bg-red-500/10"
+                className="text-judicial-gold hover:bg-red-500/10"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -178,8 +190,28 @@ export function Navbar() {
 
         {/* Tablet Navigation - Simplified */}
         <div className="hidden md:flex lg:hidden items-center space-x-4">
+          <div className="flex items-center space-x-3 text-sm font-medium">
+            <Link to="/features" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Features</Link>
+            <Link to="/case-studies" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Case Studies</Link>
+            <Link to="/smart-analysis" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Smart Analysis</Link>
+            <Link to="/about" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">About</Link>
+            <Link to="/contact" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Contact</Link>
+            <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Blog</Link>
+          </div>
+
           <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10" onClick={() => setSearchOpen(true)}>
             <Search className="h-4 w-4" />
+          </Button>
+
+          {/* Theme Toggle */}
+          <Button
+            variant="ghost"
+            onClick={toggleTheme}
+            className="h-9 w-9 rounded-lg border border-judicial-gold/20 bg-judicial-navy/50 hover:bg-judicial-gold/10 hover:border-judicial-gold/40 transition-all duration-300"
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-judicial-gold" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-judicial-gold" />
+            <span className="sr-only">Toggle theme</span>
           </Button>
           
 
@@ -204,46 +236,59 @@ export function Navbar() {
           className="md:hidden"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
-          {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {isMenuOpen ? <X className="h-6 w-6 text-black dark:text-judicial-gold" /> : <Menu className="h-6 w-6 text-black dark:text-judicial-gold" />}
         </Button>
       </div>
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-judicial-navy/95 backdrop-blur-md py-4 border-t border-judicial-gold/10">
+        <div className="md:hidden bg-white dark:bg-judicial-navy border-t border-judicial-gold/20">
           <div className="container mx-auto px-4 flex flex-col space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <Link to="/features" className="text-sm hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Features</Link>
-              <Link to="/case-studies" className="text-sm hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Case Studies</Link>
-              <Link to="/smart-analysis" className="text-sm hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Smart Analysis</Link>
-              <Link to="/about" className="text-sm hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">About</Link>
+              <Link to="/features" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Features</Link>
+              <Link to="/case-studies" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Case Studies</Link>
+              <Link to="/smart-analysis" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Smart Analysis</Link>
+              <Link to="/about" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">About</Link>
+              <Link to="/contact" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Contact</Link>
+              <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Blog</Link>
             </div>
             
-            <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/10">
-              <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10">
+            <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/10 dark:border-judicial-gold/10 light:border-judicial-navy/20">
+              <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10" onClick={() => setSearchOpen(true)}>
                 <Search className="h-4 w-4 mr-2" />
                 Search
               </Button>
-              
+
+              {/* Theme Toggle */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="h-9 w-9 rounded-lg border border-judicial-gold/30 dark:border-judicial-gold/20 bg-transparent dark:bg-judicial-navy/50 light:bg-white/50 hover:bg-judicial-gold/10 hover:border-judicial-gold/50 transition-all duration-300"
+              >
+                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-judicial-gold" />
+                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-judicial-gold" />
+                <span className="sr-only">Toggle theme</span>
+              </Button>
             </div>
             
             {isLoggedIn ? (
-              <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/10">
-                <Link to="/profile" className="text-sm hover:text-judicial-gold transition-colors flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-judicial-gold/10">
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-judicial-gold/20">
+                <Link to="/profile" className="text-sm text-slate-900 dark:text-white hover:text-judicial-gold dark:hover:text-judicial-gold transition-colors flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-judicial-gold/10 dark:hover:bg-judicial-gold/20">
                   <User className="h-4 w-4" />
                   Profile
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="text-sm text-red-500 hover:text-red-400 transition-colors flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-red-500/10"
+                  className="text-sm text-black dark:text-white hover:text-judicial-gold transition-colors flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-red-500/10"
                 >
                   <LogOut className="h-4 w-4" />
                   Logout
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/10">
-                <Link to="/auth" className="text-sm hover:text-judicial-gold transition-colors flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-judicial-gold/10">
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-judicial-gold/20">
+                <Link to="/auth" className="text-sm text-slate-900 dark:text-white hover:text-judicial-gold dark:hover:text-judicial-gold transition-colors flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-judicial-gold/10 dark:hover:bg-judicial-gold/20">
                   <LogIn className="h-4 w-4" />
                   Log in
                 </Link>

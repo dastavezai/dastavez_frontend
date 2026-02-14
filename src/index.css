@@ -42,6 +42,14 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 215 25% 20%;
     --sidebar-ring: 42 60% 58%;
+
+    /* Dark theme judicial colors (default) */
+    --judicial-dark: 220 20% 10%;
+    --judicial-navy: 215 25% 15%;
+    --judicial-blue: 210 30% 25%;
+    --judicial-gold: 42 60% 58%;
+    --judicial-lightGold: 45 65% 75%;
+    --judicial-accent: 42 50% 45%;
   }
 
   .light {
@@ -73,7 +81,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 42 60% 58%;
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 0 0% 98%;  
     --sidebar-foreground: 220 20% 15%;
     --sidebar-primary: 42 60% 58%;
     --sidebar-primary-foreground: 220 20% 15%;
@@ -81,6 +89,14 @@
     --sidebar-accent-foreground: 220 20% 15%;
     --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 42 60% 58%;
+
+    /* Light theme judicial colors */
+    --judicial-dark: 220 15% 25%;
+    --judicial-navy: 215 20% 35%;
+    --judicial-blue: 210 25% 50%;
+    --judicial-gold: 42 60% 58%;
+    --judicial-lightGold: 45 65% 85%;
+    --judicial-accent: 42 50% 55%;
   }
 }
 
@@ -532,6 +548,27 @@
     @apply bg-gradient-to-r from-judicial-gold to-judicial-lightGold bg-clip-text text-transparent;
   }
   
+  .text-gradient-hero {
+    background: linear-gradient(to right, white, rgba(255, 255, 255, 0.9));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .light .text-gradient-hero {
+    background: linear-gradient(to right, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.85));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .dark .text-gradient-hero {
+    background: linear-gradient(to right, white, rgba(255, 255, 255, 0.9));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
   .glass-card {
     @apply bg-opacity-20 backdrop-blur-lg border border-white/10 shadow-xl;
   }
@@ -686,7 +723,7 @@
   }
 
   /* Responsive feature pills */
-  .feature-pill {
+  /* .feature-pill {
     background: rgba(30, 41, 59, 0.7);
     backdrop-filter: blur(8px);
     padding: 0.5rem 1rem;
@@ -695,6 +732,27 @@
     align-items: center;
     perspective: 1000px;
     border: 1px solid rgba(255, 215, 0, 0.2);
+    transition: background-color 0.3s ease;
+  }
+  
+  /* Light mode - light pill */
+  /* .light .feature-pill {
+    background: rgba(241, 245, 250, 0.8);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+  }
+  
+  .light .feature-pill span {
+    color: rgba(15, 23, 42, 0.9);
+  } */
+  
+  /* Dark mode - dark pill */
+  /* .dark .feature-pill {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 215, 0, 0.2);
+  }
+  
+  .dark .feature-pill span {
+    color: rgba(226, 232, 240, 0.95);
   }
   
   .feature-pill:hover {
@@ -703,8 +761,6 @@
     border-color: rgba(255, 215, 0, 0.5);
   }
   
-  .feature-pill span {
-  }
   
   .feature-pill:hover span {
     transform: translateZ(10px);
@@ -718,7 +774,7 @@
   .feature-pill:hover svg {
     transform: scale(1.2) rotate(10deg);
     filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.5));
-  }
+  } */ 
   
   /* Hide visually but preserve layout for the gold message-square */
   .lucide-message-square.text-judicial-gold {
@@ -780,6 +836,34 @@
     transform-style: preserve-3d;
     perspective: 1000px;
     border: 1px solid rgba(255, 215, 0, 0.2);
+  }
+  
+  /* Light mode - light card */
+  .light .tool-card {
+    background: rgba(255, 255, 255, 0.947);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+  }
+  
+  .light .tool-card h3 {
+    color: rgba(15, 23, 42, 0.95);
+  }
+  
+  .light .tool-card p {
+    color: rgba(51, 67, 90, 0.85);
+  }
+  
+  /* Dark mode - dark card */
+  .dark .tool-card {
+    background: rgba(30, 41, 59, 0.3);
+    border: 1px solid rgba(255, 215, 0, 0.1);
+  }
+  
+  .dark .tool-card h3 {
+    color: rgba(226, 232, 240, 0.95);
+  }
+  
+  .dark .tool-card p {
+    color: rgba(203, 213, 225, 0.8);
   }
   
   .tool-card:hover {

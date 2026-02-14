@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { ChevronLeft, ChevronRight, Star, Quote, Gavel } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/components/ThemeProvider";
 
 type Testimonial = {
   id: number;
@@ -44,6 +45,7 @@ const testimonials: Testimonial[] = [
 
 export function TestimonialSection() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const { theme } = useTheme();
   
   const nextTestimonial = () => {
     setActiveIndex((prevIndex) => (prevIndex + 1) % testimonials.length);
@@ -56,7 +58,7 @@ export function TestimonialSection() {
   const currentTestimonial = testimonials[activeIndex];
   
   return (
-    <div className="py-16 bg-judicial-dark">
+    <div className={`py-16 ${theme === 'dark' ? 'bg-judicial-dark' : 'bg-white'}`}>
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center justify-center gap-4">
           <div className="relative group">
@@ -64,7 +66,7 @@ export function TestimonialSection() {
             <Gavel className="h-16 w-16 text-judicial-gold transform group-hover:rotate-6 group-hover:scale-110 transition-all duration-500" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-center transform group-hover:translate-y-1 transition-all duration-500">
-            <span className="text-judicial-gold bg-clip-text text-transparent bg-gradient-to-r from-judicial-gold to-judicial-gold/80">
+            <span className="text-judicial-gold bg-clip-text bg-gradient-to-r from-judicial-gold to-judicial-gold/80">
               AI Powered
             </span>{" "}
             Legal Intelligence

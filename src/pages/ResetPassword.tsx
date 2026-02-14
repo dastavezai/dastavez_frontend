@@ -54,7 +54,7 @@ export default function ResetPassword() {
             value={confirmPassword}
             onChange={e => setConfirmPassword(e.target.value)}
             required
-          />
+          />  
           <button
             type="submit"
             className="w-full py-3 rounded bg-judicial-gold text-judicial-dark font-semibold hover:bg-judicial-gold/90 transition"

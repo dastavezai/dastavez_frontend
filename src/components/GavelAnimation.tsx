@@ -41,13 +41,13 @@ const GavelAnimation = () => {
       let gavelRotation = 0;
       if (isHitting) {
         gavelRotation = Math.sin(hitProgress * Math.PI) * Math.PI / 4;
-        hitProgress += 0.1;
+        hitProgress += 0.04;
         if (hitProgress >= 1) {
           isHitting = false;
           hitProgress = 0;
         }
       } else {
-        gavelRotation = Math.sin(angle * 0.5) * 0.1;
+        gavelRotation = Math.sin(angle * 0.2) * 0.1;
       }
 
       // Rotate the entire gavel
@@ -103,7 +103,7 @@ const GavelAnimation = () => {
       angle += 0.05;
 
       // Trigger hitting animation periodically
-      if (!isHitting && Math.random() < 0.02) {
+      if (!isHitting && Math.random() < 0.005) {
         isHitting = true;
         hitProgress = 0;
       }

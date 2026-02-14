@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-//import { ThemeProvider } from "./components/ThemeProvider";
+import { ThemeProvider } from "./components/ThemeProvider";
 import { useEffect, useState } from "react";
 import { useToast } from "./hooks/use-toast";
 import Index from "./pages/Index";
@@ -23,9 +23,11 @@ import About from "./pages/About";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
+import BlogPost from "./pages/BlogPost";
 import RequireAdmin from "./components/RequireAdmin";
-import MMRY from "./pages/MMRY";
-import MMRYojana from "./pages/MMRYojana";
+import RequireAuth from "./components/RequireAuth";
+import Blog from "./pages/Blog";
+import Contact from "./pages/contact";
 
 const queryClient = new QueryClient();
 
@@ -39,7 +41,7 @@ const FeedbackPopup = () => {
     const params = new URLSearchParams(window.location.search);
     const debug = params.get("debugFeedback") === "1";
 
-    try { console.log("[FeedbackPopup] enabled=", enabled, "debug=", debug); } catch {}
+    try { console.log("[FeedbackPopup] enabled=", enabled, "debug=", debug); } catch { }
 
     if ((!enabled || !formUrl) && !debug) return;
     if (localStorage.getItem(storageKey) === "true" && !debug) return;
@@ -115,6 +117,7 @@ const FeedbackPopup = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <ThemeProvider defaultTheme="light" storageKey="dastavez-theme">
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -128,15 +131,31 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/verify-reset-otp" element={<VerifyResetOtp />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/chat" element={<Chat />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route
+              path="/chat"
+              element={
+                <RequireAuth>
+                  <Chat />
+                </RequireAuth>
+              }
+            />
             <Route path="/features" element={<Features />} />
             <Route path="/case-studies" element={<CaseStudies />} />
             <Route path="/secure-platform" element={<SecurePlatform />} />
             <Route path="/smart-analysis" element={<SmartAnalysis />} />
             <Route path="/about" element={<About />} />
-            <Route path="/mukhya-mantri-mahila-rojgar-yojana-fill-form" element={<MMRY />} />
-            <Route path="/mukhya-mantri-rojgar-yojana" element={<MMRYojana />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:id" element={<BlogPost />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route
+              path="/profile"
+              element={
+                <RequireAuth>
+                  <Profile />
+                </RequireAuth>
+              }
+            />
             <Route
               path="/admin"
               element={
@@ -153,11 +172,20 @@ const App = () => (
                 </RequireAdmin>
               }
             />
+            <Route
+              path="/admin/v2"
+              element={
+                <RequireAdmin>
+                  <AdminDashboard />
+                </RequireAdmin>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

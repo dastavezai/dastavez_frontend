@@ -21,7 +21,7 @@ export default function CaseAnalysisPage() {
   };
 
   return (
-    <div className="min-h-screen bg-judicial-dark p-6">
+    <div className="min-h-screen bg-white dark:bg-judicial-dark p-6 transition-colors duration-300">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div className="flex-1" />
@@ -46,7 +46,7 @@ export default function CaseAnalysisPage() {
               <button className="bg-gray-700 text-gray-200 px-4 py-2 rounded font-semibold hover:bg-gray-600 transition">Download Data</button>
             </div>
             <div className="mt-2">
-              <span className="text-sm text-gray-400 mr-2">Tags:</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400 mr-2">Tags:</span>
               <span className="inline-block bg-judicial-gold/20 text-judicial-gold px-3 py-1 rounded-full text-xs font-medium mr-2">Criminal Law</span>
               <span className="inline-block bg-judicial-gold/20 text-judicial-gold px-3 py-1 rounded-full text-xs font-medium mr-2">Search & Seizure</span>
               <span className="inline-block bg-judicial-gold/20 text-judicial-gold px-3 py-1 rounded-full text-xs font-medium">Precedent</span>
