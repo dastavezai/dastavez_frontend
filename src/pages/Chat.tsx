@@ -7,7 +7,7 @@ import AdvancedChatPage from './AdvancedChat';
 // Custom theme to make Chakra play nice with our dark mode
 const theme = extendTheme({
   config: {
-    initialColorMode: 'dark',
+    initialColorMode: 'light',
     useSystemColorMode: false,
   },
   colors: {

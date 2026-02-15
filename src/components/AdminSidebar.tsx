@@ -1,15 +1,15 @@
 import React from 'react';
 import { Button } from './ui/button';
-import { 
-  BarChart3, 
-  Users, 
-  Settings, 
-  FileText, 
-  Activity, 
-  Shield, 
-  Database, 
-  Server, 
-  Bell, 
+import {
+  BarChart3,
+  Users,
+  Settings,
+  FileText,
+  Activity,
+  Shield,
+  Database,
+  Server,
+  Bell,
   LogOut,
   Home,
   TrendingUp,
@@ -29,6 +29,8 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeSection, onSectionCha
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, badge: null },
     { id: 'users', label: 'Users', icon: Users, badge: '12' },
+    { id: 'templates', label: 'Templates', icon: FileText, badge: null },
+    { id: 'features', label: 'Features', icon: Settings, badge: null },
     { id: 'analytics', label: 'Analytics', icon: Activity, badge: null },
     { id: 'content', label: 'Content', icon: FileText, badge: '3' },
     { id: 'security', label: 'Security', icon: Shield, badge: null },
@@ -60,11 +62,10 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeSection, onSectionCha
           <Button
             key={item.id}
             variant={activeSection === item.id ? 'default' : 'ghost'}
-            className={`w-full justify-start ${
-              activeSection === item.id 
-                ? 'bg-purple-600 text-white' 
+            className={`w-full justify-start ${activeSection === item.id
+                ? 'bg-purple-600 text-white'
                 : 'text-slate-300 hover:text-white hover:bg-slate-700'
-            }`}
+              }`}
             onClick={() => onSectionChange(item.id)}
           >
             <item.icon className="w-4 h-4 mr-3" />

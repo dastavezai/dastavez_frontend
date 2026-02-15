@@ -1,94 +1,114 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
-import { Progress } from '../components/ui/progress';
 import { Switch } from '../components/ui/switch';
-import { 
-  Users, 
-  BarChart3, 
-  Settings, 
-  Shield, 
-  FileText, 
-  Activity, 
-  TrendingUp,
-  UserPlus,
-  Search,
-  Edit,
-  Trash2,
-  Eye,
-  Download,
-  Bell,
-  Database,
-  Server,
-  Zap,
-  AlertTriangle,
-  CheckCircle,
-  IndianRupee
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import {
+  Users, BarChart3, Settings, Shield, FileText, Activity,
+  Trash2, Edit, Plus, Save, Download, Server, Zap, Search, Eye,
+  IndianRupee, CheckCircle, AlertTriangle, UserPlus, X
 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import AdminSidebar from '../components/AdminSidebar';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: 'active' | 'inactive' | 'pending';
-  lastLogin: string;
-  avatar?: string;
-}
+import {
+  getTemplateDesigns, deleteTemplateDesign,
+  getFeatureAccessMatrix, updateFeatureAccessMatrix,
+  getFinancialStats
+} from '../chat-advanced/services/adminService';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const { toast } = useToast();
 
-  const users: User[] = [
-    {
-      id: '1',
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'Admin',
-      status: 'active',
-      lastLogin: '2024-01-15 10:30',
-      avatar: 'https://github.com/shadcn.png'
-    },
-    {
-      id: '2',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      role: 'User',
-      status: 'active',
-      lastLogin: '2024-01-15 09:15'
-    },
-    {
-      id: '3',
-      name: 'Bob Johnson',
-      email: 'bob@example.com',
-      role: 'Moderator',
-      status: 'pending',
-      lastLogin: '2024-01-14 16:45'
-    }
+  // Data States
+  const [stats, setStats] = useState(null);
+  const [templates, setTemplates] = useState([]);
+  const [features, setFeatures] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Users State (Mock for now, matching original)
+  const users = [
+    { id: '1', name: 'John Doe', email: 'john@example.com', role: 'Admin', status: 'active', lastLogin: '2024-01-15 10:30', avatar: 'https://github.com/shadcn.png' },
+    { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'User', status: 'active', lastLogin: '2024-01-15 09:15' },
+    { id: '3', name: 'Bob Johnson', email: 'bob@example.com', role: 'Moderator', status: 'pending', lastLogin: '2024-01-14 16:45' }
   ];
 
-  const handleUserAction = (action: string, userId: string) => {
-    toast({
-      title: "Action completed",
-      description: `${action} performed on user ${userId}`,
-    });
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'templates') loadTemplates();
+    if (activeSection === 'features') loadFeatures();
+  }, [activeSection]);
+
+  const loadStats = async () => {
+    try {
+      // In a real app, you might want to wrap this to avoid error if endpoint doesn't exist yet
+      // const data = await getFinancialStats(); 
+      // setStats(data);
+    } catch (error) {
+      console.error('Failed to load stats', error);
+    }
   };
 
-  const handleSystemAction = (action: string) => {
-    toast({
-      title: "System action",
-      description: `${action} completed successfully`,
-    });
+  const loadTemplates = async () => {
+    try {
+      setLoading(true);
+      const res = await getTemplateDesigns();
+      setTemplates(res.designs || []);
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to load templates', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadFeatures = async () => {
+    try {
+      setLoading(true);
+      const res = await getFeatureAccessMatrix();
+      setFeatures(res.matrix || res);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (id) => {
+    if (!confirm('Are you sure you want to delete this template?')) return;
+    try {
+      await deleteTemplateDesign(id);
+      toast({ title: 'Success', description: 'Template deleted' });
+      loadTemplates();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to delete template', variant: 'destructive' });
+    }
+  };
+
+  const handleSaveFeatures = async () => {
+    try {
+      await updateFeatureAccessMatrix(features);
+      toast({ title: 'Success', description: 'Feature settings saved' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to save settings', variant: 'destructive' });
+    }
+  };
+
+  const handleUserAction = (action, userId) => {
+    toast({ title: "Action completed", description: `${action} performed on user ${userId}` });
+  };
+
+  const handleSystemAction = (action) => {
+    toast({ title: "System action", description: `${action} completed successfully` });
   };
 
   const renderDashboard = () => (
     <div className="space-y-6">
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -100,7 +120,6 @@ const AdminDashboard = () => {
             <p className="text-xs text-slate-400">+12% from last month</p>
           </CardContent>
         </Card>
-
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-300">Active Users</CardTitle>
@@ -111,7 +130,6 @@ const AdminDashboard = () => {
             <p className="text-xs text-slate-400">+8% from last month</p>
           </CardContent>
         </Card>
-
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-300">Total Cases</CardTitle>
@@ -122,7 +140,6 @@ const AdminDashboard = () => {
             <p className="text-xs text-slate-400">+15% from last month</p>
           </CardContent>
         </Card>
-
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-300">Revenue</CardTitle>
@@ -135,7 +152,6 @@ const AdminDashboard = () => {
         </Card>
       </div>
 
-      {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader>
@@ -151,10 +167,9 @@ const AdminDashboard = () => {
               { action: 'Server maintenance', time: '3 hours ago', type: 'warning' }
             ].map((activity, index) => (
               <div key={index} className="flex items-center space-x-3">
-                <div className={`w-2 h-2 rounded-full ${
-                  activity.type === 'success' ? 'bg-green-500' :
-                  activity.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                }`} />
+                <div className={`w-2 h-2 rounded-full ${activity.type === 'success' ? 'bg-green-500' :
+                    activity.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
+                  }`} />
                 <div className="flex-1">
                   <p className="text-sm text-white">{activity.action}</p>
                   <p className="text-xs text-slate-400">{activity.time}</p>
@@ -193,6 +208,95 @@ const AdminDashboard = () => {
     </div>
   );
 
+  const renderTemplates = () => (
+    <div className="space-y-6">
+      <Card className="bg-slate-800/50 border-slate-700">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-white">Template Designs</CardTitle>
+            <CardDescription className="text-slate-400">Manage contract designs</CardDescription>
+          </div>
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            New Design
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-white">Loading templates...</div>
+          ) : (
+            <div className="space-y-4">
+              {templates.length === 0 ? (
+                <p className="text-slate-400">No templates found.</p>
+              ) : (
+                templates.map((t) => (
+                  <div key={t._id} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                    <div className="flex items-center space-x-4">
+                      {t.previewImage ? (
+                        <img src={t.previewImage} alt={t.name} className="w-12 h-12 rounded object-cover" />
+                      ) : (
+                        <div className="w-12 h-12 bg-slate-600 rounded flex items-center justify-center">
+                          <FileText className="w-6 h-6 text-slate-400" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-medium text-white">{t.name}</p>
+                        <p className="text-xs text-slate-400">{t.categories?.join(', ') || 'Universal'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {/* Edit button placeholder */}
+                      <Button size="sm" variant="ghost">
+                        <Edit className="w-4 h-4 text-blue-400" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteTemplate(t._id)}>
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderFeatures = () => (
+    <div className="space-y-6">
+      <Card className="bg-slate-800/50 border-slate-700">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-white">Feature Access Control</CardTitle>
+            <CardDescription className="text-slate-400">Manage feature availability by user tier</CardDescription>
+          </div>
+          <Button onClick={handleSaveFeatures}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Changes
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 text-white">
+            <p className="text-sm text-slate-400">Configure which features are available to Free vs Premium users.</p>
+            <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded">
+              <span>Advanced Chat</span>
+              <Switch defaultChecked />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded">
+              <span>Template Export</span>
+              <Switch defaultChecked />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded">
+              <span>Unlimited Documents</span>
+              <Switch />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   const renderUsers = () => (
     <div className="space-y-6">
       <Card className="bg-slate-800/50 border-slate-700">
@@ -213,13 +317,12 @@ const AdminDashboard = () => {
             <div className="flex items-center space-x-2">
               <div className="relative flex-1">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
-                <input 
-                  placeholder="Search users..." 
+                <input
+                  placeholder="Search users..."
                   className="w-full pl-8 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-md text-white placeholder-slate-400"
                 />
               </div>
             </div>
-
             <div className="space-y-3">
               {users.map((user) => (
                 <div key={user.id} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
@@ -318,10 +421,6 @@ const AdminDashboard = () => {
                 <span className="text-sm text-slate-400">Uptime</span>
                 <span className="text-sm text-white">99.9%</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-slate-400">Active Sessions</span>
-                <span className="text-sm text-white">1,247</span>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -358,14 +457,12 @@ const AdminDashboard = () => {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'dashboard':
-        return renderDashboard();
-      case 'users':
-        return renderUsers();
-      case 'system':
-        return renderSystem();
-      default:
-        return renderDashboard();
+      case 'dashboard': return renderDashboard();
+      case 'users': return renderUsers();
+      case 'templates': return renderTemplates();
+      case 'features': return renderFeatures();
+      case 'system': return renderSystem();
+      default: return renderDashboard();
     }
   };
 
@@ -381,4 +478,4 @@ const AdminDashboard = () => {
   );
 };
 
-export default AdminDashboard; 
+export default AdminDashboard;
