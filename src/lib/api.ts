@@ -1,5 +1,6 @@
 // API Configuration - Connected to Cloud Run Backend
-const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'https://api.dastavezai.org/api';
+// Use relative path '/api' if VITE_API_URL is not set (for local proxy)
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
 
 // Types
 export interface User {

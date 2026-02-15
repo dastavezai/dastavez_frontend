@@ -6,8 +6,15 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
-    allowedHosts: ["dastavezai.org","www.dastavezai.org"],
+    port: 5173,
+    allowedHosts: ["dastavezai.org", "www.dastavezai.org", "localhost"],
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   plugins: [
     react(),

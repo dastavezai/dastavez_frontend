@@ -2,7 +2,8 @@ import axios from 'axios';
 
 // Use the base URL from environment variable or default to localhost
 import { API_BASE_URL as BASE_URL } from '../constants';
-const API_URL = `${BASE_URL}/files`;
+// Don't add '/api' here - axios baseURL already includes it from BASE_URL
+const API_URL = '/files';
 
 // Create axios instance with default config
 const api = axios.create({
