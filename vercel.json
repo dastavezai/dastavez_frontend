@@ -1,8 +1,0 @@
-{
-    "rewrites": [
-        {
-            "source": "/api/(.*)",
-            "destination": "https://dastavezai-backend-production.up.railway.app/api/$1"
-        }
-    ]
-}
