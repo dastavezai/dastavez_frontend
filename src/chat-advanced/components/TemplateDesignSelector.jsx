@@ -60,10 +60,18 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
     try {
       const token = localStorage.getItem('jwt');
       const params = category ? `?category=${encodeURIComponent(category)}` : '';
-      const response = await axios.get(`/api/templates/designs${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const fetchedDesigns = response.data?.designs || [];
+      const response = await axios.get('/api/draft/design-templates');
+      const fetchedTemplates = response.data?.templates || [];
+
+      // Transform backend templates to frontend format
+      const fetchedDesigns = fetchedTemplates.map(template => ({
+        _id: template.id,
+        name: template.name,
+        description: template.description,
+        isDefault: template.id === 'professional',
+        config: { fontFamily: 'Preview only' } // Preview placeholder
+      }));
+
       setDesigns(fetchedDesigns);
       // Auto-select default design if nothing selected
       if (!selected) {
@@ -97,12 +105,12 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
 
   const handleConfirm = () => {
     console.log('🎯 [CLICK] "Apply Design" button clicked, isLoading:', isLoading);
-    
+
     if (isLoading) {
       console.warn('⚠️  [BLOCK] Already generating, ignoring duplicate Click on Apply Design');
       return;
     }
-    
+
     const design = designs.find(d => d._id === selected);
     if (design) {
       console.log('✅ [CONFIRM] Design confirmed:', { name: design.name, id: design._id, configFontFamily: design.config?.fontFamily });
@@ -129,22 +137,22 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
   // Enhanced preview mockup with legal document text
   const DesignPreview = ({ config }) => {
     const c = config || {};
-    const alignMap = { 
-      left: 'left', 
-      center: 'center', 
-      right: 'right', 
-      justified: 'justify' 
+    const alignMap = {
+      left: 'left',
+      center: 'center',
+      right: 'right',
+      justified: 'justify'
     };
-    
+
     const lineSpacingMap = {
       'single': 1.0,
       '1.15': 1.15,
       '1.5': 1.5,
       'double': 2.0
     };
-    
+
     const lineHeight = lineSpacingMap[c.lineSpacing] || 1.15;
-    
+
     return (
       <Box
         bg="white"
@@ -167,16 +175,16 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
             position="absolute"
             top="3px" left="3px" right="3px" bottom="3px"
             border={
-              c.borderStyle === 'double' ? '2px double' : 
-              c.borderStyle === 'thick' ? '1.5px solid' : 
-              '0.5px solid'
+              c.borderStyle === 'double' ? '2px double' :
+                c.borderStyle === 'thick' ? '1.5px solid' :
+                  '0.5px solid'
             }
             borderColor="gray.500"
             borderRadius="1px"
             pointerEvents="none"
           />
         )}
-        
+
         {/* Title */}
         <Text
           textAlign={c.titleAlignment || 'center'}
@@ -189,9 +197,9 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
         >
           DEED OF AGREEMENT
         </Text>
-        
+
         {/* Body content with sample legal text */}
-        <Box 
+        <Box
           fontSize={`${Math.max(4, (c.fontSize || 12) / 2.5)}px`}
           textAlign={alignMap[c.bodyAlignment] || 'justify'}
           px={c.borderStyle !== 'none' ? 1 : 0}
@@ -226,13 +234,13 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
             <Text>{language === 'hi' ? 'दस्तावेज़ डिज़ाइन चुनें' : 'Choose Document Design'}</Text>
           </HStack>
           <Text fontSize="sm" fontWeight="normal" color="gray.500" mt={1}>
-            {language === 'hi' 
+            {language === 'hi'
               ? 'अपने दस्तावेज़ के लिए एक डिज़ाइन टेम्पलेट चुनें'
               : 'Select a design template for your document'}
           </Text>
         </ModalHeader>
         <ModalCloseButton />
-        
+
         <ModalBody>
           {loading ? (
             <Center py={10}><Spinner size="lg" /></Center>
@@ -273,12 +281,12 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
                       <Icon as={FiCheck} boxSize={3} />
                     </Box>
                   )}
-                  
+
                   {/* Preview */}
                   <Box bg={previewBg} borderRadius="md" mb={2} p={1}>
                     <DesignPreview config={design.config} />
                   </Box>
-                  
+
                   {/* Info */}
                   <VStack align="start" spacing={1}>
                     <HStack>
@@ -299,7 +307,7 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
             </SimpleGrid>
           )}
         </ModalBody>
-        
+
         <ModalFooter>
           <Button variant="ghost" mr={3} onClick={handleSkip} isDisabled={isLoading}>
             {language === 'hi' ? 'छोड़ें' : 'Skip'}
