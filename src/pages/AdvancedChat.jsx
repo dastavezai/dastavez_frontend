@@ -2830,10 +2830,19 @@ const ChatPage = () => {
   const handleDownloadFile = async (fileUrl, fileName) => {
     if (!fileUrl) return;
 
-    // Normalize URL: ensure API base for relative paths
+    // Normalize URL: ensure API base for relative paths without double /api
     const isAbsolute = fileUrl.startsWith('http');
-    const isExternal = isAbsolute && !fileUrl.includes(BASE_URL);
-    const downloadUrl = isAbsolute ? fileUrl : `${BASE_URL}${fileUrl}`;
+    const apiOrigin = BASE_URL.startsWith('http') ? new URL(BASE_URL).origin : '';
+    const isExternal = isAbsolute && !fileUrl.includes(apiOrigin || BASE_URL);
+    let downloadUrl = fileUrl;
+
+    if (!isAbsolute) {
+      if (fileUrl.startsWith('/api/')) {
+        downloadUrl = apiOrigin ? `${apiOrigin}${fileUrl}` : fileUrl;
+      } else {
+        downloadUrl = `${BASE_URL}${fileUrl}`;
+      }
+    }
 
     // If it's an external link (not our API), just open it
     if (isExternal) {
