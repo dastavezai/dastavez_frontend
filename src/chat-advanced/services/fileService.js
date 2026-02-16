@@ -351,7 +351,7 @@ const fileService = {
       const token = localStorage.getItem('jwt');
       // Add timestamp to prevent caching and ensure IDM grabs the right file
       const timestamp = Date.now();
-      const downloadUrl = `${API_URL}/edit/download?format=${format}&token=${token}&t=${timestamp}`;
+      const downloadUrl = `${BASE_URL}${API_URL}/edit/download?format=${format}&token=${encodeURIComponent(token || '')}&t=${timestamp}`;
 
       // Use hidden iframe for download - works better with IDM for all file types
       // This prevents opening new tabs and allows IDM to intercept properly

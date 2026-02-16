@@ -2830,8 +2830,13 @@ const ChatPage = () => {
   const handleDownloadFile = async (fileUrl, fileName) => {
     if (!fileUrl) return;
 
+    // Normalize URL: ensure API base for relative paths
+    const isAbsolute = fileUrl.startsWith('http');
+    const isExternal = isAbsolute && !fileUrl.includes(BASE_URL);
+    const downloadUrl = isAbsolute ? fileUrl : `${BASE_URL}${fileUrl}`;
+
     // If it's an external link (not our API), just open it
-    if (fileUrl.startsWith('http') && !fileUrl.includes(BASE_URL)) {
+    if (isExternal) {
       window.open(fileUrl, '_blank');
       return;
     }
@@ -2843,17 +2848,28 @@ const ChatPage = () => {
         duration: 2000,
       });
 
-      console.log('📥 Downloading file:', { fileUrl, fileName });
+      console.log('📥 Downloading file:', { fileUrl: downloadUrl, fileName });
 
-      const response = await axios.get(fileUrl, {
+      const response = await axios.get(downloadUrl, {
         responseType: 'blob',
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      const contentType = response.headers?.['content-type'] || '';
+
+      if (contentType.includes('application/json') || contentType.includes('text/html')) {
+        const text = await response.data.text();
+        throw new Error(text || 'Download failed (unexpected response)');
+      }
+
+      if (!response.data || response.data.size === 0) {
+        throw new Error('Downloaded file is empty');
+      }
+
       console.log('✅ File downloaded, size:', response.data.size);
 
       // Create blob link and trigger download
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const url = window.URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', fileName || 'document.docx');
