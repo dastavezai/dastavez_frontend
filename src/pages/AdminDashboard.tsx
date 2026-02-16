@@ -16,7 +16,8 @@ import AdminSidebar from '../components/AdminSidebar';
 import {
   getTemplateDesigns, deleteTemplateDesign,
   getFeatureAccessMatrix, updateFeatureAccessMatrix,
-  getFinancialStats, createTemplateDesign, updateTemplateDesign
+  getFinancialStats, createTemplateDesign, updateTemplateDesign,
+  getTemplateDesignCategories
 } from '../chat-advanced/services/adminService';
 import DesignCreatorModal from '../components/DesignCreatorModal';
 
@@ -27,6 +28,7 @@ const AdminDashboard = () => {
   // Data States
   const [stats, setStats] = useState(null);
   const [templates, setTemplates] = useState([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [features, setFeatures] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -216,6 +218,19 @@ const AdminDashboard = () => {
       toast({ title: 'Error', description: 'Failed to save settings', variant: 'destructive' });
     }
   };
+
+  const loadCategories = async () => {
+    try {
+      const res = await getTemplateDesignCategories();
+      setCategories(res.categories || []);
+    } catch (error) {
+      console.error('Failed to load categories', error);
+    }
+  };
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
 
   const handleUserAction = (action, userId) => {
     toast({ title: "Action completed", description: `${action} performed on user ${userId}` });
@@ -601,7 +616,7 @@ const AdminDashboard = () => {
         onFileUpload={() => { }}
         isAnalyzing={false}
         isSaving={false}
-        templateCategories={['Legal', 'Business', 'Academic', 'Personal']}
+        templateCategories={categories.length > 0 ? categories : ['Legal', 'Business', 'Academic', 'Personal']}
       />
     </div>
   );

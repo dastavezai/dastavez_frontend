@@ -106,10 +106,9 @@ export const updateUserTier = async (userId, tier) => {
 // TEMPLATE DESIGN MANAGEMENT
 // ============================================
 
-export const getTemplateDesigns = async (category) => {
+export const getTemplateDesigns = async () => {
   try {
-    const params = category ? `?category=${encodeURIComponent(category)}` : '';
-    const response = await api.get(`${API_URL}/template-designs${params}`);
+    const response = await api.get(`${API_URL}/template-designs`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -121,7 +120,8 @@ export const getTemplateDesignCategories = async () => {
     const response = await api.get(`${API_URL}/template-designs/categories`);
     return response.data;
   } catch (error) {
-    throw error.response?.data || error.message;
+    // Fallback if endpoint fails
+    return { categories: ['Legal', 'Business', 'Academic', 'Personal'] };
   }
 };
 
@@ -156,14 +156,17 @@ export const analyzeDocumentDesign = async (file) => {
   try {
     const formData = new FormData();
     formData.append('file', file);
-    
+
+    // We need to use axios directly for multipart/form-data to override content-type correctly if needed
+    // or just rely on axios to set it when FormData is passed
     const token = localStorage.getItem('jwt');
-    const response = await axios.post(`${BASE_URL}/api/admin/template-designs/analyze`, formData, {
+    const response = await axios.post(`${API_URL}/template-designs/analyze`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         Authorization: `Bearer ${token}`
       }
     });
+
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
