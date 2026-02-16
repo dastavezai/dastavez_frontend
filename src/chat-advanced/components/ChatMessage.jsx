@@ -14,7 +14,7 @@ import { FaFile, FaImage, FaDownload } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import SuggestedActions from './SuggestedActions';
 
-const ChatMessage = ({ message, onSuggestedActionClick, language = 'en' }) => {
+const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = 'en' }) => {
   const isUser = message.role === 'user';
   const bgColor = useColorModeValue(
     isUser ? 'blue.50' : 'gray.50',
@@ -79,14 +79,26 @@ const ChatMessage = ({ message, onSuggestedActionClick, language = 'en' }) => {
               )}
             </HStack>
           </VStack>
-          <Link href={file.fileUrl} download={file.fileName} isExternal>
+          {onDownload ? (
             <Icon
               as={FaDownload}
               boxSize={4}
               color={useColorModeValue('blue.500', 'blue.300')}
-              _hover={{ color: useColorModeValue('blue.600', 'blue.200') }}
+              cursor="pointer"
+              _hover={{ color: useColorModeValue('blue.600', 'blue.200'), transform: 'scale(1.1)' }}
+              onClick={() => onDownload(file.fileUrl, file.fileName)}
+              title="Download Securely"
             />
-          </Link>
+          ) : (
+            <Link href={file.fileUrl} download={file.fileName} isExternal>
+              <Icon
+                as={FaDownload}
+                boxSize={4}
+                color={useColorModeValue('blue.500', 'blue.300')}
+                _hover={{ color: useColorModeValue('blue.600', 'blue.200') }}
+              />
+            </Link>
+          )}
         </HStack>
         {isImage && (
           <Box mt={2}>
@@ -156,10 +168,10 @@ const ChatMessage = ({ message, onSuggestedActionClick, language = 'en' }) => {
             {message.content}
           </ReactMarkdown>
         </Box>
-        
+
         {/* Note: Missing fields list is now included in the message content itself
             to support language preferences (Hindi/English) from the backend */}
-        
+
         {message.file && renderFile(message.file)}
 
         {/* Render suggested actions if present */}

@@ -2826,6 +2826,58 @@ const ChatPage = () => {
     });
   };
 
+  // 📥 Handle secure file download (DOCX/PDF)
+  const handleDownloadFile = async (fileUrl, fileName) => {
+    if (!fileUrl) return;
+
+    // If it's an external link (not our API), just open it
+    if (fileUrl.startsWith('http') && !fileUrl.includes(BASE_URL)) {
+      window.open(fileUrl, '_blank');
+      return;
+    }
+
+    try {
+      toast({
+        title: language === 'hi' ? 'डाउनलोड शुरू...' : 'Download Started...',
+        status: 'info',
+        duration: 2000,
+      });
+
+      console.log('📥 Downloading file:', { fileUrl, fileName });
+
+      const response = await axios.get(fileUrl, {
+        responseType: 'blob',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('✅ File downloaded, size:', response.data.size);
+
+      // Create blob link and trigger download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName || 'document.docx');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: language === 'hi' ? 'डाउनलोड पूर्ण' : 'Download Complete',
+        status: 'success',
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast({
+        title: language === 'hi' ? 'डाउनलोड विफल' : 'Download Failed',
+        description: error.message || 'Could not download file',
+        status: 'error',
+        duration: 4000,
+      });
+    }
+  };
+
   return (
     <Box minH="100vh" bg={bgMain}>
       <Flex
@@ -2993,6 +3045,7 @@ const ChatPage = () => {
                   message={msg}
                   role={msg.role}
                   onSuggestedActionClick={handleSuggestedActionClick}
+                  onDownload={handleDownloadFile}
                   language={language}
                 />
               ))
