@@ -60,17 +60,19 @@ const TemplateDesignSelector = ({ isOpen, onClose, onSkip, onSelect, category, c
     try {
       const token = localStorage.getItem('jwt');
       const params = category ? `?category=${encodeURIComponent(category)}` : '';
-      const response = await axios.get('/api/draft/design-templates');
-      const fetchedTemplates = response.data?.templates || [];
+      const response = await axios.get(`/api/templates/designs${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const fetchedDesigns = response.data?.designs || [];
 
       // Transform backend templates to frontend format
-      const fetchedDesigns = fetchedTemplates.map(template => ({
-        _id: template.id,
-        name: template.name,
-        description: template.description,
-        isDefault: template.id === 'professional',
-        config: { fontFamily: 'Preview only' } // Preview placeholder
-      }));
+      // const fetchedDesigns = fetchedTemplates.map(template => ({
+      //   _id: template.id,
+      //   name: template.name,
+      //   description: template.description,
+      //   isDefault: template.id === 'professional',
+      //   config: { fontFamily: 'Preview only' } // Preview placeholder
+      // }));
 
       setDesigns(fetchedDesigns);
       // Auto-select default design if nothing selected
