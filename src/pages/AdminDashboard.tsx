@@ -16,8 +16,9 @@ import AdminSidebar from '../components/AdminSidebar';
 import {
   getTemplateDesigns, deleteTemplateDesign,
   getFeatureAccessMatrix, updateFeatureAccessMatrix,
-  getFinancialStats
+  getFinancialStats, createTemplateDesign, updateTemplateDesign
 } from '../chat-advanced/services/adminService';
+import DesignCreatorModal from '../components/DesignCreatorModal';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -28,6 +29,50 @@ const AdminDashboard = () => {
   const [templates, setTemplates] = useState([]);
   const [features, setFeatures] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Template Design Modal State
+  const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
+  const [editingDesign, setEditingDesign] = useState<any>(null);
+  const [designForm, setDesignForm] = useState({
+    name: '',
+    description: '',
+    categories: [],
+    isUniversal: false,
+    isDefault: false,
+    config: {
+      fontFamily: 'Times New Roman',
+      fontSize: 12,
+      headingSize: 16,
+      lineSpacing: 1.15,
+      letterSpacing: 0,
+      paragraphSpacing: { before: 0, after: 6 },
+      textTransform: 'none',
+      wordSpacing: 0,
+      pageSize: 'A4',
+      pageOrientation: 'portrait',
+      margins: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
+      firstLineIndent: 0,
+      titleAlignment: 'center',
+      bodyAlignment: 'justified',
+      titleBold: true,
+      titleUnderline: false,
+      titleItalic: false,
+      headerText: '',
+      footerText: '',
+      headerAlignment: 'center',
+      footerAlignment: 'center',
+      showHeaderOnFirst: true,
+      showFooterOnFirst: true,
+      pageNumbering: 'none',
+      borderStyle: 'none',
+      borderColor: '#000000',
+      borderWidth: 1,
+      colorScheme: { primary: '#000000', accent: '#1a365d', background: '#ffffff' },
+      watermarkText: '',
+      watermarkOpacity: 0.1,
+      images: [],
+    }
+  });
 
   // Users State (Mock for now, matching original)
   const users = [
@@ -44,6 +89,79 @@ const AdminDashboard = () => {
     if (activeSection === 'templates') loadTemplates();
     if (activeSection === 'features') loadFeatures();
   }, [activeSection]);
+
+  // Template Design Handlers
+  const openDesignModal = (design: any = null) => {
+    if (design) {
+      setEditingDesign(design);
+      setDesignForm({
+        name: design.name,
+        description: design.description || '',
+        categories: design.categories || [],
+        isUniversal: design.isUniversal || false,
+        isDefault: design.isDefault || false,
+        config: { ...designForm.config, ...(design.config || {}) }
+      });
+    } else {
+      setEditingDesign(null);
+      setDesignForm({
+        name: '',
+        description: '',
+        categories: [],
+        isUniversal: false,
+        isDefault: false,
+        config: {
+          fontFamily: 'Times New Roman',
+          fontSize: 12,
+          headingSize: 16,
+          lineSpacing: 1.15,
+          letterSpacing: 0,
+          paragraphSpacing: { before: 0, after: 6 },
+          textTransform: 'none',
+          wordSpacing: 0,
+          pageSize: 'A4',
+          pageOrientation: 'portrait',
+          margins: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
+          firstLineIndent: 0,
+          titleAlignment: 'center',
+          bodyAlignment: 'justified',
+          titleBold: true,
+          titleUnderline: false,
+          titleItalic: false,
+          headerText: '',
+          footerText: '',
+          headerAlignment: 'center',
+          footerAlignment: 'center',
+          showHeaderOnFirst: true,
+          showFooterOnFirst: true,
+          pageNumbering: 'none',
+          borderStyle: 'none',
+          borderColor: '#000000',
+          borderWidth: 1,
+          colorScheme: { primary: '#000000', accent: '#1a365d', background: '#ffffff' },
+          watermarkText: '',
+          watermarkOpacity: 0.1,
+          images: [],
+        }
+      });
+    }
+    setIsDesignModalOpen(true);
+  };
+
+  const handleSaveDesign = async (designData: any) => {
+    try {
+      if (editingDesign) {
+        await updateTemplateDesign(editingDesign._id, designData);
+      } else {
+        await createTemplateDesign(designData);
+      }
+      setIsDesignModalOpen(false);
+      toast({ title: 'Success', description: editingDesign ? 'Design updated' : 'Design created' });
+      loadTemplates();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to save design', variant: 'destructive' });
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -168,7 +286,7 @@ const AdminDashboard = () => {
             ].map((activity, index) => (
               <div key={index} className="flex items-center space-x-3">
                 <div className={`w-2 h-2 rounded-full ${activity.type === 'success' ? 'bg-green-500' :
-                    activity.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
+                  activity.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
                   }`} />
                 <div className="flex-1">
                   <p className="text-sm text-white">{activity.action}</p>
@@ -216,7 +334,7 @@ const AdminDashboard = () => {
             <CardTitle className="text-white">Template Designs</CardTitle>
             <CardDescription className="text-slate-400">Manage contract designs</CardDescription>
           </div>
-          <Button>
+          <Button onClick={() => openDesignModal()}>
             <Plus className="w-4 h-4 mr-2" />
             New Design
           </Button>
@@ -245,8 +363,7 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      {/* Edit button placeholder */}
-                      <Button size="sm" variant="ghost">
+                      <Button size="sm" variant="ghost" onClick={() => openDesignModal(t)}>
                         <Edit className="w-4 h-4 text-blue-400" />
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => handleDeleteTemplate(t._id)}>
@@ -474,6 +591,18 @@ const AdminDashboard = () => {
           {renderContent()}
         </div>
       </div>
+      <DesignCreatorModal
+        isOpen={isDesignModalOpen}
+        onClose={() => setIsDesignModalOpen(false)}
+        editingDesign={editingDesign}
+        designForm={designForm}
+        setDesignForm={setDesignForm}
+        onSave={handleSaveDesign}
+        onFileUpload={() => { }}
+        isAnalyzing={false}
+        isSaving={false}
+        templateCategories={['Legal', 'Business', 'Academic', 'Personal']}
+      />
     </div>
   );
 };

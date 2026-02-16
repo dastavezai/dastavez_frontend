@@ -4,6 +4,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { ChakraProvider } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useToast } from "./hooks/use-toast";
 import Index from "./pages/Index";
@@ -117,75 +118,77 @@ const FeedbackPopup = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="light" storageKey="dastavez-theme">
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <FeedbackPopup />
-        <ShootingStars />
-        <CursorFollower />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/verify-reset-otp" element={<VerifyResetOtp />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route
-              path="/chat"
-              element={
-                <RequireAuth>
-                  <Chat />
-                </RequireAuth>
-              }
-            />
-            <Route path="/features" element={<Features />} />
-            <Route path="/case-studies" element={<CaseStudies />} />
-            <Route path="/secure-platform" element={<SecurePlatform />} />
-            <Route path="/smart-analysis" element={<SmartAnalysis />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/blog/:id" element={<BlogPost />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route
-              path="/profile"
-              element={
-                <RequireAuth>
-                  <Profile />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <RequireAdmin>
-                  <Admin />
-                </RequireAdmin>
-              }
-            />
-            <Route
-              path="/admin-dashboard"
-              element={
-                <RequireAdmin>
-                  <AdminDashboard />
-                </RequireAdmin>
-              }
-            />
-            <Route
-              path="/admin/v2"
-              element={
-                <RequireAdmin>
-                  <AdminDashboard />
-                </RequireAdmin>
-              }
-            />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
+    <ChakraProvider>
+      <ThemeProvider defaultTheme="light" storageKey="dastavez-theme">
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <FeedbackPopup />
+          <ShootingStars />
+          <CursorFollower />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/verify-reset-otp" element={<VerifyResetOtp />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route
+                path="/chat"
+                element={
+                  <RequireAuth>
+                    <Chat />
+                  </RequireAuth>
+                }
+              />
+              <Route path="/features" element={<Features />} />
+              <Route path="/case-studies" element={<CaseStudies />} />
+              <Route path="/secure-platform" element={<SecurePlatform />} />
+              <Route path="/smart-analysis" element={<SmartAnalysis />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/:id" element={<BlogPost />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route
+                path="/profile"
+                element={
+                  <RequireAuth>
+                    <Profile />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <RequireAdmin>
+                    <Admin />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="/admin-dashboard"
+                element={
+                  <RequireAdmin>
+                    <AdminDashboard />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="/admin/v2"
+                element={
+                  <RequireAdmin>
+                    <AdminDashboard />
+                  </RequireAdmin>
+                }
+              />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </ChakraProvider>
   </QueryClientProvider>
 );
 
