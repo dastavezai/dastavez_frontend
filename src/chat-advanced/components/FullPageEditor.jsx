@@ -523,7 +523,7 @@ const FullPageEditor = ({
                     />
                   </TabPanel>
                   {/* AI Helper Tab */}
-                  <TabPanel p={0} h="100%">
+                  <TabPanel p={0} h="100%" display="flex" flexDirection="column" overflow="hidden">
                     <AIHelperPanel 
                       selectedText={selectedText}
                       documentType={scanResults?.documentType}
