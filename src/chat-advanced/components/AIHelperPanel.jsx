@@ -25,6 +25,7 @@ const AIHelperPanel = ({ selectedText, documentType, language = 'en' }) => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
 
   const bgColor = useColorModeValue('white', 'gray.800');
@@ -34,6 +35,9 @@ const AIHelperPanel = ({ selectedText, documentType, language = 'en' }) => {
   const userBubbleBg = useColorModeValue('blue.50', 'blue.900');
   const aiBubbleBg = useColorModeValue('gray.50', 'gray.700');
   const inputBg = useColorModeValue('white', 'gray.700');
+  const scrollTrackColor = useColorModeValue('#f0f0f0', '#2d3748');
+  const scrollThumbColor = useColorModeValue('#b0b0b0', '#4a5568');
+  const scrollThumbHover = useColorModeValue('#888', '#718096');
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -135,8 +139,35 @@ const AIHelperPanel = ({ selectedText, documentType, language = 'en' }) => {
         )}
       </Box>
 
-      {/* Messages */}
-      <Box flex="1" overflowY="auto" px={2} py={2}>
+      {/* === SCROLLABLE: Messages chat area with styled scrollbar === */}
+      <Box
+        ref={messagesContainerRef}
+        flex="1"
+        minH="0"
+        overflowY="auto"
+        overflowX="hidden"
+        px={2}
+        py={2}
+        sx={{
+          '&::-webkit-scrollbar': { width: '8px' },
+          '&::-webkit-scrollbar-track': { background: scrollTrackColor, borderRadius: '10px' },
+          '&::-webkit-scrollbar-thumb': {
+            background: scrollThumbColor,
+            borderRadius: '10px',
+            border: '2px solid transparent',
+            backgroundClip: 'content-box',
+            minHeight: '50px',
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            background: scrollThumbHover,
+            borderRadius: '10px',
+            border: '2px solid transparent',
+            backgroundClip: 'content-box',
+          },
+          scrollbarWidth: 'thin',
+          scrollbarColor: `${scrollThumbColor} ${scrollTrackColor}`,
+        }}
+      >
         {messages.length === 0 && (
           <Box textAlign="center" py={8} color={mutedColor}>
             <Icon as={FaMagic} boxSize={8} mb={3} opacity={0.3} />

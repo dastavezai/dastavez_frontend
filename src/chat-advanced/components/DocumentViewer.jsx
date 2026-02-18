@@ -672,7 +672,7 @@ const DocumentViewer = ({
       </Box>
 
       {/* History Modal */}
-      <Modal isOpen={isHistoryOpen} onClose={onHistoryClose} size="md">
+      <Modal isOpen={isHistoryOpen} onClose={onHistoryClose} size="md" scrollBehavior="inside">
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Edit History</ModalHeader>
@@ -716,7 +716,7 @@ const DocumentViewer = ({
       />
 
       {/* Template Variables Modal */}
-      <Modal isOpen={isVariablesOpen} onClose={onVariablesClose} size="md">
+      <Modal isOpen={isVariablesOpen} onClose={onVariablesClose} size="md" scrollBehavior="inside">
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Template Variables</ModalHeader>
