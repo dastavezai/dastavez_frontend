@@ -9,6 +9,15 @@
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ChakraProvider } from '@chakra-ui/react';
+import axios from 'axios';
+
+// Configure axios base URL for the department app
+// (Main.jsx is bypassed when nested, so we configure it here)
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const csrfToken = localStorage.getItem('csrfToken');
+if (csrfToken) {
+  axios.defaults.headers.common['x-csrf-token'] = csrfToken;
+}
 import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
 import EditorPage from './pages/EditorPage';
