@@ -144,7 +144,15 @@ export function Navbar() {
           <Link to="/about" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">About</Link>
           <Link to="/contact" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Contact</Link>
           <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Blog</Link>
-          
+
+          {/* Department Login */}
+          <Link
+            to="/department"
+            className="px-3 py-1.5 rounded-md text-sm font-semibold bg-judicial-gold text-judicial-dark border border-judicial-gold hover:bg-judicial-lightGold transition-all duration-200"
+          >
+            Dept Login
+          </Link>
+
           <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10" onClick={() => setSearchOpen(true)}>
             <Search className="h-4 w-4 mr-2" />
             <span className="hidden xl:inline">Search</span>
@@ -199,6 +207,14 @@ export function Navbar() {
             <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Blog</Link>
           </div>
 
+          {/* Department Login (tablet) */}
+          <Link
+            to="/department"
+            className="px-3 py-1.5 rounded-md text-sm font-semibold bg-judicial-gold text-judicial-dark hover:bg-judicial-lightGold transition-all duration-200 whitespace-nowrap"
+          >
+            Dept Login
+          </Link>
+
           <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10" onClick={() => setSearchOpen(true)}>
             <Search className="h-4 w-4" />
           </Button>
@@ -251,6 +267,13 @@ export function Navbar() {
               <Link to="/about" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">About</Link>
               <Link to="/contact" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Contact</Link>
               <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10">Blog</Link>
+              {/* Department Login (mobile) */}
+              <Link
+                to="/department"
+                className="col-span-2 text-center py-2 px-3 rounded-lg bg-judicial-gold text-judicial-dark font-semibold hover:bg-judicial-lightGold transition-all duration-200"
+              >
+                🏛️ Department Login
+              </Link>
             </div>
             
             <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/10 dark:border-judicial-gold/10 light:border-judicial-navy/20">

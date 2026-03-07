@@ -29,6 +29,7 @@ import RequireAdmin from "./components/RequireAdmin";
 import RequireAuth from "./components/RequireAuth";
 import Blog from "./pages/Blog";
 import Contact from "./pages/contact";
+import DepartmentPortal from "./departmentApp/DepartmentPortal";
 
 const queryClient = new QueryClient();
 
@@ -182,6 +183,8 @@ const App = () => (
                   </RequireAdmin>
                 }
               />
+              {/* Departmental portal — self-contained sub-app at /department/* */}
+              <Route path="/department/*" element={<DepartmentPortal />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
