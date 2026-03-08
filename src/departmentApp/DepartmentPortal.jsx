@@ -27,6 +27,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import { AuthProvider } from './context/AuthContext';
 import { PreferencesProvider } from './context/PreferencesContext';
 import { AppThemeProvider } from './context/ThemeContext';
+import { DemoProvider } from './context/DemoContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -37,6 +38,7 @@ function DepartmentPortal() {
         <ErrorBoundary>
           <AuthProvider>
             <PreferencesProvider>
+              <DemoProvider>
               {/* Routes are relative to /department (the parent match in App.tsx) */}
               <Routes>
                 <Route path="/" element={<LandingPage />} />
@@ -75,6 +77,7 @@ function DepartmentPortal() {
                 />
                 <Route path="*" element={<Navigate to="/department" replace />} />
               </Routes>
+              </DemoProvider>
             </PreferencesProvider>
           </AuthProvider>
         </ErrorBoundary>

@@ -80,7 +80,7 @@ import PageBreakExtension, { useAutoPageBreak } from './editor/PageBreakExtensio
 import FontSize from './editor/FontSizeExtension.jsx';
 import DocumentConverter from './editor/DocumentConverter.jsx';
 import { useAppTheme } from '../context/ThemeContext';
-import { usePreferences } from '../context/PreferencesContext';
+import DemoLauncher from './DemoMode/DemoLauncher';
 
 const FullPageEditor = ({
   isOpen,
@@ -357,18 +357,7 @@ const FullPageEditor = ({
   }, []);
 
   
-  useEffect(() => {
-    if (formatMetadata && editor) {
-      const editorEl = document.querySelector('.tiptap-editor');
-      if (editorEl) {
-        editorEl.style.fontFamily = `'${formatMetadata.defaultFont}', serif`;
-        editorEl.style.fontSize = `${formatMetadata.defaultFontSize || 12}pt`;
-        if (formatMetadata.lineSpacing) {
-          editorEl.style.lineHeight = String(formatMetadata.lineSpacing);
-        }
-      }
-    }
-  }, [formatMetadata, editor]);
+  // formatMetadata styling is applied via pageStyle in the sx prop below — no useEffect needed
 
   
   const handleRevertChange = useCallback((changeIdx) => {
@@ -499,8 +488,16 @@ const FullPageEditor = ({
         fontFamily: formatMetadata.defaultFont,
         bodyFontSize: formatMetadata.defaultFontSize,
         lineSpacing: formatMetadata.lineSpacing,
-        bodyAlignment: formatMetadata.bodyAlignment,
         margins: formatMetadata.margins,
+        pageSize: formatMetadata.pageSize?.name || 'A4',
+        pageOrientation: formatMetadata.pageSize?.orientation || 'portrait',
+        bodyAlignment: formatMetadata.bodyAlignment || 'left',
+        borderStyle: formatMetadata.hasBorders ? formatMetadata.borderStyle : undefined,
+        borderColor: formatMetadata.colors?.textColor?.replace('#', '') || '000000',
+        headerText: formatMetadata.headerText || undefined,
+        footerText: formatMetadata.footerText || undefined,
+        headingSize: formatMetadata.headingStyles?.Heading1?.fontSize || undefined,
+        paragraphSpacing: formatMetadata.paragraphSpacing || undefined,
       } : undefined);
 
       const blob = await fileService.downloadEdited(format, finalDesignConfig, selectedFile?._id);
@@ -1346,17 +1343,23 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
   const charCount = plainText.length;
 
   
-  const { preferences: userPrefs } = usePreferences();
-
   const pageStyle = formatMetadata ? {
     fontFamily: `'${formatMetadata.defaultFont}', serif`,
-    fontSize: `${userPrefs?.editorFontSize || formatMetadata.defaultFontSize || 12}pt`,
+    fontSize: `${formatMetadata.defaultFontSize || 12}pt`,
     lineHeight: formatMetadata.lineSpacing || 1.15,
     paddingTop: `${(formatMetadata.margins?.topInches || 1) * 72}px`,
     paddingRight: `${(formatMetadata.margins?.rightInches || 1) * 72}px`,
     paddingBottom: `${(formatMetadata.margins?.bottomInches || 1) * 72}px`,
     paddingLeft: `${(formatMetadata.margins?.leftInches || 1) * 72}px`,
-  } : { fontSize: `${userPrefs?.editorFontSize || 12}pt` };
+    textAlign: formatMetadata.bodyAlignment || 'left',
+    // Page width from page size (1 inch = 96px CSS) — A4=8.27in, Letter=8.5in, Legal=8.5in
+    pageWidth: formatMetadata.pageSize?.name === 'Letter' || formatMetadata.pageSize?.name === 'Legal'
+      ? '816px' : formatMetadata.pageSize?.name === 'A5' ? '559px' : '793px',
+    paragraphSpacingBefore: formatMetadata.paragraphSpacing?.before
+      ? `${formatMetadata.paragraphSpacing.before / 20}pt` : undefined,
+    paragraphSpacingAfter: formatMetadata.paragraphSpacing?.after
+      ? `${formatMetadata.paragraphSpacing.after / 20}pt` : undefined,
+  } : { fontSize: '12pt' };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="full" motionPreset="slideInBottom">
@@ -1384,6 +1387,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             <HStack spacing={1.5}>
               <Tooltip label={leftSidebarOpen ? 'Hide AI panels' : 'Show AI panels'} fontSize="xs">
                 <IconButton
+                  data-tour="sidebar-toggle-analysis"
                   icon={leftSidebarOpen ? <MdChevronLeft /> : <MdChevronRight />}
                   size="sm"
                   variant="ghost"
@@ -1453,8 +1457,10 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 />
               </Tooltip>
 
+              <DemoLauncher context="editor" />
+
               <Menu>
-                <MenuButton as={Button} size="sm" colorScheme="green" rightIcon={<FiChevronDown />} leftIcon={<FiDownload />}>
+                <MenuButton data-tour="download-menu" as={Button} size="sm" colorScheme="green" rightIcon={<FiChevronDown />} leftIcon={<FiDownload />}>
                   Download
                 </MenuButton>
                 <MenuList>
@@ -1494,7 +1500,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           </Box>
         )}
 
-        <EditorToolbar editor={editor} />
+        <EditorToolbar data-tour="editor-toolbar" editor={editor} />
 
         
         <ModalBody p={0} display="flex" flexDirection="row" overflow="hidden" data-editor-flex-row>
@@ -1664,7 +1670,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               my={0}
               mb={0}
               w="100%"
-              maxW="793px"
+              maxW={pageStyle.pageWidth || '793px'}
               minH="calc(100vh - 200px)"
               pb="120px"
               bg="#ffffff"
@@ -1696,7 +1702,10 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                     paddingBottom: pageStyle.paddingBottom,
                     paddingLeft: pageStyle.paddingLeft,
                   } : {}),
-                  '& p': { marginBottom: '0.5em' },
+                  '& p': {
+                    marginBottom: pageStyle.paragraphSpacingAfter || '0.5em',
+                    marginTop: pageStyle.paragraphSpacingBefore || undefined,
+                  },
                   '& h1': { fontSize: '2em', fontWeight: 'bold', marginBottom: '0.5em', marginTop: '0.8em' },
                   '& h2': { fontSize: '1.5em', fontWeight: 'bold', marginBottom: '0.4em', marginTop: '0.7em' },
                   '& h3': { fontSize: '1.17em', fontWeight: 'bold', marginBottom: '0.3em', marginTop: '0.6em' },

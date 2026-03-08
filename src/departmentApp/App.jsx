@@ -7,6 +7,7 @@ import Subscription from './pages/Subscription';
 import AdminDashboard from './pages/AdminDashboard';
 import { AuthProvider } from './context/AuthContext';
 import { PreferencesProvider } from './context/PreferencesContext';
+import { DemoProvider } from './context/DemoContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -16,6 +17,7 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <PreferencesProvider>
+          <DemoProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
@@ -55,6 +57,7 @@ function App() {
             <Route path="/chat/:id" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </DemoProvider>
           </PreferencesProvider>
         </AuthProvider>
       </BrowserRouter>

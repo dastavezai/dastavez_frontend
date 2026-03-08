@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import {
   Box, VStack, HStack, Text, Badge, Icon,
-  Collapse, Divider, useColorModeValue, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, Button
+  Collapse, Divider, useColorModeValue, Tag, Tabs, TabList, Tab, TabPanels, TabPanel, Button,
+  Alert, AlertIcon, Tooltip, Spinner,
 } from '@chakra-ui/react';
 import { MdSecurity, MdExpandMore, MdExpandLess, MdAddCircleOutline, MdAutoFixHigh } from 'react-icons/md';
-import { FaShieldAlt, FaPlusCircle } from 'react-icons/fa';
+import { FaShieldAlt, FaPlusCircle, FaBookOpen, FaRobot } from 'react-icons/fa';
+import { FiSearch, FiCheck, FiCopy, FiExternalLink } from 'react-icons/fi';
+import fileService from '../../services/fileService';
+import { StatuteCard } from './PrecedencePanel';
 
 const SEV_COLOR = { critical: 'red', warning: 'orange', info: 'blue' };
 
-const CompliancePanel = ({ complianceIssues = [], missingClauses = [], compact = false, onApplySuggestion }) => {
+const CompliancePanel = ({ complianceIssues = [], missingClauses = [], statutesReferenced = [], compact = false, onApplySuggestion, onFollowUp, onFindCaseInDoc }) => {
   const [expanded, setExpanded] = useState(null);
   const [appliedItems, setAppliedItems] = useState(new Set());
   const [loadingItems, setLoadingItems] = useState(new Set());
@@ -24,7 +28,7 @@ const CompliancePanel = ({ complianceIssues = [], missingClauses = [], compact =
   const mutedColor = useColorModeValue('gray.500', 'gray.400');
   const textColor = useColorModeValue('gray.800', 'gray.100');
 
-  const totalIssues = complianceIssues.length + missingClauses.length;
+  const totalIssues = complianceIssues.length + missingClauses.length + statutesReferenced.length;
 
   const EmptyState = ({ icon, label }) => (
     <Box textAlign="center" py={4} color={mutedColor}>
@@ -123,6 +127,12 @@ const CompliancePanel = ({ complianceIssues = [], missingClauses = [], compact =
               <Badge ml={1} colorScheme="orange" fontSize="2xs">{missingClauses.length}</Badge>
             )}
           </Tab>
+          <Tab fontSize="xs">
+            Statutes
+            {statutesReferenced.length > 0 && (
+              <Badge ml={1} colorScheme="teal" fontSize="2xs">{statutesReferenced.length}</Badge>
+            )}
+          </Tab>
         </TabList>
 
         <TabPanels>
@@ -216,6 +226,24 @@ const CompliancePanel = ({ complianceIssues = [], missingClauses = [], compact =
                         </>
                       ) : null
                     }
+                  />
+                ))}
+              </VStack>
+            )}
+          </TabPanel>
+
+          <TabPanel px={0} py={1}>
+            {statutesReferenced.length === 0 ? (
+              <EmptyState icon={FaBookOpen} label="No statutes referenced in this document." />
+            ) : (
+              <VStack spacing={2} align="stretch">
+                {statutesReferenced.map((s, idx) => (
+                  <StatuteCard
+                    key={idx}
+                    statute={s}
+                    compact={compact}
+                    onFollowUp={onFollowUp}
+                    onFindCaseInDoc={onFindCaseInDoc}
                   />
                 ))}
               </VStack>

@@ -179,6 +179,16 @@ const fileService = {
     }
   },
 
+  discoverPrecedents: async (fileId) => {
+    try {
+      const response = await api.post(`${API_URL}/${fileId}/discover-precedents`, {}, { timeout: 120000 });
+      return response.data;
+    } catch (error) {
+      console.error('Discover precedents error:', error);
+      throw error;
+    }
+  },
+
   
   updateSuggestionStatus: async (suggestionId, status, fileId = null) => {
     

@@ -3,10 +3,10 @@ import {
   Box, VStack, HStack, Text, Badge, Icon, Divider,
   Collapse, Button, useColorModeValue, Flex, Image,
   Skeleton, SkeletonCircle, Tooltip, Tag, Spinner,
-  Progress, useToast,
+  Progress, useToast, Alert, AlertIcon, Input,
 } from '@chakra-ui/react';
 import { MdGavel, MdExpandMore, MdExpandLess, MdAutoFixHigh, MdOutlineShield } from 'react-icons/md';
-import { FaBalanceScale, FaExternalLinkAlt, FaRobot, FaSearch } from 'react-icons/fa';
+import { FaBalanceScale, FaExternalLinkAlt, FaRobot, FaSearch, FaBookOpen } from 'react-icons/fa';
 import { FiSearch, FiCopy, FiCheck, FiExternalLink } from 'react-icons/fi';
 import fileService from '../../services/fileService';
 
@@ -516,42 +516,511 @@ const CaseCard = ({ p, compact, onFollowUp, onApplySuggestion, onFindCaseInDoc }
 };
 
 
-const PrecedencePanel = ({ precedences = [], compact = false, onFollowUp, onApplySuggestion, onFindCaseInDoc }) => {
-  const mutedColor = useColorModeValue('gray.500', 'gray.400');
+const StatuteCard = ({ statute, compact, onFollowUp, onFindCaseInDoc }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [copiedRef, setCopiedRef] = useState(false);
+  const [sectionAnalysis, setSectionAnalysis] = useState(null);
+  const [sectionLoading, setSectionLoading] = useState(false);
+  const toast = useToast();
 
-  if (!precedences || precedences.length === 0) {
-    return (
-      <Box textAlign="center" py={compact ? 4 : 8} color={mutedColor}>
-        <Icon as={FaBalanceScale} boxSize={compact ? 6 : 10} mb={2} opacity={0.3} />
-        <Text fontSize="sm">No precedences found for this document.</Text>
-        {!compact && (
-          <Text fontSize="xs" mt={1} color={mutedColor}>Precedences are generated automatically during scanning.</Text>
-        )}
-      </Box>
-    );
-  }
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const cardBg = useColorModeValue('white', 'gray.800');
+  const expandedBg = useColorModeValue('gray.50', 'gray.750');
+  const mutedColor = useColorModeValue('gray.500', 'gray.400');
+  const textColor = useColorModeValue('gray.800', 'gray.100');
+  const contextBg = useColorModeValue('blue.50', 'blue.900');
+  const warningBg = useColorModeValue('orange.50', 'orange.900');
+
+  const indianKanoonUrl = statute.name
+    ? `https://indiankanoon.org/search/?formInput=${encodeURIComponent(statute.name + (statute.sections ? ' section ' + statute.sections : ''))}`
+    : null;
+
+  const handleCopyRef = (e) => {
+    e.stopPropagation();
+    const refStr = statute.sections
+      ? `${statute.name}, ${statute.sections}`
+      : statute.name;
+    navigator.clipboard.writeText(refStr).then(() => {
+      setCopiedRef(true);
+      setTimeout(() => setCopiedRef(false), 2000);
+    });
+  };
+
+  const handleAnalyseSections = async (e) => {
+    e.stopPropagation();
+    setSectionLoading(true);
+    try {
+      const prompt = `For the Indian statute "${statute.name}"${statute.sections ? `, specifically ${statute.sections}` : ''}: provide a brief analysis of the key provisions and their practical effect. Reply ONLY with a JSON object: {"provisions": [{"section": "...", "title": "short title", "effect": "one line practical effect"}], "currentStatus": "in force / superseded / partially amended", "lastAmendment": "year or N/A"}`;
+      const res = await fileService.aiChatAboutDocument({
+        message: prompt,
+        selectedText: '',
+        chatHistory: [],
+        language: 'English',
+      });
+      const text = res?.reply || res?.message || '';
+      const jsonMatch = text.match(/\{[\s\S]*?"provisions"[\s\S]*?\}/);
+      if (jsonMatch) {
+        setSectionAnalysis(JSON.parse(jsonMatch[0]));
+      }
+    } catch (err) {
+      console.warn('Section analysis failed:', err.message);
+      toast({ title: 'Section analysis failed', status: 'warning', duration: 2000 });
+    } finally {
+      setSectionLoading(false);
+    }
+  };
+
+  const handleFollowUp = (e) => {
+    e.stopPropagation();
+    onFollowUp?.({
+      caseName: statute.name,
+      citation: statute.sections ? `Sections ${statute.sections}` : '',
+      relevance: statute.relevance || '',
+      summary: statute.relevance || '',
+      isStatute: true,
+    });
+  };
 
   return (
-    <VStack spacing={compact ? 2 : 3} align="stretch">
-      {!compact && (
-        <HStack spacing={2} mb={1}>
-          <Icon as={MdGavel} color="purple.400" />
-          <Text fontWeight="bold" fontSize="sm">
-            Case Precedences <Badge ml={1} colorScheme="purple" fontSize="xs">{precedences.length}</Badge>
-          </Text>
-          <Text fontSize="2xs" color={mutedColor} ml="auto">Click to expand · Follow up in AI</Text>
+    <Box
+      bg={cardBg}
+      border="1px solid"
+      borderColor={borderColor}
+      borderLeft="3px solid"
+      borderLeftColor={isOpen ? 'teal.500' : 'teal.300'}
+      borderRadius="md"
+      overflow="hidden"
+      transition="all 0.2s"
+      _hover={{ boxShadow: 'md' }}
+    >
+      <Box
+        px={3} py={compact ? 2 : 2.5}
+        cursor="pointer"
+        onClick={() => setIsOpen(v => !v)}
+        _hover={{ bg: useColorModeValue('teal.50', 'gray.700') }}
+      >
+        <HStack justify="space-between" align="start" spacing={2}>
+          <VStack align="start" spacing={0.5} flex={1} minW={0}>
+            <HStack spacing={1.5}>
+              <Icon as={FaBookOpen} color="teal.400" boxSize={3.5} flexShrink={0} />
+              <Text fontWeight="semibold" fontSize={compact ? 'xs' : 'sm'} color={textColor} noOfLines={isOpen ? undefined : 2} lineHeight="1.4">
+                {statute.name || 'Unknown Statute'}
+              </Text>
+            </HStack>
+            {statute.sections && (
+              <Text fontSize="2xs" color="teal.600" fontFamily="mono" letterSpacing="0.03em" ml={5}>
+                Sections: {statute.sections}
+              </Text>
+            )}
+          </VStack>
+          <HStack spacing={1} flexShrink={0}>
+            {statute.superseded && (
+              <Badge colorScheme="orange" fontSize="2xs" variant="subtle">Superseded</Badge>
+            )}
+            <Badge colorScheme="teal" fontSize="2xs" variant="subtle">Statute</Badge>
+            <Icon as={isOpen ? MdExpandLess : MdExpandMore} color={mutedColor} boxSize={4} />
+          </HStack>
         </HStack>
+      </Box>
+
+      <Collapse in={isOpen} animateOpacity>
+        <Divider borderColor={borderColor} />
+        <Box px={3} py={3} bg={expandedBg}>
+          <VStack spacing={2.5} align="stretch">
+            {/* Superseded warning */}
+            {statute.superseded && (
+              <Alert status="warning" borderRadius="md" py={2} px={3} fontSize="xs">
+                <AlertIcon boxSize={4} />
+                <Box>
+                  <Text fontWeight="bold" fontSize="xs">This statute has been superseded</Text>
+                  <Text fontSize="2xs">
+                    Replaced by <strong>{statute.superseded.by}</strong> w.e.f. {statute.superseded.date}.
+                    Consider updating references in this document.
+                  </Text>
+                </Box>
+              </Alert>
+            )}
+
+            {/* Relevance to document */}
+            {statute.relevance && (
+              <Box>
+                <Text fontSize="2xs" color={mutedColor} fontWeight="bold" textTransform="uppercase" mb={0.5}>Relevance to document</Text>
+                <Text fontSize="xs" color={textColor} lineHeight="1.6">{statute.relevance}</Text>
+              </Box>
+            )}
+
+            {/* Document context snippet */}
+            {statute.documentContext && (
+              <Box p={2} bg={contextBg} borderRadius="md" border="1px solid" borderColor={useColorModeValue('blue.200', 'blue.700')}>
+                <Text fontSize="2xs" color={mutedColor} fontWeight="bold" textTransform="uppercase" mb={0.5}>Referenced in document</Text>
+                <Text fontSize="xs" color={textColor} lineHeight="1.6" fontStyle="italic">"{statute.documentContext}"</Text>
+              </Box>
+            )}
+
+            {/* Section analysis (on demand) */}
+            {sectionAnalysis && (
+              <Box p={2} bg={useColorModeValue('green.50', 'green.900')} borderRadius="md" border="1px solid" borderColor={useColorModeValue('green.200', 'green.700')}>
+                <Text fontSize="xs" fontWeight="bold" color="green.600" mb={1}>Section Analysis</Text>
+                {sectionAnalysis.currentStatus && (
+                  <Badge colorScheme={sectionAnalysis.currentStatus.includes('superseded') ? 'orange' : 'green'} fontSize="2xs" mb={1}>
+                    {sectionAnalysis.currentStatus}
+                  </Badge>
+                )}
+                {sectionAnalysis.provisions?.map((prov, i) => (
+                  <Box key={i} mb={1}>
+                    <Text fontSize="xs" fontWeight="semibold" color={textColor}>
+                      {prov.section}{prov.title ? ` — ${prov.title}` : ''}
+                    </Text>
+                    <Text fontSize="2xs" color={mutedColor} lineHeight="1.5">{prov.effect}</Text>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </VStack>
+
+          {/* Action buttons */}
+          <HStack spacing={2} mt={3} justify="flex-end" flexWrap="wrap">
+            {onFindCaseInDoc && statute.name && (
+              <Tooltip label="Find where this statute is cited in the document" fontSize="xs" placement="top">
+                <Button
+                  size="xs" colorScheme="teal" variant="ghost"
+                  leftIcon={<Icon as={FiSearch} boxSize={3} />} fontSize="2xs"
+                  onClick={(e) => { e.stopPropagation(); onFindCaseInDoc(statute.name.replace(/,?\s*\d{4}$/, '')); }}
+                >
+                  Find in Doc
+                </Button>
+              </Tooltip>
+            )}
+            <Tooltip label="Copy statute reference to clipboard" fontSize="xs" placement="top">
+              <Button
+                size="xs" colorScheme={copiedRef ? 'green' : 'gray'} variant="ghost"
+                leftIcon={<Icon as={copiedRef ? FiCheck : FiCopy} boxSize={3} />} fontSize="2xs"
+                onClick={handleCopyRef}
+              >
+                {copiedRef ? 'Copied!' : 'Copy Ref'}
+              </Button>
+            </Tooltip>
+            {statute.sections && !sectionAnalysis && (
+              <Tooltip label="AI analysis of the cited sections" fontSize="xs" placement="top">
+                <Button
+                  size="xs" colorScheme="green" variant="ghost"
+                  leftIcon={sectionLoading ? <Spinner size="xs" /> : <Icon as={FaRobot} boxSize={3} />}
+                  fontSize="2xs" isLoading={sectionLoading} loadingText="Analysing…"
+                  onClick={handleAnalyseSections}
+                >
+                  Analyse Sections
+                </Button>
+              </Tooltip>
+            )}
+            {onFollowUp && (
+              <Tooltip label="Discuss this statute further with Law AI Helper" fontSize="xs" placement="top">
+                <Button size="xs" colorScheme="blue" variant="solid"
+                  leftIcon={<Icon as={FaRobot} boxSize={3} />} fontSize="2xs"
+                  onClick={handleFollowUp}
+                >
+                  Follow up in AI
+                </Button>
+              </Tooltip>
+            )}
+          </HStack>
+
+          {/* External links */}
+          <HStack spacing={2} mt={2} flexWrap="wrap">
+            {indianKanoonUrl && (
+              <Button as="a" href={indianKanoonUrl} target="_blank" rel="noopener noreferrer"
+                size="xs" variant="outline" colorScheme="orange" fontSize="2xs"
+                leftIcon={<Icon as={FiExternalLink} boxSize={3} />}
+                onClick={e => e.stopPropagation()}>
+                Indian Kanoon
+              </Button>
+            )}
+            <Button as="a"
+              href={`https://www.indiacode.nic.in/handle/123456789/1362/simple-search?searchterm=${encodeURIComponent(statute.name.replace(/,?\s*\d{4}$/, ''))}&start=0`}
+              target="_blank" rel="noopener noreferrer"
+              size="xs" variant="outline" colorScheme="blue" fontSize="2xs"
+              leftIcon={<Icon as={FiExternalLink} boxSize={3} />}
+              onClick={e => e.stopPropagation()}>
+              India Code
+            </Button>
+          </HStack>
+        </Box>
+      </Collapse>
+    </Box>
+  );
+};
+
+
+const PrecedencePanel = ({
+  precedences = [],
+  statutes = [],
+  aiSuggestedPrecedents = [],
+  fileId = null,
+  compact = false,
+  docType = '',
+  docSnippet = '',
+  onFollowUp,
+  onApplySuggestion,
+  onFindCaseInDoc,
+}) => {
+  const mutedColor  = useColorModeValue('gray.500', 'gray.400');
+  const textColor   = useColorModeValue('gray.800', 'gray.100');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const emptyBg     = useColorModeValue('purple.50', 'purple.900');
+  const emptyBorder = useColorModeValue('purple.200', 'purple.700');
+  const labelColor  = useColorModeValue('purple.700', 'purple.200');
+  const toast       = useToast();
+
+  const [suggestedCases, setSuggestedCases] = useState([]);
+  const [isSuggesting, setIsSuggesting]     = useState(false);
+  const [manualCases, setManualCases]       = useState([]);
+  const [showAddForm, setShowAddForm]       = useState(false);
+  const [addForm, setAddForm]               = useState({ caseName: '', citation: '', relevance: 'High', summary: '' });
+
+  const allCases = [...precedences, ...aiSuggestedPrecedents.map(c => ({ ...c, _aiSuggested: true })), ...suggestedCases, ...manualCases];
+
+  const discoverCases = async () => {
+    setIsSuggesting(true);
+    try {
+      if (fileId) {
+        const res = await fileService.discoverPrecedents(fileId);
+        if (res?.aiSuggestedPrecedents?.length) {
+          setSuggestedCases(res.aiSuggestedPrecedents.map(c => ({ ...c, _aiSuggested: true })));
+          toast({ title: `${res.aiSuggestedPrecedents.length} related cases found`, status: 'success', duration: 4000, isClosable: true });
+          return;
+        }
+      }
+      // Fallback: use AI chat
+      const statuteList = (statutes || [])
+        .map(s => `${s.name}${s.sections ? ` (${s.sections})` : ''}`)
+        .join('; ');
+      const prompt = `You are a senior Indian legal advocate. This document is: "${docType || 'a legal document'}"${
+        statuteList ? ` involving: ${statuteList}` : ''
+      }.${
+        docSnippet ? `\n\nContext excerpt: "${docSnippet.slice(0, 400)}"` : ''
+      }\n\nList 3-5 landmark Indian Supreme Court / High Court cases most commonly cited in this type of document.\nReturn ONLY a JSON array (no markdown fences, no text outside the array):\n[{"caseName":"Full Case Name v. Respondent","citation":"(Year) SCC/AIR citation or empty string","relevance":"High","summary":"One line on why it is cited","principle":"Key legal principle established","court":"Supreme Court of India or specific High Court"}]`;
+      const chatRes = await fileService.aiChatAboutDocument({
+        message: prompt,
+        selectedText: '',
+        chatHistory: [],
+        language: 'English',
+      });
+      const text = chatRes?.reply || chatRes?.message || '';
+      const match = text.match(/\[[\s\S]*?\]/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        if (Array.isArray(parsed) && parsed.length) {
+          setSuggestedCases(parsed.map(c => ({ ...c, _aiSuggested: true })));
+          toast({ title: `${parsed.length} related cases found`, status: 'success', duration: 4000, isClosable: true });
+          return;
+        }
+      }
+      toast({ title: 'No suggestions returned', status: 'info', duration: 3000 });
+    } catch {
+      toast({ title: 'Could not fetch suggestions', status: 'warning', duration: 3000 });
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  const submitManualCase = () => {
+    if (!addForm.caseName.trim()) return;
+    setManualCases(prev => [...prev, { ...addForm, _manual: true }]);
+    setAddForm({ caseName: '', citation: '', relevance: 'High', summary: '' });
+    setShowAddForm(false);
+    toast({ title: 'Case added', status: 'success', duration: 2000 });
+  };
+
+  return (
+    <VStack spacing={compact ? 2 : 5} align="stretch">
+
+      {/* ── Case Precedences ──────────────────────────── */}
+      <Box>
+        {!compact && (
+          <HStack
+            spacing={2} mb={3} pb={2}
+            borderBottomWidth="2px" borderColor="purple.200"
+          >
+            <Icon as={MdGavel} color="purple.400" boxSize={5} />
+            <Text fontWeight="bold" fontSize="sm" color={textColor}>
+              Case Precedences
+              <Badge
+                ml={2}
+                colorScheme={allCases.length > 0 ? 'purple' : 'gray'}
+                fontSize="xs"
+              >
+                {allCases.length}
+              </Badge>
+            </Text>
+            <HStack ml="auto" spacing={1}>
+              <Tooltip label="Ask AI to suggest landmark cases for this document type" hasArrow>
+                <Button
+                  size="xs" colorScheme="purple" variant="outline"
+                  leftIcon={<Icon as={FaRobot} boxSize={3} />}
+                  onClick={discoverCases}
+                  isLoading={isSuggesting}
+                  loadingText="Searching…"
+                  fontSize="2xs"
+                >
+                  AI Discover
+                </Button>
+              </Tooltip>
+              <Tooltip label="Manually add a case citation" hasArrow>
+                <Button
+                  size="xs" colorScheme="gray" variant="ghost"
+                  onClick={() => setShowAddForm(f => !f)}
+                  fontSize="2xs"
+                >
+                  {showAddForm ? '✕ Cancel' : '+ Add'}
+                </Button>
+              </Tooltip>
+            </HStack>
+          </HStack>
+        )}
+
+        {/* Manual entry form */}
+        <Collapse in={showAddForm} animateOpacity>
+          <Box
+            p={3} mb={3}
+            borderWidth="1px" borderColor={emptyBorder}
+            borderRadius="md" bg={emptyBg}
+          >
+            <Text fontSize="xs" fontWeight="bold" mb={2} color={labelColor}>
+              Add Case Citation
+            </Text>
+            <VStack spacing={2} align="stretch">
+              <Input
+                placeholder="Case name (e.g. State of Maharashtra v. Prakash)"
+                value={addForm.caseName}
+                onChange={e => setAddForm(f => ({ ...f, caseName: e.target.value }))}
+                size="sm" fontSize="xs"
+              />
+              <Input
+                placeholder="Citation (e.g. (2023) 5 SCC 123) — optional"
+                value={addForm.citation}
+                onChange={e => setAddForm(f => ({ ...f, citation: e.target.value }))}
+                size="sm" fontSize="xs"
+              />
+              <Input
+                placeholder="Why is this case relevant to the document?"
+                value={addForm.summary}
+                onChange={e => setAddForm(f => ({ ...f, summary: e.target.value }))}
+                size="sm" fontSize="xs"
+              />
+              <HStack>
+                <Button
+                  size="xs" colorScheme="purple"
+                  onClick={submitManualCase}
+                  isDisabled={!addForm.caseName.trim()}
+                >
+                  Save Case
+                </Button>
+                <Button size="xs" variant="ghost" onClick={() => setShowAddForm(false)}>Cancel</Button>
+              </HStack>
+            </VStack>
+          </Box>
+        </Collapse>
+
+        {/* Case list or rich empty state */}
+        {allCases.length === 0 ? (
+          <Box
+            p={compact ? 3 : 7}
+            borderWidth="1px" borderColor={emptyBorder}
+            borderRadius="xl" bg={emptyBg}
+            textAlign="center"
+          >
+            <Icon as={MdGavel} boxSize={compact ? 6 : 9} color="purple.300" mb={2} />
+            <Text fontSize="sm" fontWeight="semibold" color={labelColor} mb={1}>
+              No case citations detected
+            </Text>
+            <Text fontSize="xs" color={mutedColor} mb={compact ? 2 : 5} maxW="xs" mx="auto">
+              {compact
+                ? 'No case law found. Use AI Discover or add manually.'
+                : 'The document does not appear to reference specific court judgments. Use AI Discover to find relevant precedents for this document type, or add known cases manually.'}
+            </Text>
+            {!compact && (
+              <VStack spacing={2} align="center">
+                <HStack spacing={2} flexWrap="wrap" justify="center">
+                  <Button
+                    size="sm" colorScheme="purple"
+                    leftIcon={<Icon as={FaRobot} />}
+                    onClick={discoverCases}
+                    isLoading={isSuggesting}
+                    loadingText="Discovering…"
+                  >
+                    AI Discover Relevant Cases
+                  </Button>
+                  <Button
+                    size="sm" variant="outline" colorScheme="purple"
+                    leftIcon={<Icon as={MdGavel} />}
+                    onClick={() => { setShowAddForm(true); }}
+                  >
+                    Add Case Manually
+                  </Button>
+                </HStack>
+                <Text fontSize="2xs" color={mutedColor} mt={1}>
+                  AI Discover uses your document type and cited statutes to suggest landmark Indian precedents.
+                </Text>
+              </VStack>
+            )}
+          </Box>
+        ) : (
+          <VStack spacing={compact ? 2 : 3} align="stretch">
+            {allCases.map((p, idx) => (
+              <Box key={`case-${idx}`}>
+                {(p._aiSuggested || p._manual) && (
+                  <Badge
+                    mb={1} ml={1}
+                    colorScheme={p._aiSuggested ? 'purple' : 'teal'}
+                    fontSize="2xs" variant="solid"
+                  >
+                    {p._aiSuggested ? 'AI Suggested' : 'Manual'}
+                  </Badge>
+                )}
+                <CaseCard
+                  p={p} compact={compact}
+                  onFollowUp={onFollowUp}
+                  onApplySuggestion={onApplySuggestion}
+                  onFindCaseInDoc={onFindCaseInDoc}
+                />
+              </Box>
+            ))}
+          </VStack>
+        )}
+      </Box>
+
+      {/* ── Statutes Referenced ───────────────────────── */}
+      {statutes && statutes.length > 0 && (
+        <Box>
+          {!compact && (
+            <HStack
+              spacing={2} mb={3} pb={2}
+              borderBottomWidth="2px" borderColor="teal.200"
+            >
+              <Icon as={FaBookOpen} color="teal.400" boxSize={5} />
+              <Text fontWeight="bold" fontSize="sm" color={textColor}>
+                Statutes Referenced
+                <Badge ml={2} colorScheme="teal" fontSize="xs">{statutes.length}</Badge>
+              </Text>
+              <Text fontSize="2xs" color={mutedColor} ml="auto">Click to expand · Look up · AI analysis</Text>
+            </HStack>
+          )}
+          <VStack spacing={compact ? 2 : 3} align="stretch">
+            {statutes.map((s, idx) => (
+              <StatuteCard
+                key={idx}
+                statute={s}
+                compact={compact}
+                onFollowUp={onFollowUp}
+                onFindCaseInDoc={onFindCaseInDoc}
+              />
+            ))}
+          </VStack>
+        </Box>
       )}
-      {precedences.map((p, idx) => (
-        <CaseCard
-          key={idx} p={p} compact={compact}
-          onFollowUp={onFollowUp}
-          onApplySuggestion={onApplySuggestion}
-          onFindCaseInDoc={onFindCaseInDoc}
-        />
-      ))}
+
     </VStack>
   );
 };
 
+export { StatuteCard };
 export default PrecedencePanel;

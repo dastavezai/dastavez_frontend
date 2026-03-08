@@ -105,6 +105,7 @@ Be thorough, specific, and cite exact legal provisions where possible.`;
     detectedDocType = '',
     extractedParties = null,
     precedenceAnalysis = [],
+    statutesReferenced = [],
     complianceIssues = [],
     missingClauses = [],
     clauseFlaws = [],
@@ -114,6 +115,7 @@ Be thorough, specific, and cite exact legal provisions where possible.`;
     governmentCompliance = null,
     smartSuggestions = [],
     scanResults = null,
+    aiSuggestedPrecedents = [],
   } = scanData;
 
   
@@ -251,14 +253,14 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
       id: 'precedences',
       label: compact ? 'Cases' : 'Precedences',
       icon: MdGavel,
-      count: precedenceAnalysis.length,
+      count: precedenceAnalysis.length + aiSuggestedPrecedents.length,
       colorScheme: 'purple',
     },
     {
       id: 'compliance',
       label: 'Compliance',
       icon: FaShieldAlt,
-      count: complianceIssues.length + missingClauses.length,
+      count: complianceIssues.length + missingClauses.length + statutesReferenced.length,
       colorScheme: 'teal',
     },
     {
@@ -324,10 +326,25 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
     },
   ];
 
-  // Determine which non-interactive tabs to visually dim
+  // Determine which tabs to visually dim based on doc type relevance
   const docTypeLower = (detectedDocType || '').toLowerCase();
-  const isLitigation = /petition|plaint|suit|complaint|appeal|bail|slp|written statement/.test(docTypeLower);
+  const isLitigation = /petition|plaint|suit|complaint|appeal|bail|slp|written statement|writ|application|revision|review/.test(docTypeLower);
   const isContract = /agreement|deed|contract|lease|rental|mou|memorandum/.test(docTypeLower);
+  const isOrder = /order|judgment|decree|ruling|opinion/.test(docTypeLower);
+  // Map interactive tab relevance by document type
+  const tabRelevance = {
+    overview: true,
+    precedences: true,
+    compliance: true,
+    clauses: isContract || (!isLitigation && !isOrder),
+    issues: true,
+    caseSearch: true,
+    arguments: isLitigation || isOrder,
+    contractReview: isContract,
+    courtFormat: isLitigation || isOrder,
+    crossRef: true,
+    counterAff: isLitigation,
+  };
 
   return (
     <Box h="100%" display="flex" flexDirection="column">
@@ -340,6 +357,7 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
         flexDirection="column"
       >
         <TabList
+          data-tour="analysis-tablist"
           px={compact ? 2 : 3}
           py={compact ? 1 : 2}
           borderBottom="1px solid"
@@ -349,9 +367,10 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
           flexShrink={0}
         >
           {tabs.map(t => {
-            const dimmed = !t.interactive && t.count === 0;
+            const relevant = tabRelevance[t.id] !== false;
+            const dimmed = (!t.interactive && t.count === 0) || (t.interactive && !relevant);
             return (
-            <Tab key={t.id} fontSize={compact ? 'xs' : 'sm'} px={compact ? 2 : 3} py={1} opacity={dimmed ? 0.5 : 1}>
+            <Tab key={t.id} data-tour={`tab-${t.id}`} fontSize={compact ? 'xs' : 'sm'} px={compact ? 2 : 3} py={1} opacity={dimmed ? 0.5 : 1}>
               <Icon as={t.icon} boxSize={compact ? 3 : 4} mr={1} />
               {t.label}
               {t.count > 0 && (
@@ -490,7 +509,10 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
           <TabPanel px={compact ? 2 : 4} py={compact ? 2 : 4}>
             <PrecedencePanel
               precedences={precedenceAnalysis}
+              aiSuggestedPrecedents={aiSuggestedPrecedents}
+              fileId={currentFileId}
               compact={compact}
+              docType={detectedDocType}
               onFollowUp={onFollowUp}
               onApplySuggestion={onApplySuggestion}
               onFindCaseInDoc={onFindCaseInDoc}
@@ -501,8 +523,11 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
             <CompliancePanel
               complianceIssues={complianceIssues}
               missingClauses={missingClauses}
+              statutesReferenced={statutesReferenced}
               compact={compact}
               onApplySuggestion={onApplySuggestion}
+              onFollowUp={onFollowUp}
+              onFindCaseInDoc={onFindCaseInDoc}
             />
             {governmentCompliance && governmentCompliance.applicable && (
               <Box mt={4} p={3} borderWidth="1px" borderColor={borderColor} borderRadius="md" bg={cardBg}>

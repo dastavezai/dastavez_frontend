@@ -20,6 +20,7 @@ import AnalysisDashboard from './analysis/AnalysisDashboard';
 import TemplateBrowser from './TemplateBrowser';
 import DocumentFieldsModal from './DocumentFieldsModal';
 import { useAuth } from '../context/AuthContext';
+import DemoLauncher from './DemoMode/DemoLauncher';
 
 const detectPlaceholderFields = (htmlOrText = '') => {
   const fields = [];
@@ -319,6 +320,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       detectedDocType:       session?.detectedDocType       || data?.detectedDocType       || '',
       extractedParties:      session?.extractedParties      || data?.extractedParties      || null,
       precedenceAnalysis:    session?.precedenceAnalysis    || data?.precedenceAnalysis    || [],
+      statutesReferenced:    session?.statutesReferenced    || data?.statutesReferenced    || [],
       complianceIssues:      session?.complianceIssues      || data?.complianceIssues      || [],
       missingClauses:        session?.missingClauses        || data?.missingClauses        || [],
       clauseFlaws:           session?.clauseFlaws           || data?.clauseFlaws           || [],
@@ -338,6 +340,9 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       matchedTemplateId:     session?.matchedTemplateId     || data?.matchedTemplateId     || '',
       matchedTemplateConfidence: session?.matchedTemplateConfidence || data?.matchedTemplateConfidence || '',
       detectedBlankFields: session?.detectedBlankFields || data?.detectedBlankFields || null,
+      extractedDocumentFields: session?.extractedDocumentFields || data?.extractedDocumentFields || null,
+      isCompleteDocument: session?.isCompleteDocument || data?.isCompleteDocument || false,
+      aiSuggestedPrecedents: session?.aiSuggestedPrecedents || data?.aiSuggestedPrecedents || [],
     };
     setScanData(merged);
 
@@ -370,6 +375,27 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       setFillModalTitle(merged.detectedDocType || data?.fileName || 'Document');
       setFillSource('template');
       setMatchedTemplateName(merged.matchedTemplateId);
+    } else if (merged.isCompleteDocument && Array.isArray(merged.extractedDocumentFields) && merged.extractedDocumentFields.length > 0) {
+      // Complete document — use smart-extracted fields for reviewing/editing existing values.
+      // This takes priority over detected blanks because the server confirmed the document is complete.
+      const smartFields = merged.extractedDocumentFields.map(f => ({
+        key: f.key,
+        label: f.label,
+        type: f.type || 'text',
+        required: false,
+        example: '',
+        category: f.category || 'other',
+        originalValue: f.value || '',
+      }));
+      const smartPrefill = {};
+      merged.extractedDocumentFields.forEach(f => {
+        if (f.value) smartPrefill[f.key] = f.value;
+      });
+      setFillModalFields(smartFields);
+      setFillModalPrefill(smartPrefill);
+      setFillModalTitle(merged.detectedDocType || data?.fileName || 'Document');
+      setFillSource('smart_extracted');
+      setShowFieldChoice(false);
     } else if (detected.length > 0) {
       // Placeholders found but no template match — save AI-detected for choice UI
       detected.forEach(f => { if (parties[f.key]) prefill[f.key] = parties[f.key]; });
@@ -497,9 +523,42 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       return h;
     };
 
-    if (fillSource === 'template' || fillSource === 'ai' || fillSource === 'uploaded_json') {
-      // Client-side replacement — server's detectedVariables use BLANK_N names that won't match
-      updatedHtml = applyLabelReplacement(htmlContent, fillModalFields, values);
+    if (fillSource === 'smart_extracted') {
+      // Global find-replace for complete documents: replace original value → new value everywhere
+      fillModalFields.forEach(field => {
+        const newVal = values[field.key];
+        const origVal = field.originalValue;
+        if (!origVal || !newVal || newVal === origVal) return;
+        // Replace all occurrences of original value with new value in HTML
+        // Use a text-aware approach: replace in text nodes while preserving HTML tags
+        const escaped = escapeRe(origVal);
+        const regex = new RegExp(escaped, 'g');
+        updatedHtml = updatedHtml.replace(regex, newVal);
+      });
+    } else if (fillSource === 'template' || fillSource === 'ai' || fillSource === 'uploaded_json') {
+      // Client-side replacement — try label-based pattern matching first
+      const labelReplaced = applyLabelReplacement(htmlContent, fillModalFields, values);
+      const blanksRemain = (labelReplaced.match(/_{3,}/g) || []).length;
+      const hadBlanks = (htmlContent.match(/_{3,}/g) || []).length;
+
+      if (labelReplaced !== htmlContent) {
+        // Label replacement worked — use it
+        updatedHtml = labelReplaced;
+      } else if (fillSource === 'ai') {
+        // AI-detected fields on a completed document (no blanks to replace):
+        // Fall back to global find-replace using originalValue if fields have them,
+        // otherwise just proceed to editor — user's values were persisted to server
+        fillModalFields.forEach(field => {
+          const newVal = values[field.key];
+          const origVal = field.originalValue;
+          if (!origVal || !newVal || newVal === origVal) return;
+          const escaped = escapeRe(origVal);
+          const regex = new RegExp(escaped, 'g');
+          updatedHtml = updatedHtml.replace(regex, newVal);
+        });
+      } else {
+        updatedHtml = labelReplaced;
+      }
     } else {
       // Legacy path: try server-side fill (for curly-brace {Variable} style documents)
       try {
@@ -661,12 +720,16 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
               <Heading size="lg" bgGradient="linear(to-r, blue.400, purple.500)" bgClip="text">
                 Start with a Document
               </Heading>
-              <Text color={textMuted} fontSize="sm">
-                Upload an existing legal document or start from a blank template.
-              </Text>
+              <HStack spacing={1}>
+                <Text color={textMuted} fontSize="sm">
+                  Upload an existing legal document or start from a blank template.
+                </Text>
+                <DemoLauncher size="xs" context="upload" />
+              </HStack>
             </VStack>
 
             <Box
+              data-tour="upload-dropzone"
               w="100%"
               minH="180px"
               border="2px dashed"
@@ -922,6 +985,17 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
                 </Text>
               </Alert>
             )}
+            {fillSource === 'smart_extracted' && fillModalFields.length > 0 && (
+              <Alert status="info" borderRadius="lg" fontSize="sm" py={2}>
+                <AlertIcon boxSize={4} />
+                <Box flex={1}>
+                  <Text fontWeight="600">Complete document — {fillModalFields.length} fields extracted for review</Text>
+                  <Text fontSize="xs" color={textMuted}>
+                    You can review and edit any pre-filled values before opening the editor.
+                  </Text>
+                </Box>
+              </Alert>
+            )}
 
             <Box w="100%" maxH="480px" overflowY="auto">
               <AnalysisDashboard
@@ -941,6 +1015,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
                 Scan Another File
               </Button>
               <Button
+                data-tour="open-editor-btn"
                 colorScheme="blue"
                 size="md"
                 rightIcon={<Icon as={FaArrowRight} />}

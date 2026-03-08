@@ -35,8 +35,13 @@ import {
   useToast,
   Alert,
   AlertIcon,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
 } from '@chakra-ui/react';
-import { FaFileAlt, FaCheck, FaExclamationCircle, FaMagic, FaDatabase, FaRobot, FaUpload } from 'react-icons/fa';
+import { FaFileAlt, FaCheck, FaExclamationCircle, FaMagic, FaDatabase, FaRobot, FaUpload, FaEdit } from 'react-icons/fa';
 import fileService from '../services/fileService';
 
 const DocumentFieldsModal = ({
@@ -68,13 +73,16 @@ const DocumentFieldsModal = ({
   const inputBg = useColorModeValue('white', 'gray.700');
   const progressBg = useColorModeValue('gray.100', 'gray.700');
 
+  const accordionBg = useColorModeValue('gray.50', 'gray.700');
+  const accordionHoverBg = useColorModeValue('gray.100', 'gray.600');
+
   
   const t = {
     en: {
-      fillDetails: isEditMode ? 'Edit Document Details' : 'Fill Document Details',
+      fillDetails: isEditMode ? 'Edit Document Details' : fieldSource === 'smart_extracted' ? 'Review & Edit Document Fields' : 'Fill Document Details',
       required: 'Required',
       optional: 'Optional',
-      submit: isEditMode ? 'Update & Regenerate' : 'Generate Document',
+      submit: isEditMode ? 'Update & Regenerate' : fieldSource === 'smart_extracted' ? 'Apply Changes' : 'Generate Document',
       cancel: 'Cancel',
       progress: 'Progress',
       fieldsCompleted: 'fields completed',
@@ -411,7 +419,7 @@ const DocumentFieldsModal = ({
         <ModalBody py={4}>
           {fieldSource && (
             <Alert
-              status={fieldSource === 'template' ? 'success' : fieldSource === 'ai' ? 'warning' : 'info'}
+              status={fieldSource === 'template' ? 'success' : fieldSource === 'smart_extracted' ? 'info' : fieldSource === 'ai' ? 'warning' : 'info'}
               borderRadius="lg"
               mb={4}
               fontSize="sm"
@@ -419,10 +427,12 @@ const DocumentFieldsModal = ({
             >
               <AlertIcon boxSize={4} />
               <HStack spacing={2}>
-                <Icon as={fieldSource === 'template' ? FaDatabase : fieldSource === 'ai' ? FaRobot : FaUpload} />
+                <Icon as={fieldSource === 'template' ? FaDatabase : fieldSource === 'smart_extracted' ? FaEdit : fieldSource === 'ai' ? FaRobot : FaUpload} />
                 <Text>
                   {fieldSource === 'template'
                     ? 'Fields from curated template — high accuracy'
+                    : fieldSource === 'smart_extracted'
+                    ? 'Detected fields from your document — edit any value to replace it throughout'
                     : fieldSource === 'ai'
                     ? 'AI-detected fields — please review carefully'
                     : 'Fields from uploaded JSON'}
@@ -430,9 +440,52 @@ const DocumentFieldsModal = ({
               </HStack>
             </Alert>
           )}
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-            {fields.map((field) => renderField(field))}
-          </SimpleGrid>
+          {fieldSource === 'smart_extracted' ? (() => {
+            const CATEGORY_LABELS = {
+              parties: 'Parties & Advocates',
+              court_details: 'Court & Case Details',
+              personal_details: 'Personal Details',
+              financial_property: 'Financial & Property',
+              dates: 'Dates & Timeline',
+              sections_acts: 'Sections & Acts',
+              other: 'Other Fields',
+            };
+            const grouped = {};
+            fields.forEach(f => {
+              const cat = f.category || 'other';
+              if (!grouped[cat]) grouped[cat] = [];
+              grouped[cat].push(f);
+            });
+            const categories = Object.keys(grouped);
+            return (
+              <Accordion allowMultiple defaultIndex={categories.map((_, i) => i)}>
+                {categories.map(cat => (
+                  <AccordionItem key={cat} border="none" mb={2}>
+                    <AccordionButton
+                      bg={accordionBg}
+                      borderRadius="md"
+                      _hover={{ bg: accordionHoverBg }}
+                    >
+                      <Box flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">
+                        {CATEGORY_LABELS[cat] || cat}
+                        <Badge ml={2} colorScheme="blue" fontSize="2xs">{grouped[cat].length}</Badge>
+                      </Box>
+                      <AccordionIcon />
+                    </AccordionButton>
+                    <AccordionPanel pb={3} pt={2}>
+                      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                        {grouped[cat].map(field => renderField(field))}
+                      </SimpleGrid>
+                    </AccordionPanel>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            );
+          })() : (
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+              {fields.map((field) => renderField(field))}
+            </SimpleGrid>
+          )}
         </ModalBody>
 
         <Divider />
