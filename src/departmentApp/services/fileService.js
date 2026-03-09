@@ -30,6 +30,58 @@ api.interceptors.request.use(
   }
 );
 
+// Auto-refresh CSRF token on 403 CSRF errors and retry the original request once
+let isRefreshingCsrf = false;
+let csrfRetryQueue = [];
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const isCsrfError =
+      error.response?.status === 403 &&
+      (error.response?.data?.message === 'Invalid CSRF token' ||
+       error.response?.data?.error === 'Invalid CSRF token');
+
+    if (isCsrfError && !originalRequest._csrfRetried) {
+      originalRequest._csrfRetried = true;
+
+      if (!isRefreshingCsrf) {
+        isRefreshingCsrf = true;
+        try {
+          const token = localStorage.getItem('token');
+          const resp = await axios.post(
+            `${BASE_URL}/api/auth/refresh-csrf`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const newCsrf = resp.data.csrfToken;
+          localStorage.setItem('csrfToken', newCsrf);
+          axios.defaults.headers.common['x-csrf-token'] = newCsrf;
+          // Flush queued requests
+          csrfRetryQueue.forEach(cb => cb(newCsrf));
+          csrfRetryQueue = [];
+        } catch (refreshErr) {
+          csrfRetryQueue = [];
+          return Promise.reject(refreshErr);
+        } finally {
+          isRefreshingCsrf = false;
+        }
+      } else {
+        // Queue this request until CSRF is refreshed
+        await new Promise(resolve => csrfRetryQueue.push(resolve));
+      }
+
+      // Retry with new CSRF token
+      originalRequest.headers['x-csrf-token'] = localStorage.getItem('csrfToken');
+      return api(originalRequest);
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+
 export const uploadFile = async (file, onProgress) => {
   try {
     console.log('📤 Client uploading file:', {
