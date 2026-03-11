@@ -40,8 +40,9 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
+  Collapse,
 } from '@chakra-ui/react';
-import { FaFileAlt, FaCheck, FaExclamationCircle, FaMagic, FaDatabase, FaRobot, FaUpload, FaEdit } from 'react-icons/fa';
+import { FaFileAlt, FaCheck, FaExclamationCircle, FaMagic, FaDatabase, FaRobot, FaUpload, FaEdit, FaChevronUp, FaChevronDown } from 'react-icons/fa';
 import fileService from '../services/fileService';
 
 const DocumentFieldsModal = ({
@@ -62,6 +63,7 @@ const DocumentFieldsModal = ({
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [isSofOpen, setIsSofOpen] = useState(false);
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
   const { isOpen: isPartialOpen, onOpen: onPartialOpen, onClose: onPartialClose } = useDisclosure();
   const cancelRef = React.useRef();
@@ -442,18 +444,6 @@ const DocumentFieldsModal = ({
             </Alert>
           )}
 
-          {summaryBox && (
-            <Box mb={6} p={4} bg={useColorModeValue('blue.50', 'blue.900')} borderRadius="md" borderLeft="4px solid" borderLeftColor="blue.500">
-              <HStack mb={2} color="blue.600">
-                <Icon as={FaFileAlt} />
-                <Text fontWeight="bold" fontSize="sm">{language === 'hi' ? 'दस्तावेज़ का सार (SOF)' : 'Summary of File (SOF)'}</Text>
-              </HStack>
-              <Text fontSize="sm" color={useColorModeValue('gray.700', 'gray.300')} whiteSpace="pre-wrap">
-                {summaryBox}
-              </Text>
-            </Box>
-          )}
-
           {fieldSource === 'smart_extracted' ? (() => {
             const CATEGORY_LABELS = {
               parties: 'Parties & Advocates',
@@ -502,24 +492,57 @@ const DocumentFieldsModal = ({
           )}
         </ModalBody>
 
+
+        {summaryBox && (
+          <Collapse in={isSofOpen} animateOpacity>
+            <Box p={4} bg={useColorModeValue('blue.50', 'blue.900')} borderTop="1px solid" borderColor={borderColor}>
+              <HStack justify="space-between" mb={2}>
+                <HStack color="blue.600">
+                  <Icon as={FaFileAlt} />
+                  <Text fontWeight="bold" fontSize="sm">{language === 'hi' ? 'दस्तावेज़ का सार (SOF)' : 'Summary of File (SOF)'}</Text>
+                </HStack>
+                <Button size="xs" colorScheme="purple" leftIcon={<FaMagic />}>
+                  {language === 'hi' ? 'AI द्वारा ठीक करें' : 'Fix by AI'}
+                </Button>
+              </HStack>
+              <Text fontSize="sm" color={useColorModeValue('gray.700', 'gray.300')} whiteSpace="pre-wrap" maxH="200px" overflowY="auto">
+                {summaryBox}
+              </Text>
+            </Box>
+          </Collapse>
+        )}
+
         <Divider />
 
         <ModalFooter>
           <HStack spacing={3} w="100%" justify="space-between">
-            <Tooltip label="Auto-fill all fields with AI-generated test values" placement="top">
-              <Button
-                leftIcon={<Icon as={FaMagic} />}
-                variant="outline"
-                colorScheme="purple"
-                size="sm"
-                onClick={handleAutoFill}
-                isLoading={isAutoFilling}
-                loadingText="Filling..."
-                isDisabled={isSubmitting || fields.length === 0}
-              >
-                Auto-fill
-              </Button>
-            </Tooltip>
+            <HStack spacing={2}>
+              <Tooltip label="Auto-fill all fields with AI-generated test values" placement="top">
+                <Button
+                  leftIcon={<Icon as={FaMagic} />}
+                  variant="outline"
+                  colorScheme="purple"
+                  size="sm"
+                  onClick={handleAutoFill}
+                  isLoading={isAutoFilling}
+                  loadingText="Filling..."
+                  isDisabled={isSubmitting || fields.length === 0}
+                >
+                  Auto-fill
+                </Button>
+              </Tooltip>
+              {summaryBox && (
+                <Button
+                  leftIcon={isSofOpen ? <FaChevronDown /> : <FaChevronUp />}
+                  variant={isSofOpen ? 'solid' : 'outline'}
+                  colorScheme="blue"
+                  size="sm"
+                  onClick={() => setIsSofOpen(!isSofOpen)}
+                >
+                  {language === 'hi' ? 'SOF देखें' : 'Review SOF'}
+                </Button>
+              )}
+            </HStack>
             <HStack spacing={3}>
               <Button variant="ghost" onClick={handleCancelClick} isDisabled={isSubmitting || isAutoFilling}>
                 {text.cancel}

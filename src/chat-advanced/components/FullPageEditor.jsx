@@ -68,6 +68,8 @@ import EditorToolbar from './EditorToolbar';
 import SmartSuggestionsPanel from './SmartSuggestionsPanel';
 import DocumentAnalysisPanel from './DocumentAnalysisPanel';
 import AIHelperPanel from './AIHelperPanel';
+import '../../departmentApp/components/FullPageEditor.css';
+
 
 /**
  * FullPageEditor - Full-screen rich-text document editor with TipTap
@@ -601,7 +603,9 @@ const FullPageEditor = ({
                   '& h2': { fontSize: '1.5em', fontWeight: 'bold', marginBottom: '0.4em', marginTop: '0.7em' },
                   '& h3': { fontSize: '1.17em', fontWeight: 'bold', marginBottom: '0.3em', marginTop: '0.6em' },
                   '& h4': { fontSize: '1em', fontWeight: 'bold', marginBottom: '0.3em', marginTop: '0.5em' },
-                  '& ul, & ol': { paddingLeft: '1.5em', marginBottom: '0.5em' },
+                  '& ul': { paddingLeft: '1.5em', marginBottom: '0.5em', listStyleType: 'disc' },
+                  '& ol': { paddingLeft: '1.5em', marginBottom: '0.5em', listStyleType: 'decimal' },
+                  '& li': { marginBottom: '0.2em' },
                   '& blockquote': {
                     borderLeft: '3px solid',
                     borderColor: 'gray.300',

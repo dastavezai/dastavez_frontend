@@ -81,6 +81,8 @@ import FontSize from './editor/FontSizeExtension.jsx';
 import DocumentConverter from './editor/DocumentConverter.jsx';
 import { useAppTheme } from '../context/ThemeContext';
 import DemoLauncher from './DemoMode/DemoLauncher';
+import './FullPageEditor.css';
+
 
 const FullPageEditor = ({
   isOpen,
