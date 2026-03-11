@@ -1,0 +1,96 @@
+/* ============================================================
+   FullPageEditor Styles
+   These rules are scoped to .tiptap-editor so they don't
+   affect anything outside the editor canvas.
+   ============================================================ */
+
+/* ── List Formatting ─────────────────────────────────────── */
+
+/* Ordered lists: show numbers visually */
+.tiptap-editor ol {
+  list-style-type: decimal;
+  padding-left: 1.6em;
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+
+/* Unordered lists: show bullets visually */
+.tiptap-editor ul {
+  list-style-type: disc;
+  padding-left: 1.6em;
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+
+/* List items */
+.tiptap-editor li {
+  padding: 2px 0;
+  line-height: 1.6;
+}
+
+/* Nested lists */
+.tiptap-editor ol ol,
+.tiptap-editor ul ul,
+.tiptap-editor ol ul,
+.tiptap-editor ul ol {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+}
+
+.tiptap-editor ol ol { list-style-type: lower-alpha; }
+.tiptap-editor ol ol ol { list-style-type: lower-roman; }
+
+/* ── Alignment ───────────────────────────────────────────── */
+/* Inline text-align styles from DOCX are already on the element;
+   we make sure the editor doesn't override them. */
+.tiptap-editor p,
+.tiptap-editor h1,
+.tiptap-editor h2,
+.tiptap-editor h3,
+.tiptap-editor h4,
+.tiptap-editor h5,
+.tiptap-editor h6,
+.tiptap-editor li {
+  /* Do NOT hardcode text-align here; let inline styles from docxStructureToHtml win */
+  white-space: pre-wrap;    /* preserve intentional whitespace */
+  word-break: break-word;
+}
+
+/* ── Headings ────────────────────────────────────────────── */
+.tiptap-editor h1 { font-size: 1.8em; font-weight: 700; margin: 0.5em 0 0.3em; }
+.tiptap-editor h2 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0 0.3em; }
+.tiptap-editor h3 { font-size: 1.25em; font-weight: 600; margin: 0.4em 0 0.25em; }
+.tiptap-editor h4,
+.tiptap-editor h5,
+.tiptap-editor h6 { font-size: 1em; font-weight: 600; margin: 0.3em 0 0.2em; }
+
+/* ── Table ───────────────────────────────────────────────── */
+.tiptap-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8em 0;
+}
+.tiptap-editor th,
+.tiptap-editor td {
+  border: 1px solid #ccc;
+  padding: 6px 8px;
+  vertical-align: top;
+}
+.tiptap-editor th {
+  background: #f5f5f5;
+  font-weight: 600;
+  text-align: left;
+}
+
+/* ── General Paragraph Spacing ───────────────────────────── */
+.tiptap-editor p {
+  margin: 0.3em 0;
+  line-height: 1.6;
+  min-height: 1em; /* ensures empty paragraphs are visible */
+}
+
+/* ── Strong / Em / U / S ─────────────────────────────────── */
+.tiptap-editor strong { font-weight: 700; }
+.tiptap-editor em     { font-style: italic; }
+.tiptap-editor u      { text-decoration: underline; }
+.tiptap-editor s      { text-decoration: line-through; }
