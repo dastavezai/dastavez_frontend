@@ -478,7 +478,7 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
                 >
                   <HStack justify="space-between" mb={showSof ? 2 : 0}>
                     <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color={mutedColor}>
-                      Summary of File (SOF)
+                      Statement of Facts (SOF)
                     </Text>
                     <Button
                       size="xs"
@@ -493,7 +493,7 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
                     <Textarea
                       value={sofText}
                       onChange={(e) => setSofText(e.target.value)}
-                      placeholder="Summary of the document (SOF) will appear here after scan..."
+                      placeholder="Statement of Facts (SOF) from the document will appear here after scan..."
                       size="sm"
                       minH="80px"
                       fontSize="xs"

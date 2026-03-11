@@ -499,7 +499,7 @@ const DocumentFieldsModal = ({
               <HStack justify="space-between" mb={2}>
                 <HStack color="blue.600">
                   <Icon as={FaFileAlt} />
-                  <Text fontWeight="bold" fontSize="sm">{language === 'hi' ? 'दस्तावेज़ का सार (SOF)' : 'Summary of File (SOF)'}</Text>
+                  <Text fontWeight="bold" fontSize="sm">{language === 'hi' ? 'तथ्य विवरण (SOF)' : 'Statement of Facts (SOF)'}</Text>
                 </HStack>
                 <Button size="xs" colorScheme="purple" leftIcon={<FaMagic />}>
                   {language === 'hi' ? 'AI द्वारा ठीक करें' : 'Fix by AI'}

@@ -73,7 +73,7 @@ const DocumentAnalysisPanel = ({ scanResults, formatMetadata, ocrConfidence }) =
             <Box bg={cardBg} p={3} borderRadius="md" border="1px solid" borderColor={borderColor}>
               <HStack spacing={2} mb={1}>
                 <Icon as={FaBullseye} color="teal.500" />
-                <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color={mutedColor}>Summary of File (SOF)</Text>
+                <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color={mutedColor}>Statement of Facts (SOF)</Text>
               </HStack>
               <Text fontSize="sm" color={textColor} fontStyle="italic">
                 "{scanResults.summary}"
