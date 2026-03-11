@@ -4,6 +4,7 @@ import {
   HStack, Text, Badge, Icon, VStack, useColorModeValue,
   Stat, StatLabel, StatNumber, StatHelpText, SimpleGrid, Divider,
   Spinner, Button, Progress, Tooltip, Alert, AlertIcon,
+  Collapse, Textarea,
 } from '@chakra-ui/react';
 import {
   MdGavel, MdSecurity, MdTimeline, MdCompareArrows, MdLightbulb, MdDescription,
@@ -62,11 +63,25 @@ const AnalysisDashboard = ({
   editor,
   currentFileId,
   documentContext = '',
+  sofExpanded = false,
+  onSofExpandToggle,
+  sofValue,
+  onSofChange,
 }) => {
   const [deepAnalysis, setDeepAnalysis] = useState(null);
   const [deepLoading, setDeepLoading] = useState(false);
   const [clauseSuggestions, setClauseSuggestions] = useState([]);
   const [clauseLoading, setClauseLoading] = useState(false);
+  const [localSofExpanded, setLocalSofExpanded] = useState(false);
+  const [localSofValue, setLocalSofValue] = useState('');
+  const isSofControlled = onSofExpandToggle != null;
+  const showSof = isSofControlled ? sofExpanded : localSofExpanded;
+  const toggleSof = () => {
+    if (isSofControlled) onSofExpandToggle();
+    else setLocalSofExpanded((p) => !p);
+  };
+  const sofText = sofValue !== undefined ? sofValue : (localSofValue || scanData?.scanResults?.summary || '');
+  const setSofText = onSofChange || setLocalSofValue;
 
   const runDeepAnalysis = async () => {
     setDeepLoading(true);
@@ -231,6 +246,7 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
   const mutedColor = useColorModeValue('gray.500', 'gray.400');
   const textColor = useColorModeValue('gray.800', 'gray.100');
   const headingColor = useColorModeValue('blue.700', 'blue.300');
+  const textareaBg = useColorModeValue('white', 'gray.700');
 
   
   const totalIssues =
@@ -448,6 +464,44 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
                   {Array.isArray(extractedParties.otherParties) && extractedParties.otherParties.slice(0, 5).map((p, i) => (
                     <PartyRow key={i} label="Other" value={p} colorScheme="orange" compact={compact} />
                   ))}
+                </Box>
+              )}
+
+              {/* Summary of File (SOF) - collapsible, editable */}
+              {scanData && (
+                <Box
+                  bg={cardBg}
+                  border="1px solid"
+                  borderColor={borderColor}
+                  borderRadius="md"
+                  p={3}
+                >
+                  <HStack justify="space-between" mb={showSof ? 2 : 0}>
+                    <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color={mutedColor}>
+                      Summary of File (SOF)
+                    </Text>
+                    <Button
+                      size="xs"
+                      colorScheme="blue"
+                      variant={showSof ? 'solid' : 'outline'}
+                      onClick={toggleSof}
+                    >
+                      {showSof ? 'Hide SOF' : 'See SOF'}
+                    </Button>
+                  </HStack>
+                  <Collapse in={showSof} animateOpacity>
+                    <Textarea
+                      value={sofText}
+                      onChange={(e) => setSofText(e.target.value)}
+                      placeholder="Summary of the document (SOF) will appear here after scan..."
+                      size="sm"
+                      minH="80px"
+                      fontSize="xs"
+                      bg={textareaBg}
+                      borderColor={borderColor}
+                      _placeholder={{ color: mutedColor }}
+                    />
+                  </Collapse>
                 </Box>
               )}
 

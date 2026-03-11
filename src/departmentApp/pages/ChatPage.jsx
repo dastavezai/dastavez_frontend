@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import {
   Box,
   Container,

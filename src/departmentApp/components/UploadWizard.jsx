@@ -155,6 +155,8 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
   const [aiDetectedFields, setAiDetectedFields] = useState([]);
   const [editingAiFields, setEditingAiFields]   = useState(false);
   const [matchedTemplateName, setMatchedTemplateName] = useState('');
+  const [sofExpanded, setSofExpanded] = useState(false);
+  const [editedSof, setEditedSof] = useState('');
   const inputRef = useRef(null);
   const jsonInputRef = useRef(null);
   const pollRef  = useRef(null);
@@ -182,6 +184,8 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       setAiDetectedFields([]);
       setEditingAiFields(false);
       setMatchedTemplateName('');
+      setSofExpanded(false);
+      setEditedSof('');
     }
     return () => clearStageTimer();
   }, [isOpen]);
@@ -345,6 +349,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       aiSuggestedPrecedents: session?.aiSuggestedPrecedents || data?.aiSuggestedPrecedents || [],
     };
     setScanData(merged);
+    setEditedSof(merged?.scanResults?.summary ?? '');
 
     // Determine field source: JSON template match vs AI-detected vs none
     const templateFields = merged.matchedTemplateFields;
@@ -417,16 +422,24 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
 
   
   const proceedToEditor = useCallback((overrideHtml, overrideScanData) => {
+    const data = overrideScanData || scanData;
+    const scanDataWithSof = data ? {
+      ...data,
+      scanResults: {
+        ...(data.scanResults || {}),
+        summary: editedSof ?? data.scanResults?.summary ?? '',
+      },
+    } : data;
     onOpenEditor?.({
       fileId: uploadedFileId,
       sessionId,
-      scanData: overrideScanData || scanData,
+      scanData: scanDataWithSof,
       htmlContent: overrideHtml || htmlContent,
       fileName,
       isBlank: false,
     });
     onClose();
-  }, [onOpenEditor, uploadedFileId, sessionId, scanData, htmlContent, fileName, onClose]);
+  }, [onOpenEditor, uploadedFileId, sessionId, scanData, editedSof, htmlContent, fileName, onClose]);
 
   const handleOpenEditor = () => {
     if (showFieldChoice) {
@@ -632,7 +645,14 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       const resAdv = pick('respondent_advocate', 'res_advocate', 'resadvocate', 'respondent_adv');
       if (resAdv) ep.respondentAdvocates = [resAdv];
 
-      return { ...scanData, extractedParties: ep };
+      return {
+        ...scanData,
+        extractedParties: ep,
+        scanResults: {
+          ...(scanData.scanResults || {}),
+          summary: editedSof ?? scanData.scanResults?.summary ?? '',
+        },
+      };
     })();
 
     setShowFillModal(false);
@@ -1001,6 +1021,10 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
               <AnalysisDashboard
                 scanData={scanData}
                 compact={false}
+                sofExpanded={sofExpanded}
+                onSofExpandToggle={() => setSofExpanded((p) => !p)}
+                sofValue={editedSof}
+                onSofChange={setEditedSof}
               />
             </Box>
 
@@ -1013,6 +1037,14 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
                 onClick={() => { setStep('pick'); setSelectedFile(null); }}
               >
                 Scan Another File
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                colorScheme="blue"
+                onClick={() => setSofExpanded((p) => !p)}
+              >
+                {sofExpanded ? 'Hide SOF' : 'See SOF'}
               </Button>
               <Button
                 data-tour="open-editor-btn"
@@ -1282,6 +1314,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
         isEditMode={false}
         allowPartial={true}
         fieldSource={fillSource}
+        summaryBox={editedSof || scanData?.scanResults?.summary || null}
       />
     </>
   );
