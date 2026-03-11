@@ -55,6 +55,7 @@ const DocumentFieldsModal = ({
   isEditMode = false,
   allowPartial = false,
   fieldSource = '',
+  summaryBox = null,
 }) => {
   const [values, setValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -76,7 +77,7 @@ const DocumentFieldsModal = ({
   const accordionBg = useColorModeValue('gray.50', 'gray.700');
   const accordionHoverBg = useColorModeValue('gray.100', 'gray.600');
 
-  
+
   const t = {
     en: {
       fillDetails: isEditMode ? 'Edit Document Details' : fieldSource === 'smart_extracted' ? 'Review & Edit Document Fields' : 'Fill Document Details',
@@ -114,7 +115,7 @@ const DocumentFieldsModal = ({
 
   const text = t[language] || t.en;
 
-  
+
   useEffect(() => {
     const init = {};
     fields.forEach((field) => {
@@ -126,7 +127,7 @@ const DocumentFieldsModal = ({
     setIsSubmitting(false);
   }, [fields, initialValues, isOpen]);
 
-  
+
   const requiredFields = fields.filter((f) => f.required !== false);
   const filledRequired = requiredFields.filter(
     (f) => values[f.key] && String(values[f.key]).trim().length > 0
@@ -137,7 +138,7 @@ const DocumentFieldsModal = ({
 
   const handleChange = (key, value) => {
     setValues((prev) => ({ ...prev, [key]: value }));
-    
+
     if (errors[key]) {
       setErrors((prev) => ({ ...prev, [key]: null }));
     }
@@ -145,7 +146,7 @@ const DocumentFieldsModal = ({
 
   const handleBlur = (key) => {
     setTouched((prev) => ({ ...prev, [key]: true }));
-    
+
     const field = fields.find((f) => f.key === key);
     if (field?.required !== false && (!values[key] || !String(values[key]).trim())) {
       setErrors((prev) => ({ ...prev, [key]: text.fieldRequired }));
@@ -167,7 +168,7 @@ const DocumentFieldsModal = ({
     });
 
     setErrors(newErrors);
-    
+
     const allTouched = {};
     fields.forEach((f) => (allTouched[f.key] = true));
     setTouched(allTouched);
@@ -175,14 +176,14 @@ const DocumentFieldsModal = ({
     return isValid;
   };
 
-  
+
   const handleAutoFill = async () => {
     setIsAutoFilling(true);
     try {
       const result = await fileService.autoFillFields(templateTitle, fields);
       if (result?.values && typeof result.values === 'object') {
         setValues(prev => ({ ...prev, ...result.values }));
-        
+
         setErrors(prev => {
           const cleared = { ...prev };
           Object.keys(result.values).forEach(k => { cleared[k] = null; });
@@ -212,14 +213,14 @@ const DocumentFieldsModal = ({
 
   const handleSubmit = async () => {
     console.log('🔵 [DocumentFieldsModal] handleSubmit called', { progress, isSubmitting, allowPartial });
-    
+
     if (!allowPartial && !validateAll()) {
       console.log('⚠️ [DocumentFieldsModal] Validation failed (strict mode)');
       return;
     }
 
-    
-    
+
+
     if (allowPartial && progress < 100) {
       validateAll();
       console.log('⚠️ [DocumentFieldsModal] Partial completion — prompting confirmation');
@@ -249,30 +250,30 @@ const DocumentFieldsModal = ({
     onPartialClose();
     await doSubmit();
   };
-  
-  
+
+
   const handleCancelClick = () => {
     console.log('🔵 [DocumentFieldsModal] Cancel button clicked');
     onConfirmOpen();
   };
-  
-  
+
+
   const handleConfirmCancel = () => {
     console.log('🔵 [DocumentFieldsModal] Cancel confirmed - returning to main menu');
     onConfirmClose();
-    
+
     onClose(null, true);
   };
-  
-  
+
+
   const handleXClose = () => {
     console.log('🔵 [DocumentFieldsModal] X button clicked', { isEditMode });
-    
+
     if (isEditMode) {
-      
+
       onConfirmOpen();
     } else {
-      
+
       console.log('💾 [DocumentFieldsModal] Saving partial data and closing (initial fill)');
       onClose(values, false);
     }
@@ -284,7 +285,7 @@ const DocumentFieldsModal = ({
     const hasError = touched[key] && errors[key];
     const value = values[key] || '';
 
-    
+
     let inputElement;
 
     if (type === 'date') {
@@ -432,14 +433,27 @@ const DocumentFieldsModal = ({
                   {fieldSource === 'template'
                     ? 'Fields from curated template — high accuracy'
                     : fieldSource === 'smart_extracted'
-                    ? 'Detected fields from your document — edit any value to replace it throughout'
-                    : fieldSource === 'ai'
-                    ? 'AI-detected fields — please review carefully'
-                    : 'Fields from uploaded JSON'}
+                      ? 'Detected fields from your document — edit any value to replace it throughout'
+                      : fieldSource === 'ai'
+                        ? 'AI-detected fields — please review carefully'
+                        : 'Fields from uploaded JSON'}
                 </Text>
               </HStack>
             </Alert>
           )}
+
+          {summaryBox && (
+            <Box mb={6} p={4} bg={useColorModeValue('blue.50', 'blue.900')} borderRadius="md" borderLeft="4px solid" borderLeftColor="blue.500">
+              <HStack mb={2} color="blue.600">
+                <Icon as={FaFileAlt} />
+                <Text fontWeight="bold" fontSize="sm">{language === 'hi' ? 'दस्तावेज़ का सार (SOF)' : 'Summary of File (SOF)'}</Text>
+              </HStack>
+              <Text fontSize="sm" color={useColorModeValue('gray.700', 'gray.300')} whiteSpace="pre-wrap">
+                {summaryBox}
+              </Text>
+            </Box>
+          )}
+
           {fieldSource === 'smart_extracted' ? (() => {
             const CATEGORY_LABELS = {
               parties: 'Parties & Advocates',
@@ -526,7 +540,7 @@ const DocumentFieldsModal = ({
           </HStack>
         </ModalFooter>
       </ModalContent>
-      
+
       <AlertDialog
         isOpen={isConfirmOpen}
         leastDestructiveRef={cancelRef}

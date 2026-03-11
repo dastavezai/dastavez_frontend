@@ -57,6 +57,7 @@ const DocumentFieldsModal = ({
   initialValues = {},
   language = 'en',
   isEditMode = false,
+  summaryBox = null,
 }) => {
   const [values, setValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -172,7 +173,7 @@ const DocumentFieldsModal = ({
 
   const handleSubmit = async () => {
     console.log('🔵 [DocumentFieldsModal] handleSubmit called', { progress, isSubmitting });
-    
+
     if (!validateAll()) {
       console.log('⚠️ [DocumentFieldsModal] Validation failed');
       return;
@@ -191,13 +192,13 @@ const DocumentFieldsModal = ({
       console.log('🔓 [DocumentFieldsModal] isSubmitting reset to false');
     }
   };
-  
+
   // 🆕 Handle Cancel button click - show confirmation dialog
   const handleCancelClick = () => {
     console.log('🔵 [DocumentFieldsModal] Cancel button clicked');
     onConfirmOpen();
   };
-  
+
   // 🆕 Confirm cancellation - close modal and return to main menu
   const handleConfirmCancel = () => {
     console.log('🔵 [DocumentFieldsModal] Cancel confirmed - returning to main menu');
@@ -205,11 +206,11 @@ const DocumentFieldsModal = ({
     // Pass null to indicate cancellation (not partial save)
     onClose(null, true); // true = cancelled
   };
-  
+
   // 🆕 Handle X close button - smart behavior based on mode
   const handleXClose = () => {
     console.log('🔵 [DocumentFieldsModal] X button clicked', { isEditMode });
-    
+
     if (isEditMode) {
       // During edit, show confirmation (don't lose changes)
       onConfirmOpen();
@@ -359,6 +360,18 @@ const DocumentFieldsModal = ({
         <Divider />
 
         <ModalBody py={4}>
+          {summaryBox && (
+            <Box mb={6} p={4} bg={useColorModeValue('blue.50', 'blue.900')} borderRadius="md" borderLeft="4px solid" borderLeftColor="blue.500">
+              <HStack mb={2} color="blue.600">
+                <Icon as={FaFileAlt} />
+                <Text fontWeight="bold" fontSize="sm">{language === 'hi' ? 'दस्तावेज़ का सार (SOF)' : 'Summary of File (SOF)'}</Text>
+              </HStack>
+              <Text fontSize="sm" color={useColorModeValue('gray.700', 'gray.300')} whiteSpace="pre-wrap">
+                {summaryBox}
+              </Text>
+            </Box>
+          )}
+
           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
             {fields.map((field) => renderField(field))}
           </SimpleGrid>
@@ -383,7 +396,7 @@ const DocumentFieldsModal = ({
           </HStack>
         </ModalFooter>
       </ModalContent>
-      
+
       {/* Cancel Confirmation Dialog */}
       <AlertDialog
         isOpen={isConfirmOpen}

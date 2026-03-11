@@ -66,7 +66,7 @@ const ChatPage = () => {
   const { colorMode, toggleColorMode } = useColorMode();
   const { token, logout, user } = useAuth();
   const toast = useToast();
-  
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -78,26 +78,26 @@ const ChatPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [analyzingFile, setAnalyzingFile] = useState(false);
-  
-  
+
+
   const [clearPassword, setClearPassword] = useState('');
   const [showClearPassword, setShowClearPassword] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const { isOpen: isClearModalOpen, onOpen: onClearModalOpen, onClose: onClearModalClose } = useDisclosure();
-  
-  
+
+
   const [intentOverride, setIntentOverride] = useState(null);
   const [intentLabel, setIntentLabel] = useState(null);
-  
-  
+
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [editSessionActive, setEditSessionActive] = useState(false);
   const [editChangesCount, setEditChangesCount] = useState(0);
   const [documentAnalysis, setDocumentAnalysis] = useState(null);
   const [editSession, setEditSession] = useState(null);
   const [isFullEditorOpen, setIsFullEditorOpen] = useState(false);
-  
-  
+
+
   const [scanStatus, setScanStatus] = useState('none');
   const [scanResults, setScanResults] = useState(null);
   const [formatMetadata, setFormatMetadata] = useState(null);
@@ -107,53 +107,53 @@ const ChatPage = () => {
   const [ocrConfidence, setOcrConfidence] = useState(null);
   const [ocrTextLength, setOcrTextLength] = useState(0);
   const [scanData, setScanData] = useState(null);
-  
-  
+
+
   const isMobile = useBreakpointValue({ base: true, lg: false });
-  
-  
+
+
   const [isFieldsModalOpen, setIsFieldsModalOpen] = useState(false);
   const [fieldsModalData, setFieldsModalData] = useState(null);
-  
-  
+
+
   const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
-  
-  
+
+
   const [isDocTypeSelectorOpen, setIsDocTypeSelectorOpen] = useState(false);
-  
-  
+
+
   const [isGuidanceModalOpen, setIsGuidanceModalOpen] = useState(false);
-  
-  
+
+
   const [isComplaintFormOpen, setIsComplaintFormOpen] = useState(false);
   const [complaintContext, setComplaintContext] = useState({});
   const [lastGeneratedComplaint, setLastGeneratedComplaint] = useState(null);
-  
-  
+
+
   const [showPostDownloadOptions, setShowPostDownloadOptions] = useState(false);
   const [lastGeneratedTemplate, setLastGeneratedTemplate] = useState(null);
-  
-  
+
+
   const [isDesignSelectorOpen, setIsDesignSelectorOpen] = useState(false);
   const [pendingFormGeneration, setPendingFormGeneration] = useState(null);
   const [selectedDesignConfig, setSelectedDesignConfig] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  
-  
+
+
   const [lastSubmittedFields, setLastSubmittedFields] = useState(null);
   const [isEditingDocument, setIsEditingDocument] = useState(false);
-  
-  
+
+
   const [formClosedWithoutSubmit, setFormClosedWithoutSubmit] = useState(false);
   const [partialFormData, setPartialFormData] = useState(null);
-  
-  
+
+
   const [activeDraftInfo, setActiveDraftInfo] = useState(null);
-  
-  
+
+
   const [isPendingUserChoice, setIsPendingUserChoice] = useState(false);
-  
-  
+
+
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -161,17 +161,17 @@ const ChatPage = () => {
   const silenceTimeoutRef = useRef(null);
   const lastSpeechTimeRef = useRef(null);
   const isListeningRef = useRef(false);
-  
-  
+
+
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('chatLanguage') || 'en';
   });
-  
-  
+
+
   useEffect(() => {
     localStorage.setItem('chatLanguage', language);
   }, [language]);
-  
+
   const toggleLanguage = () => {
     setLanguage(prev => prev === 'en' ? 'hi' : 'en');
     toast({
@@ -181,10 +181,10 @@ const ChatPage = () => {
       isClosable: true,
     });
   };
-  
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  
+
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const inputBg = useColorModeValue('white', 'gray.700');
@@ -199,7 +199,7 @@ const ChatPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  
+
   const getWelcomeMessage = () => {
     return language === 'hi'
       ? "नमस्ते! मैं आपका AI कानूनी सहायक हूँ। आज मैं आपकी कैसे मदद कर सकता हूँ?"
@@ -211,14 +211,14 @@ const ChatPage = () => {
       try {
         setIsInitialLoad(true);
         const response = await axios.get(`${BASE_URL}/chat/history`, {
-          headers: { 
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (response.data && response.data.length === 0) {
-          
+
           setMessages([{
             role: 'assistant',
             content: getWelcomeMessage()
@@ -235,7 +235,7 @@ const ChatPage = () => {
           duration: 3000,
           isClosable: true,
         });
-        
+
         setMessages([{
           role: 'assistant',
           content: getWelcomeMessage()
@@ -250,8 +250,8 @@ const ChatPage = () => {
     }
   }, [token, toast]);
 
-  
-  
+
+
   useEffect(() => {
     if (messages.length !== 1) return;
     const [first] = messages;
@@ -268,38 +268,38 @@ const ChatPage = () => {
     scrollToBottom();
   }, [messages]);
 
-  
+
   useEffect(() => {
-    
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
+
     if (!SpeechRecognition) {
       setSpeechSupported(false);
       console.log('Speech recognition not supported in this browser');
       return;
     }
-    
-    
+
+
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    
-    
+
+
     recognition.lang = 'en-IN';
-    
-    
+
+
     const playSound = (type) => {
       try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
+
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
+
         if (type === 'start') {
-          
+
           oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
           oscillator.frequency.linearRampToValueAtTime(800, audioContext.currentTime + 0.15);
           gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
@@ -307,7 +307,7 @@ const ChatPage = () => {
           oscillator.start(audioContext.currentTime);
           oscillator.stop(audioContext.currentTime + 0.2);
         } else if (type === 'stop') {
-          
+
           oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
           oscillator.frequency.linearRampToValueAtTime(300, audioContext.currentTime + 0.2);
           gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
@@ -315,7 +315,7 @@ const ChatPage = () => {
           oscillator.start(audioContext.currentTime);
           oscillator.stop(audioContext.currentTime + 0.25);
         } else if (type === 'timeout') {
-          
+
           oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
           gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
           gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.1);
@@ -328,22 +328,22 @@ const ChatPage = () => {
         console.log('Audio notification not available');
       }
     };
-    
-    
+
+
     const SILENCE_TIMEOUT = 2500;
     const MAX_LISTEN_TIME = 60000;
-    
+
     let maxTimeoutId = null;
-    
+
     const startSilenceTimer = () => {
-      
+
       if (silenceTimeoutRef.current) {
         clearTimeout(silenceTimeoutRef.current);
       }
-      
-      
+
+
       silenceTimeoutRef.current = setTimeout(() => {
-        
+
         if (recognitionRef.current && isListeningRef.current) {
           console.log('Stopping due to silence timeout');
           playSound('timeout');
@@ -358,18 +358,18 @@ const ChatPage = () => {
         }
       }, SILENCE_TIMEOUT);
     };
-    
+
     recognition.onstart = () => {
       setIsListening(true);
       isListeningRef.current = true;
       setInterimTranscript('');
       lastSpeechTimeRef.current = Date.now();
       playSound('start');
-      
-      
+
+
       startSilenceTimer();
-      
-      
+
+
       maxTimeoutId = setTimeout(() => {
         if (recognitionRef.current) {
           console.log('Stopping due to max time limit');
@@ -385,15 +385,15 @@ const ChatPage = () => {
         }
       }, MAX_LISTEN_TIME);
     };
-    
+
     recognition.onresult = (event) => {
       let finalTranscript = '';
       let interim = '';
-      
-      
+
+
       lastSpeechTimeRef.current = Date.now();
       startSilenceTimer();
-      
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
@@ -402,8 +402,8 @@ const ChatPage = () => {
           interim += transcript;
         }
       }
-      
-      
+
+
       if (finalTranscript) {
         setInput(prev => (prev + finalTranscript).trim());
         setInterimTranscript('');
@@ -411,17 +411,17 @@ const ChatPage = () => {
         setInterimTranscript(interim);
       }
     };
-    
+
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
       setIsListening(false);
       setInterimTranscript('');
-      
-      
+
+
       if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       if (maxTimeoutId) clearTimeout(maxTimeoutId);
-      
-      
+
+
       if (event.error === 'not-allowed') {
         toast({
           title: 'Microphone access denied',
@@ -465,26 +465,26 @@ const ChatPage = () => {
         });
       }
     };
-    
+
     recognition.onend = () => {
       const wasListening = isListeningRef.current;
       setIsListening(false);
       isListeningRef.current = false;
       setInterimTranscript('');
-      
-      
+
+
       if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       if (maxTimeoutId) clearTimeout(maxTimeoutId);
-      
-      
+
+
       if (wasListening) {
         playSound('stop');
       }
     };
-    
+
     recognitionRef.current = recognition;
-    
-    
+
+
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
@@ -493,8 +493,8 @@ const ChatPage = () => {
       if (maxTimeoutId) clearTimeout(maxTimeoutId);
     };
   }, [toast]);
-  
-  
+
+
   const toggleListening = () => {
     if (!speechSupported) {
       toast({
@@ -506,9 +506,9 @@ const ChatPage = () => {
       });
       return;
     }
-    
+
     if (isListening) {
-      
+
       recognitionRef.current?.stop();
       toast({
         title: 'Voice input stopped',
@@ -529,7 +529,7 @@ const ChatPage = () => {
         });
       } catch (error) {
         console.error('Failed to start speech recognition:', error);
-        
+
         recognitionRef.current?.stop();
         setTimeout(() => {
           try {
@@ -569,7 +569,7 @@ const ChatPage = () => {
     }
     if (!input.trim() && !selectedFile) return;
 
-    
+
     setMessages((prev) => prev.map(msg => ({
       ...msg,
       actionsActive: false
@@ -584,8 +584,8 @@ const ChatPage = () => {
       return newMessages;
     });
     setIsLoading(true);
-    
-    
+
+
     setShowPostDownloadOptions(false);
 
     try {
@@ -594,7 +594,7 @@ const ChatPage = () => {
       if (selectedFile && selectedFile._id) {
         setAnalyzingFile(true);
         try {
-          
+
           response = await fileService.analyzeFile(selectedFile._id, userMessage, intentOverride, language);
           setMessages(prev => [
             ...prev,
@@ -606,37 +606,37 @@ const ChatPage = () => {
           setAnalyzingFile(false);
         }
       } else {
-        
-        
-        const payload = { 
+
+
+        const payload = {
           message: userMessage,
           language: language
         };
         if (intentOverride) {
           payload.intentOverride = intentOverride;
         }
-        
-        response = await axios.post(`${BASE_URL}/chat/message`, 
+
+        response = await axios.post(`${BASE_URL}/chat/message`,
           payload,
-          { 
-            headers: { 
+          {
+            headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           }
         );
-        
-        
-        
-        
-        
+
+
+
+
+
         console.log('📥 Received response:', {
           hasResponse: !!response.data.response,
           responseLength: response.data.response?.length,
           mode: response.data.mode,
           hasSuggestedActions: !!response.data.suggestedActions
         });
-        
+
         const assistantMessage = {
           role: 'assistant',
           content: response.data.response || 'No response received from server'
@@ -648,8 +648,8 @@ const ChatPage = () => {
         if (response.data.templatePath) assistantMessage.templatePath = response.data.templatePath;
         if (response.data.templateTitle) assistantMessage.templateTitle = response.data.templateTitle;
         if (response.data.suggestedActions) assistantMessage.suggestedActions = response.data.suggestedActions;
-        
-        
+
+
         if (response.data.complaintData) {
           setLastGeneratedComplaint({
             data: response.data.complaintData,
@@ -658,13 +658,13 @@ const ChatPage = () => {
           });
         }
 
-        
+
         const hasSuggestedActions = response.data.suggestedActions && response.data.suggestedActions.length > 0;
         const isPendingMode = ['template_confirmation', 'document_ready'].includes(response.data.mode);
         setIsPendingUserChoice(hasSuggestedActions && isPendingMode);
 
-        
-        
+
+
         if ((response.data.mode === 'waiting_for_details' || response.data.mode === 'draft_form_open') && response.data.missingFields && response.data.templatePath) {
           await openFieldsModalWithSchema({
             templatePath: response.data.templatePath,
@@ -672,7 +672,7 @@ const ChatPage = () => {
             missingFields: response.data.missingFields,
             initialValues: response.data.preFilledValues || {}
           });
-          
+
           setActiveDraftInfo({
             templatePath: response.data.templatePath,
             templateTitle: response.data.templateTitle || (language === 'hi' ? 'दस्तावेज़' : 'Document'),
@@ -710,21 +710,21 @@ const ChatPage = () => {
           isClosable: true,
         });
       }
-      
+
     } finally {
       setIsLoading(false);
       setAnalyzingFile(false);
     }
   };
 
-  
+
   const handleClearChat = () => {
     setClearPassword('');
     setShowClearPassword(false);
     onClearModalOpen();
   };
 
-  
+
   const handleConfirmClearChat = async () => {
     if (!clearPassword.trim()) {
       toast({
@@ -739,13 +739,13 @@ const ChatPage = () => {
     setIsClearing(true);
     try {
       await axios.delete(`${BASE_URL}/chat/clear`, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         data: { password: clearPassword }
       });
-      
+
       setMessages([{
         role: 'assistant',
         content: "Hello! I'm your AI legal assistant. How can I help you today?"
@@ -770,7 +770,7 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const disableOldButtons = () => {
     setMessages((prev) => prev.map(msg => ({
       ...msg,
@@ -780,7 +780,7 @@ const ChatPage = () => {
 
   const openFieldsModalWithSchema = async ({ templatePath, templateTitle, missingFields, initialValues = null }) => {
     console.log('📋 [openFieldsModalWithSchema] Called with:', { templatePath, templateTitle, hasMissingFields: !!missingFields });
-    
+
     if (!templatePath) {
       console.error('❌ [openFieldsModalWithSchema] No templatePath provided');
       throw new Error('Template path is required');
@@ -793,7 +793,7 @@ const ChatPage = () => {
         fieldCount: schemaData.fields?.length,
         displayTitle: schemaData.displayTitle
       });
-      
+
       setFieldsModalData({
         templatePath,
         templateTitle: templateTitle || schemaData.displayTitle,
@@ -807,12 +807,12 @@ const ChatPage = () => {
         response: schemaError.response?.data,
         status: schemaError.response?.status
       });
-      
-      
+
+
       if (!missingFields || missingFields.length === 0) {
         throw new Error(`Failed to load template schema: ${schemaError.response?.data?.message || schemaError.message}`);
       }
-      
+
       console.warn('⚠️ [openFieldsModalWithSchema] Using missingFields fallback');
       setFieldsModalData({
         templatePath,
@@ -831,22 +831,22 @@ const ChatPage = () => {
     setFormClosedWithoutSubmit(false);
   };
 
-  
+
   const handleSuggestedActionClick = async (actionType, suggestion) => {
     console.log('Suggested action clicked:', actionType, suggestion);
 
-    
+
     setIsPendingUserChoice(false);
 
-    
-    
+
+
 
     switch (actionType) {
       case 'RESUME_FORM': {
-        
+
         console.log('📝 RESUME_FORM action triggered with data:', partialFormData, activeDraftInfo);
-        
-        
+
+
         const resumeSource = partialFormData || activeDraftInfo;
         if (resumeSource) {
           await openFieldsModalWithSchema({
@@ -857,8 +857,8 @@ const ChatPage = () => {
           });
           toast({
             title: language === 'hi' ? '📝 फॉर्म फिर से खोला गया' : '📝 Form Resumed',
-            description: language === 'hi' 
-              ? 'आपका पिछला डेटा बहाल कर दिया गया है' 
+            description: language === 'hi'
+              ? 'आपका पिछला डेटा बहाल कर दिया गया है'
               : 'Your previous data has been restored',
             status: 'success',
             duration: 2000,
@@ -875,10 +875,10 @@ const ChatPage = () => {
       }
 
       case 'CLOSE_DRAFT_FLOW': {
-        
+
         console.log('❌ CLOSE_DRAFT_FLOW action triggered');
-        
-        
+
+
         try {
           await axios.post(`${BASE_URL}/chat/exit-document-mode`, {}, {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -886,11 +886,11 @@ const ChatPage = () => {
         } catch (error) {
           console.warn('Failed to clear server session on CLOSE_DRAFT_FLOW:', error);
         }
-        
-        
+
+
         setIsFieldsModalOpen(false);
-        
-        
+
+
         setFieldsModalData(null);
         setPartialFormData(null);
         setActiveDraftInfo(null);
@@ -902,8 +902,8 @@ const ChatPage = () => {
         setIntentLabel(null);
         setIsPendingUserChoice(false);
         setShowPostDownloadOptions(false);
-        
-        
+
+
         const closeDraftMsg = {
           role: 'assistant',
           content: language === 'hi'
@@ -919,7 +919,7 @@ const ChatPage = () => {
           mode: 'draft_closed'
         };
         setMessages(prev => [...prev, closeDraftMsg]);
-        
+
         toast({
           title: language === 'hi' ? '✅ ड्राफ्ट बंद' : '✅ Draft Closed',
           status: 'success',
@@ -929,10 +929,10 @@ const ChatPage = () => {
       }
 
       case 'REGENERATE_DRAFT': {
-        
+
         console.log('🔄 REGENERATE_DRAFT action triggered');
-        
-        
+
+
         try {
           await axios.post(`${BASE_URL}/chat/exit-document-mode`, {}, {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -940,11 +940,11 @@ const ChatPage = () => {
         } catch (error) {
           console.warn('Failed to clear server session on REGENERATE_DRAFT:', error);
         }
-        
-        
+
+
         setIsFieldsModalOpen(false);
-        
-        
+
+
         setFieldsModalData(null);
         setPartialFormData(null);
         setActiveDraftInfo(null);
@@ -953,8 +953,8 @@ const ChatPage = () => {
         setIntentOverride(null);
         setIntentLabel(null);
         setIsPendingUserChoice(false);
-        
-        
+
+
         const regenMsg = {
           role: 'assistant',
           content: language === 'hi'
@@ -972,7 +972,7 @@ const ChatPage = () => {
           mode: 'draft_regenerate'
         };
         setMessages(prev => [...prev, regenMsg]);
-        
+
         toast({
           title: language === 'hi' ? '🔄 नया ड्राफ्ट शुरू करें' : '🔄 Starting Fresh',
           description: language === 'hi' ? 'पुराना ड्राफ्ट रद्द कर दिया गया' : 'Previous draft discarded',
@@ -983,15 +983,15 @@ const ChatPage = () => {
       }
 
       case 'ASK_ABOUT_DRAFT': {
-        
+
         console.log('💬 ASK_ABOUT_DRAFT action triggered', activeDraftInfo);
-        
+
         const draftInfo = activeDraftInfo || partialFormData || fieldsModalData;
         const draftTitle = draftInfo?.templateTitle || (language === 'hi' ? 'यह दस्तावेज़' : 'this document');
-        
-        
+
+
         if (isFieldsModalOpen) {
-          
+
           setActiveDraftInfo(prev => ({
             ...prev,
             templatePath: fieldsModalData?.templatePath || prev?.templatePath,
@@ -1000,18 +1000,18 @@ const ChatPage = () => {
           }));
           setIsFieldsModalOpen(false);
         }
-        
-        
+
+
         const askMsg = language === 'hi'
           ? `**${draftTitle}** के बारे में बताएं और फ़ॉर्म भरने में मदद करें`
           : `Tell me about **${draftTitle}** and help me fill the form`;
-        
+
         setMessages(prev => [...prev, { role: 'user', content: askMsg }]);
-        
+
         try {
           setIsLoading(true);
           const askResponse = await axios.post(`${BASE_URL}/chat/message`,
-            { 
+            {
               message: language === 'hi'
                 ? `${draftTitle} दस्तावेज़ के बारे में विस्तार से बताएं: इसका उद्देश्य क्या है, इसकी मुख्य धाराएं क्या हैं, और फ़ॉर्म भरते समय क्या ध्यान रखना चाहिए?`
                 : `Explain the "${draftTitle}" document in detail: its purpose, key clauses, legal requirements, and tips for filling out the form correctly.`,
@@ -1020,14 +1020,14 @@ const ChatPage = () => {
             },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
-          
+
           if (askResponse.data) {
             const aiHelpMsg = {
               role: 'assistant',
               content: askResponse.data.response,
               suggestedActions: [
                 ...((askResponse.data.suggestedActions) || []),
-                
+
                 language === 'hi'
                   ? { type: 'draft_action', label: '📝 फ़ॉर्म भरना जारी रखें', icon: '📝', action: 'RESUME_FORM', description: 'फ़ॉर्म वापस खोलें' }
                   : { type: 'draft_action', label: '📝 Resume Form filling', icon: '📝', action: 'RESUME_FORM', description: 'Reopen the form to continue' }
@@ -1037,7 +1037,7 @@ const ChatPage = () => {
           }
         } catch (error) {
           console.error('ASK_ABOUT_DRAFT AI call failed:', error);
-          
+
           setMessages(prev => [...prev, {
             role: 'assistant',
             content: language === 'hi'
@@ -1056,29 +1056,29 @@ const ChatPage = () => {
       }
 
       case 'DOCUMENT_REQUEST': {
-        
+
         console.log('📋 DOCUMENT_REQUEST action triggered:', suggestion);
-        
+
         disableOldButtons();
         setIntentOverride('DOCUMENT_REQUEST');
-        
-        
-        const docType = suggestion?.data?.documentType || 
-                        suggestion?.label?.replace('Generate', '').replace('बनाएं', '').trim();
-        
-        const docMsg = language === 'hi' 
-          ? `मुझे ${docType} चाहिए` 
+
+
+        const docType = suggestion?.data?.documentType ||
+          suggestion?.label?.replace('Generate', '').replace('बनाएं', '').trim();
+
+        const docMsg = language === 'hi'
+          ? `मुझे ${docType} चाहिए`
           : `I need to generate a ${docType}`;
-        
+
         setMessages(prev => [...prev, { role: 'user', content: docMsg }]);
-        
+
         try {
           setIsLoading(true);
-          const response = await axios.post(`${BASE_URL}/chat/message`, 
+          const response = await axios.post(`${BASE_URL}/chat/message`,
             { message: docMsg, language, intentOverride: 'DOCUMENT_REQUEST' },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
-          
+
           if (response.data) {
             const assistantMsg = {
               role: 'assistant',
@@ -1088,10 +1088,10 @@ const ChatPage = () => {
             if (response.data.suggestedActions) assistantMsg.suggestedActions = response.data.suggestedActions;
             if (response.data.missingFields) assistantMsg.missingFields = response.data.missingFields;
             if (response.data.templatePath) assistantMsg.templatePath = response.data.templatePath;
-            
+
             setMessages(prev => [...prev, assistantMsg]);
-            
-            
+
+
             if (response.data.mode === 'waiting_for_details' && response.data.missingFields && response.data.templatePath) {
               await openFieldsModalWithSchema({
                 templatePath: response.data.templatePath,
@@ -1099,7 +1099,7 @@ const ChatPage = () => {
                 missingFields: response.data.missingFields
               });
             }
-            
+
             if (response.data.remainingMessages !== null) {
               setRemainingMessages(response.data.remainingMessages);
             }
@@ -1121,41 +1121,41 @@ const ChatPage = () => {
       }
 
       case 'CREATE_DOCUMENT': {
-        
+
         console.log('📝 CREATE_DOCUMENT action triggered - opening document selector');
         setIntentOverride('DOCUMENT_REQUEST');
-        
-        
+
+
         setIsDocTypeSelectorOpen(true);
         break;
       }
 
       case 'GUIDE_ME': {
-        
+
         console.log('🧭 GUIDE_ME action triggered - opening guidance modal');
         setIntentOverride('DOCUMENT_REQUEST');
-        
-        
+
+
         setIsGuidanceModalOpen(true);
         break;
       }
 
       case 'BROWSE_TEMPLATES': {
-        
+
         console.log('🔍 BROWSE_TEMPLATES action triggered - opening template browser');
         setIsTemplateBrowserOpen(true);
         break;
       }
 
       case 'LEGAL_INFORMATION':
-        
+
         setIntentOverride('LEGAL_INFORMATION');
         setIntentLabel(language === 'hi' ? '⚖️ कानूनी जानकारी' : '⚖️ Legal Information');
-        
+
         toast({
           title: language === 'hi' ? '⚖️ जानकारी मोड' : '⚖️ Information Mode',
-          description: language === 'hi' 
-            ? 'मैं आपको कानूनी जानकारी दूंगा' 
+          description: language === 'hi'
+            ? 'मैं आपको कानूनी जानकारी दूंगा'
             : "I'll provide legal information",
           status: 'info',
           duration: 3000,
@@ -1163,37 +1163,37 @@ const ChatPage = () => {
         break;
 
       case 'CASE_SEARCH': {
-        
+
         console.log('🔍 CASE_SEARCH action triggered - searching cases with context');
-        
+
         disableOldButtons();
-        
-        
+
+
         const lastUserMessage = messages.filter(m => m.role === 'user').slice(-1)[0];
         const lastAssistantMessage = messages.filter(m => m.role === 'assistant').slice(-1)[0];
-        
-        
+
+
         const searchContext = lastAssistantMessage?.content?.substring(0, 200) || '';
-        const searchMsg = language === 'hi' 
-          ? `इस मामले से संबंधित केस खोजें: ${lastUserMessage?.content || searchContext}` 
+        const searchMsg = language === 'hi'
+          ? `इस मामले से संबंधित केस खोजें: ${lastUserMessage?.content || searchContext}`
           : `Search related cases for: ${lastUserMessage?.content || searchContext}`;
-        
+
         setMessages(prev => [...prev, { role: 'user', content: searchMsg }]);
-        
+
         try {
           setIsLoading(true);
-          
+
           const response = await axios.post(`${BASE_URL}/chat/message`, {
             message: searchMsg,
             language,
             intentOverride: 'LEGAL_INFORMATION'
           }, {
-            headers: { 
-              Authorization: `Bearer ${token}`, 
-              'Content-Type': 'application/json' 
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
             }
           });
-          
+
           if (response.data) {
             const assistantMsg = {
               role: 'assistant',
@@ -1201,9 +1201,9 @@ const ChatPage = () => {
             };
             if (response.data.mode) assistantMsg.mode = response.data.mode;
             if (response.data.suggestedActions) assistantMsg.suggestedActions = response.data.suggestedActions;
-            
+
             setMessages(prev => [...prev, assistantMsg]);
-            
+
             if (response.data.remainingMessages !== null) {
               setRemainingMessages(response.data.remainingMessages);
             }
@@ -1224,13 +1224,13 @@ const ChatPage = () => {
       }
 
       case 'browse_templates': {
-        
+
         console.log('🔍 browse_templates (lowercase) action triggered - opening template browser');
         setIsTemplateBrowserOpen(true);
         break;
       }
 
-      
+
       case 'DOC_RENT_AGREEMENT':
       case 'DOC_LEGAL_NOTICE':
       case 'DOC_AFFIDAVIT': {
@@ -1241,20 +1241,20 @@ const ChatPage = () => {
         };
         const docType = docTypeMap[actionType];
         const docMsg = language === 'hi' ? `मुझे ${docType.hi} बनाना है` : `I want to create a ${docType.en}`;
-        
+
         disableOldButtons();
         setMessages(prev => [...prev, { role: 'user', content: docMsg }]);
         setIntentOverride('DOCUMENT_REQUEST');
-        
+
         try {
           setIsLoading(true);
-          const response = await axios.post(`${BASE_URL}/chat/message`, 
+          const response = await axios.post(`${BASE_URL}/chat/message`,
             { message: docMsg, language, intentOverride: 'DOCUMENT_REQUEST' },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
           if (response.data) {
-            setMessages(prev => [...prev, { 
-              role: 'assistant', 
+            setMessages(prev => [...prev, {
+              role: 'assistant',
               content: response.data.response,
               suggestedActions: response.data.suggestedActions || []
             }]);
@@ -1268,20 +1268,20 @@ const ChatPage = () => {
       }
 
       case 'FREEFORM_YES': {
-        
+
         disableOldButtons();
         const confirmMsg = language === 'hi' ? 'हाँ, कस्टम दस्तावेज़ बनाएं' : 'Yes, create custom document';
         setMessages(prev => [...prev, { role: 'user', content: confirmMsg }]);
-        
+
         try {
           setIsLoading(true);
-          const response = await axios.post(`${BASE_URL}/chat/message`, 
+          const response = await axios.post(`${BASE_URL}/chat/message`,
             { message: '1', language, intentOverride: 'DOCUMENT_REQUEST' },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
           if (response.data) {
-            setMessages(prev => [...prev, { 
-              role: 'assistant', 
+            setMessages(prev => [...prev, {
+              role: 'assistant',
               content: response.data.response,
               suggestedActions: response.data.suggestedActions || []
             }]);
@@ -1294,22 +1294,22 @@ const ChatPage = () => {
         break;
       }
 
-      
+
       case 'AI_DOC_FILLED': {
-        
+
         console.log('📝 AI_DOC_FILLED action triggered');
         disableOldButtons();
         const filledMsg = language === 'hi' ? 'भरा हुआ दस्तावेज़ चाहिए' : 'I want a filled document';
         setMessages(prev => [...prev, { role: 'user', content: filledMsg }]);
-        
+
         try {
           setIsLoading(true);
-          const response = await axios.post(`${BASE_URL}/chat/message`, 
+          const response = await axios.post(`${BASE_URL}/chat/message`,
             { message: '1', language, intentOverride: 'DOCUMENT_REQUEST' },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
           if (response.data) {
-            
+
             if (response.data.missingFields && response.data.missingFields.length > 0) {
               await openFieldsModalWithSchema({
                 templatePath: response.data.templatePath,
@@ -1317,8 +1317,8 @@ const ChatPage = () => {
                 missingFields: response.data.missingFields
               });
             }
-            setMessages(prev => [...prev, { 
-              role: 'assistant', 
+            setMessages(prev => [...prev, {
+              role: 'assistant',
               content: response.data.response,
               suggestedActions: response.data.suggestedActions || []
             }]);
@@ -1332,21 +1332,21 @@ const ChatPage = () => {
       }
 
       case 'AI_DOC_RAW': {
-        
+
         console.log('📋 AI_DOC_RAW action triggered');
         disableOldButtons();
         const rawMsg = language === 'hi' ? 'कच्चा टेम्पलेट चाहिए' : 'I want a raw template';
         setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
-        
+
         try {
           setIsLoading(true);
-          const response = await axios.post(`${BASE_URL}/chat/message`, 
+          const response = await axios.post(`${BASE_URL}/chat/message`,
             { message: '2', language, intentOverride: 'DOCUMENT_REQUEST' },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
           if (response.data) {
-            setMessages(prev => [...prev, { 
-              role: 'assistant', 
+            setMessages(prev => [...prev, {
+              role: 'assistant',
               content: response.data.response,
               suggestedActions: response.data.suggestedActions || [],
               document: response.data.document,
@@ -1361,20 +1361,20 @@ const ChatPage = () => {
         break;
       }
 
-      
+
       case 'USE_TEMPLATE': {
         disableOldButtons();
         const templateMsg = language === 'hi' ? 'हाँ, इस टेम्पलेट का उपयोग करें' : 'Yes, use this template';
         setMessages(prev => [...prev, { role: 'user', content: templateMsg }]);
-        
+
         try {
           setIsLoading(true);
-          const response = await axios.post(`${BASE_URL}/chat/message`, 
+          const response = await axios.post(`${BASE_URL}/chat/message`,
             { message: '1', language, intentOverride: 'DOCUMENT_REQUEST' },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
           if (response.data) {
-            
+
             const shouldOpenForm = (response.data.mode === 'waiting_for_details' || response.data.mode === 'draft_form_open')
               && response.data.missingFields?.length > 0 && response.data.templatePath;
             if (shouldOpenForm) {
@@ -1384,7 +1384,7 @@ const ChatPage = () => {
                 missingFields: response.data.missingFields,
                 initialValues: response.data.preFilledValues || {}
               });
-              
+
               setActiveDraftInfo({
                 templatePath: response.data.templatePath,
                 templateTitle: response.data.templateTitle || (language === 'hi' ? 'दस्तावेज़' : 'Document'),
@@ -1392,8 +1392,8 @@ const ChatPage = () => {
                 preFilledValues: response.data.preFilledValues || {}
               });
             }
-            setMessages(prev => [...prev, { 
-              role: 'assistant', 
+            setMessages(prev => [...prev, {
+              role: 'assistant',
               content: response.data.response,
               mode: response.data.mode,
               suggestedActions: response.data.suggestedActions || []
@@ -1411,16 +1411,16 @@ const ChatPage = () => {
         disableOldButtons();
         const aiMsg = language === 'hi' ? 'AI से दस्तावेज़ बनाएं' : 'Generate with AI';
         setMessages(prev => [...prev, { role: 'user', content: aiMsg }]);
-        
+
         try {
           setIsLoading(true);
-          const response = await axios.post(`${BASE_URL}/chat/message`, 
+          const response = await axios.post(`${BASE_URL}/chat/message`,
             { message: '2', language, intentOverride: 'DOCUMENT_REQUEST' },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
           if (response.data) {
-            setMessages(prev => [...prev, { 
-              role: 'assistant', 
+            setMessages(prev => [...prev, {
+              role: 'assistant',
               content: response.data.response,
               suggestedActions: response.data.suggestedActions || []
             }]);
@@ -1433,11 +1433,11 @@ const ChatPage = () => {
         break;
       }
 
-      
+
       case 'NEW_DOCUMENT': {
         console.log('📝 NEW_DOCUMENT action triggered - showing document creation choice');
-        
-        
+
+
         try {
           await axios.post(`${BASE_URL}/chat/exit-document-mode`, {}, {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -1445,39 +1445,39 @@ const ChatPage = () => {
         } catch (error) {
           console.warn('Failed to clear server document session:', error);
         }
-        
-        
+
+
         setShowPostDownloadOptions(false);
         setLastGeneratedTemplate(null);
         setIntentOverride(null);
         setIntentLabel(null);
-        
-        
+
+
         disableOldButtons();
         const choiceMessage = {
           role: 'assistant',
-          content: language === 'hi' 
+          content: language === 'hi'
             ? 'बढ़िया! आप कैसे शुरू करना चाहेंगे?'
             : 'Great! How would you like to start?',
           suggestedActions: language === 'hi'
             ? [
-                { type: 'doc_choice', label: '📝 दस्तावेज़ बनाएं', icon: '📝', action: 'CREATE_DOCUMENT', description: 'दस्तावेज़ प्रकार चुनें' },
-                { type: 'doc_choice', label: '📚 टेम्पलेट ब्राउज़ करें', icon: '📚', action: 'BROWSE_TEMPLATES', description: 'सभी टेम्पलेट देखें' }
-              ]
+              { type: 'doc_choice', label: '📝 दस्तावेज़ बनाएं', icon: '📝', action: 'CREATE_DOCUMENT', description: 'दस्तावेज़ प्रकार चुनें' },
+              { type: 'doc_choice', label: '📚 टेम्पलेट ब्राउज़ करें', icon: '📚', action: 'BROWSE_TEMPLATES', description: 'सभी टेम्पलेट देखें' }
+            ]
             : [
-                { type: 'doc_choice', label: '📝 Create Document', icon: '📝', action: 'CREATE_DOCUMENT', description: 'Choose document type' },
-                { type: 'doc_choice', label: '📚 Browse Templates', icon: '📚', action: 'BROWSE_TEMPLATES', description: 'View all templates' }
-              ]
+              { type: 'doc_choice', label: '📝 Create Document', icon: '📝', action: 'CREATE_DOCUMENT', description: 'Choose document type' },
+              { type: 'doc_choice', label: '📚 Browse Templates', icon: '📚', action: 'BROWSE_TEMPLATES', description: 'View all templates' }
+            ]
         };
         setMessages(prev => [...prev, choiceMessage]);
         break;
       }
 
-      
+
       case 'EXIT_DOCUMENT_MODE': {
         console.log('❌ EXIT_DOCUMENT_MODE action triggered');
-        
-        
+
+
         try {
           await axios.post(`${BASE_URL}/chat/exit-document-mode`, {}, {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -1486,8 +1486,8 @@ const ChatPage = () => {
         } catch (error) {
           console.warn('Failed to clear server document session:', error);
         }
-        
-        
+
+
         setShowPostDownloadOptions(false);
         setLastGeneratedTemplate(null);
         setLastSubmittedFields(null);
@@ -1497,16 +1497,16 @@ const ChatPage = () => {
         setIntentLabel(null);
         setFieldsModalData(null);
         setIsFieldsModalOpen(false);
-        
-        const exitMsg = language === 'hi' 
-          ? 'दस्तावेज़ मोड से बाहर निकल गए। आप कुछ और पूछ सकते हैं।' 
+
+        const exitMsg = language === 'hi'
+          ? 'दस्तावेज़ मोड से बाहर निकल गए। आप कुछ और पूछ सकते हैं।'
           : 'Exited document mode. You can ask me anything else.';
-        
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: exitMsg 
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: exitMsg
         }]);
-        
+
         toast({
           title: language === 'hi' ? '✅ बाहर निकले' : '✅ Exited',
           description: language === 'hi' ? 'दस्तावेज़ मोड से बाहर' : 'Exited document mode',
@@ -1516,22 +1516,22 @@ const ChatPage = () => {
         break;
       }
 
-      
+
       case 'RATE_LIKE':
       case 'RATE_DISLIKE': {
         const isLike = action === 'RATE_LIKE';
         console.log(`${isLike ? '👍' : '👎'} Rating:`, isLike ? 'LIKE' : 'DISLIKE');
-        
+
         try {
-          await axios.post(`${BASE_URL}/chat/rate-draft`, 
+          await axios.post(`${BASE_URL}/chat/rate-draft`,
             { rating: isLike ? 'like' : 'dislike', templatePath: lastGeneratedTemplate?.path },
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
           );
-          
+
           toast({
             title: language === 'hi' ? '✅ धन्यवाद!' : '✅ Thank you!',
-            description: language === 'hi' 
-              ? 'आपकी प्रतिक्रिया दर्ज की गई' 
+            description: language === 'hi'
+              ? 'आपकी प्रतिक्रिया दर्ज की गई'
               : 'Your feedback has been recorded',
             status: 'success',
             duration: 2000,
@@ -1542,27 +1542,27 @@ const ChatPage = () => {
         break;
       }
 
-      
+
       case 'EDIT_DOCUMENT': {
         console.log('✏️ EDIT_DOCUMENT action triggered');
-        
-        
+
+
         if (lastGeneratedComplaint) {
-          
+
           console.log('✏️ Editing complaint with data:', lastGeneratedComplaint.data);
           setIsComplaintFormOpen(true);
-          
-          
+
+
           toast({
             title: language === 'hi' ? '✏️ शिकायत संपादित करें' : '✏️ Edit Complaint',
-            description: language === 'hi' 
-              ? 'विवरण अपडेट करें और पुनः जेनरेट करें' 
+            description: language === 'hi'
+              ? 'विवरण अपडेट करें और पुनः जेनरेट करें'
               : 'Update details and regenerate',
             status: 'info',
             duration: 2000,
           });
         } else if (lastGeneratedTemplate && lastSubmittedFields) {
-          
+
           console.log('✏️ Editing template document');
           setIsEditingDocument(true);
           await openFieldsModalWithSchema({
@@ -1571,21 +1571,21 @@ const ChatPage = () => {
             missingFields: [],
             initialValues: lastSubmittedFields
           });
-          
+
           toast({
             title: language === 'hi' ? '✏️ संपादित करें' : '✏️ Edit Document',
-            description: language === 'hi' 
-              ? 'फ़ील्ड मान अपडेट करें और पुनः जेनरेट करें' 
+            description: language === 'hi'
+              ? 'फ़ील्ड मान अपडेट करें और पुनः जेनरेट करें'
               : 'Update field values and regenerate',
             status: 'info',
             duration: 2000,
           });
         } else {
-          
+
           toast({
             title: language === 'hi' ? '⚠️ डेटा नहीं मिला' : '⚠️ Data Not Found',
-            description: language === 'hi' 
-              ? 'पिछले दस्तावेज़ का डेटा उपलब्ध नहीं है' 
+            description: language === 'hi'
+              ? 'पिछले दस्तावेज़ का डेटा उपलब्ध नहीं है'
               : 'Previous document data is not available',
             status: 'warning',
             duration: 3000,
@@ -1595,14 +1595,14 @@ const ChatPage = () => {
       }
 
       case 'general_help':
-        
+
         setIntentOverride(null);
         setIntentLabel(null);
-        
+
         toast({
           title: language === 'hi' ? '🤖 ऑटो-डिटेक्ट मोड' : '🤖 Auto-Detect Mode',
-          description: language === 'hi' 
-            ? 'मैं आपके प्रश्न का स्वचालित रूप से पता लगाऊंगा' 
+          description: language === 'hi'
+            ? 'मैं आपके प्रश्न का स्वचालित रूप से पता लगाऊंगा'
             : "I'll automatically detect your intent",
           status: 'info',
           duration: 3000,
@@ -1610,45 +1610,45 @@ const ChatPage = () => {
         break;
 
       case 'GENERATE_COMPLAINT': {
-        
+
         console.log('📝 GENERATE_COMPLAINT action triggered - opening complaint form');
-        
-        
+
+
         const lastUserMessage = messages.filter(m => m.role === 'user').slice(-1)[0];
         const lastAssistantMessage = messages.filter(m => m.role === 'assistant').slice(-1)[0];
-        
-        
+
+
         const userContent = lastUserMessage?.content?.toLowerCase() || '';
         const aiContent = lastAssistantMessage?.content?.toLowerCase() || '';
         const combinedContext = userContent + ' ' + aiContent;
-        
-        
+
+
         let suggestedComplaintType = null;
         let suggestedDescription = lastUserMessage?.content || '';
-        
-        
+
+
         if (/rental|rent|tenant|landlord|lease|evict|property dispute|vacating/i.test(combinedContext)) {
           suggestedComplaintType = 'civil';
         }
-        
+
         else if (/consumer|defect|product|service|refund|warranty|fraud|seller/i.test(combinedContext)) {
           suggestedComplaintType = 'consumer';
         }
-        
+
         else if (/theft|assault|fraud|cheating|criminal|fir|police|violence/i.test(combinedContext)) {
           suggestedComplaintType = 'criminal';
         }
-        
+
         else if (/divorce|maintenance|custody|domestic|dowry|marriage/i.test(combinedContext)) {
           suggestedComplaintType = 'family';
         }
-        
+
         else if (/salary|employer|workplace|termination|harassment|labor|employment/i.test(combinedContext)) {
           suggestedComplaintType = 'labor';
         }
-        
+
         console.log('🤖 Smart pre-fill detected:', { suggestedComplaintType, descriptionLength: suggestedDescription.length });
-        
+
         const contextData = {
           originalMessage: lastUserMessage?.content || '',
           aiResponseExcerpt: lastAssistantMessage?.content?.substring(0, 500) || '',
@@ -1659,52 +1659,52 @@ const ChatPage = () => {
             timestamp: new Date().toISOString()
           }
         };
-        
+
         setComplaintContext(contextData);
         setIsComplaintFormOpen(true);
         break;
       }
 
       case 'LEARN_MORE_LAW': {
-        
+
         console.log('⚖️ LEARN_MORE_LAW action triggered - generating detailed analysis');
-        
+
         disableOldButtons();
-        
-        
+
+
         const lastAssistantMessage = messages.filter(m => m.role === 'assistant').slice(-1)[0];
         const lastUserMessage = messages.filter(m => m.role === 'user').slice(-1)[0];
-        
-        
-        const learnMoreMsg = language === 'hi' 
-          ? 'इस कानून के बारे में विस्तार से बताएं' 
+
+
+        const learnMoreMsg = language === 'hi'
+          ? 'इस कानून के बारे में विस्तार से बताएं'
           : 'Provide detailed analysis of this law';
-        
+
         setMessages(prev => [...prev, { role: 'user', content: learnMoreMsg }]);
-        
+
         try {
           setIsLoading(true);
-          
+
           const response = await axios.post(`${BASE_URL}/chat/legal-analysis`, {
             lawReference: suggestion?.metadata?.lawReference || null,
             previousMessage: lastUserMessage?.content || '',
             previousResponse: lastAssistantMessage?.content || ''
           }, {
-            headers: { 
-              Authorization: `Bearer ${token}`, 
-              'Content-Type': 'application/json' 
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
             }
           });
-          
+
           if (response.data?.success) {
-            setMessages(prev => [...prev, { 
-              role: 'assistant', 
+            setMessages(prev => [...prev, {
+              role: 'assistant',
               content: response.data.response,
               mode: 'legal_analysis',
               analysisSubject: response.data.analysisSubject
             }]);
-            
-            
+
+
             if (response.data.remainingMessages !== null) {
               setRemainingMessages(response.data.remainingMessages);
             }
@@ -1712,15 +1712,15 @@ const ChatPage = () => {
           }
         } catch (error) {
           console.error('Legal analysis generation failed:', error);
-          const errorMsg = language === 'hi' 
-            ? 'विश्लेषण बनाने में त्रुटि। कृपया पुनः प्रयास करें।' 
+          const errorMsg = language === 'hi'
+            ? 'विश्लेषण बनाने में त्रुटि। कृपया पुनः प्रयास करें।'
             : 'Error generating analysis. Please try again.';
-          
-          setMessages(prev => [...prev, { 
-            role: 'assistant', 
+
+          setMessages(prev => [...prev, {
+            role: 'assistant',
             content: errorMsg
           }]);
-          
+
           toast({
             title: language === 'hi' ? 'त्रुटि' : 'Error',
             description: error.response?.data?.message || (language === 'hi' ? 'विश्लेषण बनाने में विफल' : 'Failed to generate analysis'),
@@ -1733,9 +1733,9 @@ const ChatPage = () => {
         break;
       }
 
-      
+
       case 'SHOW_CATEGORIES': {
-        
+
         console.log('📚 SHOW_CATEGORIES (legacy) - opening template browser');
         setIsTemplateBrowserOpen(true);
         break;
@@ -1746,10 +1746,10 @@ const ChatPage = () => {
     }
   };
 
-  
-  
+
+
   const handleFieldsFormSubmit = async (fieldValues) => {
-    
+
     if (isGenerating) {
       console.warn('⚠️  Generation already in progress, blocking form submission');
       toast({
@@ -1778,18 +1778,18 @@ const ChatPage = () => {
 
     console.log('📝 Form submitted:', { templatePath: fieldsModalData.templatePath, fieldCount: Object.keys(fieldValues).length });
 
-    
+
     setLastSubmittedFields(fieldValues);
-    
-    
+
+
     setFormClosedWithoutSubmit(false);
     setPartialFormData(null);
     setActiveDraftInfo(null);
 
-    
+
     const templateCategory = fieldsModalData.templatePath.split('/')[0] || '';
 
-    
+
     setIsFieldsModalOpen(false);
     setPendingFormGeneration({
       type: 'form',
@@ -1802,16 +1802,16 @@ const ChatPage = () => {
     });
     setIsDesignSelectorOpen(true);
   };
-  
-  
+
+
   const handleFieldsFormClose = (partialValues, isCancelled = false) => {
     console.log('🚪 [handleFieldsFormClose] Called', { isCancelled, hasPartialData: !!partialValues, isEditMode: isEditingDocument });
-    
+
     if (isCancelled) {
-      
+
       console.log('🔴 [handleFieldsFormClose] User cancelled draft flow - resetting server + client state');
-      
-      
+
+
       (async () => {
         try {
           await axios.post(`${BASE_URL}/chat/exit-document-mode`, {}, {
@@ -1822,8 +1822,8 @@ const ChatPage = () => {
           console.warn('⚠️ Failed to clear server session on cancel:', error);
         }
       })();
-      
-      
+
+
       setFieldsModalData(null);
       setPartialFormData(null);
       setActiveDraftInfo(null);
@@ -1834,11 +1834,11 @@ const ChatPage = () => {
       setIntentOverride(null);
       setIntentLabel(null);
       setIsPendingUserChoice(false);
-      
-      
+
+
       const mainMenuMessage = {
         role: 'assistant',
-        content: language === 'hi' 
+        content: language === 'hi'
           ? 'आपने ड्राफ्ट प्रक्रिया रद्द कर दी है। मैं आपकी कैसे मदद कर सकता हूं?'
           : 'You cancelled the draft process. How can I help you?',
         suggestedActions: language === 'hi' ? [
@@ -1852,20 +1852,20 @@ const ChatPage = () => {
         ],
         mode: 'draft_cancelled'
       };
-      
+
       setMessages(prev => [...prev, mainMenuMessage]);
       setIsFieldsModalOpen(false);
       return;
     }
-    
-    
-    
+
+
+
     const hasAnyData = partialValues && Object.values(partialValues).some(v => v && String(v).trim() !== '');
-    
+
     if (hasAnyData && !isEditingDocument && fieldsModalData) {
       console.log('💾 [handleFieldsFormClose] Saving partial data for recovery (initial fill)');
-      
-      
+
+
       setPartialFormData({
         templatePath: fieldsModalData.templatePath,
         templateTitle: fieldsModalData.templateTitle,
@@ -1873,16 +1873,16 @@ const ChatPage = () => {
         partialValues: partialValues
       });
       setFormClosedWithoutSubmit(true);
-      
-      
+
+
       setMessages(prev => {
         const lastIndex = prev.length - 1;
         const lastMsg = prev[lastIndex];
-        
-        
+
+
         if (lastMsg && lastMsg.role === 'assistant' && lastMsg.suggestedActions) {
           const hasResumeAction = lastMsg.suggestedActions.some(a => a.action === 'RESUME_FORM');
-          
+
           if (!hasResumeAction) {
             const resumeAction = language === 'hi' ? {
               type: 'action',
@@ -1897,46 +1897,46 @@ const ChatPage = () => {
               action: 'RESUME_FORM',
               description: 'Reopen the partially filled form'
             };
-            
+
             const updatedMsg = {
               ...lastMsg,
               suggestedActions: [...lastMsg.suggestedActions, resumeAction]
             };
-            
+
             return [...prev.slice(0, lastIndex), updatedMsg];
           }
         }
-        
+
         return prev;
       });
     } else {
       console.log('🚪 [handleFieldsFormClose] No partial data or edit mode - just closing');
     }
-    
-    
+
+
     setIsFieldsModalOpen(false);
   };
 
-  
+
   const handleDesignSelected = async (design) => {
     console.log('🔍 [TRACE] handleDesignSelected called with design:', design?.name || 'no design');
-    
-    
+
+
     if (isGenerating) {
       console.warn('⚠️  [BLOCK] Generation already in progress, blocking handleDesignSelected');
       return;
     }
-    
+
     setIsGenerating(true);
     console.log('✅ [SET] isGenerating = true (in handleDesignSelected)');
-    
+
     setIsDesignSelectorOpen(false);
     const designConfig = design?.config || null;
     setSelectedDesignConfig(designConfig);
 
     const pending = pendingFormGeneration;
     console.log('📋 [STATE] pendingFormGeneration before clear:', pending?.type, pending?.data?.templateTitle);
-    
+
     setPendingFormGeneration(null);
 
     try {
@@ -1945,11 +1945,11 @@ const ChatPage = () => {
         return;
       }
 
-      console.log('🎨 [EXEC] Design selected - calling executor:', { 
-        designName: design?.name, 
+      console.log('🎨 [EXEC] Design selected - calling executor:', {
+        designName: design?.name,
         type: pending.type,
         hasDesignConfig: !!designConfig,
-        fontFamily: designConfig?.fontFamily 
+        fontFamily: designConfig?.fontFamily
       });
 
       if (pending.type === 'form') {
@@ -1967,37 +1967,37 @@ const ChatPage = () => {
     }
   };
 
-  
-  
+
+
   const handleDesignSelectorSkip = () => {
     console.log('🔍 [TRACE] handleDesignSelectorSkip called - user wants to skip design selection');
-    
-    
+
+
     if (isGenerating) {
       console.warn('⚠️  [BLOCK] Generation already in progress, blocking handleDesignSelectorSkip');
       return;
     }
-    
-    
+
+
     if (!pendingFormGeneration) {
       console.log('ℹ️  [SKIP] No pending generation data, just closing design selector');
       setIsDesignSelectorOpen(false);
       return;
     }
-    
+
     setIsGenerating(true);
     console.log('✅ [SET] isGenerating = true (in handleDesignSelectorSkip)');
-    
+
     setIsDesignSelectorOpen(false);
     const pending = pendingFormGeneration;
     console.log('📋 [STATE] pendingFormGeneration before clear:', pending?.type, pending?.data?.templateTitle);
-    
+
     setPendingFormGeneration(null);
 
     try {
       console.log('⏭️  [EXEC] Skipping design selection - generating with defaults (NO designConfig)');
 
-      
+
       if (pending.type === 'form') {
         console.log('📝 [CALL] Calling executeFormGeneration WITHOUT designConfig (from skip action)');
         executeFormGeneration(pending.data, null);
@@ -2013,15 +2013,15 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const handleDesignSelectorClose = () => {
     console.log('🔍 [TRACE] handleDesignSelectorClose called (modal X or Escape - NOT generating)');
     setIsDesignSelectorOpen(false);
-    
-    
+
+
   };
 
-  
+
   const executeFormGeneration = async (formData, designConfig) => {
     const { templatePath, templateTitle, fieldValues } = formData;
 
@@ -2033,7 +2033,7 @@ const ChatPage = () => {
     });
 
     try {
-      
+
       const result = await draftService.generateFromForm(
         templatePath,
         fieldValues,
@@ -2098,17 +2098,17 @@ const ChatPage = () => {
     }
   };
 
-  
-  
 
-  
-  
+
+
+
+
   const handleComplaintFormSubmit = async (complaintData) => {
     console.log('📝 Submitting complaint form:', complaintData);
-    
+
     setIsComplaintFormOpen(false);
-    
-    
+
+
     setPendingFormGeneration({
       type: 'complaint',
       data: complaintData,
@@ -2117,32 +2117,32 @@ const ChatPage = () => {
     setIsDesignSelectorOpen(true);
   };
 
-  
+
   const executeComplaintGeneration = async (complaintData, designConfig) => {
     try {
       setIsLoading(true);
-      
+
       disableOldButtons();
-      
-      
-      const userMsg = language === 'hi' 
-        ? `${complaintData.complaintType} के लिए शिकायत बनाएं: ${complaintData.againstWhom}` 
+
+
+      const userMsg = language === 'hi'
+        ? `${complaintData.complaintType} के लिए शिकायत बनाएं: ${complaintData.againstWhom}`
         : `Generate ${complaintData.complaintType} complaint against ${complaintData.againstWhom}`;
-      
+
       setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-      
-      
+
+
       const response = await axios.post(`${BASE_URL}/chat/generate-complaint`, {
         complaintData,
         actionContext: complaintContext,
         designConfig
       }, {
-        headers: { 
-          Authorization: `Bearer ${token}`, 
-          'Content-Type': 'application/json' 
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.data?.success) {
         const postDownloadActions = response.data.suggestedActions || (language === 'hi' ? [
           { type: 'action', label: 'शिकायत संपादित करें', icon: '✏️', action: 'EDIT_DOCUMENT', description: 'मौजूदा शिकायत को संपादित करें' },
@@ -2153,7 +2153,7 @@ const ChatPage = () => {
           { type: 'action', label: 'Exit', icon: '✖️', action: 'EXIT_DOCUMENT_MODE', description: 'Exit document mode' },
           { type: 'rating', label: 'Rate your experience', icon: '⭐', action: 'RATE_EXPERIENCE', description: 'How was the complaint process?' }
         ]);
-        
+
         const assistantMessage = {
           role: 'assistant',
           content: response.data.response,
@@ -2167,9 +2167,9 @@ const ChatPage = () => {
           mode: 'document_ready',
           suggestedActions: postDownloadActions
         };
-        
+
         setMessages(prev => [...prev, assistantMessage]);
-        
+
         if (response.data.complaintData) {
           setLastGeneratedComplaint({
             data: response.data.complaintData,
@@ -2177,12 +2177,12 @@ const ChatPage = () => {
             timestamp: Date.now()
           });
         }
-        
+
         if (response.data.remainingMessages !== null) {
           setRemainingMessages(response.data.remainingMessages);
         }
         setSubscriptionStatus(response.data.subscriptionStatus);
-        
+
         toast({
           title: language === 'hi' ? '✅ शिकायत तैयार!' : '✅ Complaint Ready!',
           description: language === 'hi' ? 'आपकी शिकायत सफलतापूर्वक बनाई गई है' : 'Your complaint has been generated successfully',
@@ -2192,14 +2192,14 @@ const ChatPage = () => {
       }
     } catch (error) {
       console.error('Complaint generation failed:', error);
-      
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: language === 'hi' 
-          ? 'शिकायत बनाने में त्रुटि। कृपया पुनः प्रयास करें।' 
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: language === 'hi'
+          ? 'शिकायत बनाने में त्रुटि। कृपया पुनः प्रयास करें।'
           : 'Error generating complaint. Please try again.'
       }]);
-      
+
       toast({
         title: language === 'hi' ? 'त्रुटि' : 'Error',
         description: error.response?.data?.message || (language === 'hi' ? 'शिकायत बनाने में विफल' : 'Failed to generate complaint'),
@@ -2212,24 +2212,24 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const handleComplaintFormClose = (isCancelled = false) => {
     console.log('🚪 [handleComplaintFormClose] Called', { isCancelled });
-    
+
     setIsComplaintFormOpen(false);
     setComplaintContext(null);
-    
+
     if (isCancelled) {
-      
+
       console.log('🔴 [handleComplaintFormClose] User cancelled complaint process - showing main menu');
-      
-      
+
+
       setLastGeneratedComplaint(null);
-      
-      
+
+
       const mainMenuMessage = {
         role: 'assistant',
-        content: language === 'hi' 
+        content: language === 'hi'
           ? 'आपने शिकायत प्रक्रिया रद्द कर दी है। मैं आपकी कैसे मदद कर सकता हूं?'
           : 'You cancelled the complaint process. How can I help you?',
         suggestedActions: language === 'hi' ? [
@@ -2243,49 +2243,49 @@ const ChatPage = () => {
         ],
         mode: 'complaint_cancelled'
       };
-      
+
       setMessages(prev => [...prev, mainMenuMessage]);
     }
-    
+
   };
 
-  
+
   const handleTemplateSelect = async (template) => {
     console.log('📋 [handleTemplateSelect] Template selected:', template.relPath);
     setIsTemplateBrowserOpen(false);
-    
-    
+
+
     disableOldButtons();
-    
-    
-    const userMsg = language === 'hi' 
+
+
+    const userMsg = language === 'hi'
       ? `मैंने "${template.displayTitle}" टेम्पलेट चुना`
       : `I selected the "${template.displayTitle}" template`;
-    
+
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setIntentOverride('DOCUMENT_REQUEST');
-    
+
     try {
       setIsLoading(true);
-      
-      
+
+
       console.log('📋 [handleTemplateSelect] Opening fields modal directly...');
-      
+
       await openFieldsModalWithSchema({
         templatePath: template.relPath,
         templateTitle: template.displayTitle,
         missingFields: null
       });
-      
-      
+
+
       setActiveDraftInfo({
         templatePath: template.relPath,
         templateTitle: template.displayTitle,
         missingFields: null,
         preFilledValues: {}
       });
-      
-      
+
+
       const draftFormInlineActions = language === 'hi' ? [
         { type: 'draft_action', label: 'फ़ॉर्म भरना जारी रखें', icon: '📝', action: 'RESUME_FORM', description: 'फ़ॉर्म को फिर से खोलें' },
         { type: 'draft_action', label: 'ड्राफ्ट बंद करें', icon: '❌', action: 'CLOSE_DRAFT_FLOW', description: 'ड्राफ्ट प्रक्रिया बंद करें और रीसेट करें' },
@@ -2297,7 +2297,7 @@ const ChatPage = () => {
         { type: 'draft_action', label: 'Regenerate new draft', icon: '🔄', action: 'REGENERATE_DRAFT', description: 'Discard this and start a fresh draft request' },
         { type: 'draft_action', label: 'Ask about this draft', icon: '💬', action: 'ASK_ABOUT_DRAFT', description: 'Get real-time AI assistance about this document' },
       ];
-      
+
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: language === 'hi'
@@ -2306,9 +2306,9 @@ const ChatPage = () => {
         mode: 'draft_form_open',
         suggestedActions: draftFormInlineActions
       }]);
-      
+
       console.log('✅ [handleTemplateSelect] Fields modal opened successfully');
-      
+
     } catch (error) {
       console.error('❌ [handleTemplateSelect] Error:', error);
       console.error('Error details:', {
@@ -2316,7 +2316,7 @@ const ChatPage = () => {
         response: error.response?.data,
         stack: error.stack
       });
-      
+
       toast({
         title: language === 'hi' ? 'त्रुटि' : 'Error',
         description: error.response?.data?.message || error.message || (language === 'hi' ? 'टेम्पलेट लोड करने में विफल' : 'Failed to load template'),
@@ -2324,11 +2324,11 @@ const ChatPage = () => {
         duration: 5000,
         isClosable: true,
       });
-      
-      
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: language === 'hi' 
+
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: language === 'hi'
           ? `क्षमा करें, "${template.displayTitle}" लोड करते समय त्रुटि हुई। कृपया पुनः प्रयास करें।`
           : `Sorry, there was an error loading "${template.displayTitle}". Please try again.`
       }]);
@@ -2337,12 +2337,12 @@ const ChatPage = () => {
     }
   };
 
-  
 
-  
+
+
   const handleGenerateSameAgain = async () => {
     setShowPostDownloadOptions(false);
-    
+
     if (!lastGeneratedTemplate?.path) {
       toast({
         title: language === 'hi' ? 'त्रुटि' : 'Error',
@@ -2353,7 +2353,7 @@ const ChatPage = () => {
       return;
     }
 
-    
+
     try {
       const schemaData = await draftService.getTemplateSchema(lastGeneratedTemplate.path, token);
       setFieldsModalData({
@@ -2373,11 +2373,11 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const handleGenerateDifferent = () => {
     setShowPostDownloadOptions(false);
     setLastGeneratedTemplate(null);
-    
+
     setMessages(prev => [...prev, {
       role: 'assistant',
       content: language === 'hi'
@@ -2386,20 +2386,20 @@ const ChatPage = () => {
     }]);
   };
 
-  
+
   const handleExitDocumentMode = () => {
     setShowPostDownloadOptions(false);
     setLastGeneratedTemplate(null);
     setIntentOverride(null);
     setIntentLabel(null);
-    
+
     setMessages(prev => [...prev, {
       role: 'assistant',
       content: language === 'hi'
         ? '🤖 ठीक है! अब मैं स्वचालित मोड में हूँ। आप मुझसे कुछ भी पूछ सकते हैं - कानूनी सवाल, दस्तावेज़, केस खोज, या कुछ और!'
         : '🤖 Got it! I\'m now in auto-detect mode. You can ask me anything - legal questions, documents, case search, or anything else!'
     }]);
-    
+
     toast({
       title: language === 'hi' ? 'मोड बदला गया' : 'Mode Changed',
       description: language === 'hi' ? 'AI अब स्वचालित रूप से आपके इरादे का पता लगाएगा' : 'AI will now auto-detect your intent',
@@ -2408,9 +2408,9 @@ const ChatPage = () => {
     });
   };
 
-  
+
   const handleHardReset = async () => {
-    
+
     try {
       await axios.post(`${BASE_URL}/chat/exit-document-mode`, {}, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -2419,15 +2419,15 @@ const ChatPage = () => {
     } catch (error) {
       console.warn('Failed to clear backend session:', error);
     }
-    
-    
+
+
     setShowPostDownloadOptions(false);
     setLastGeneratedTemplate(null);
     setIntentOverride(null);
     setIntentLabel(null);
     setFieldsModalData(null);
     setIsFieldsModalOpen(false);
-    
+
     toast({
       title: language === 'hi' ? '🔄 रीसेट किया गया' : '🔄 Reset Complete',
       description: language === 'hi' ? 'सभी सत्र साफ़ हो गए। AI स्वचालित मोड में है।' : 'All sessions cleared. AI is back in auto-detect mode.',
@@ -2436,37 +2436,37 @@ const ChatPage = () => {
     });
   };
 
-  
+
   const handleDocumentTypeSelected = async (documentType, category) => {
     console.log('📄 Document type selected:', documentType, category);
-    
-    
+
+
     setIsDocTypeSelectorOpen(false);
-    
-    
+
+
     disableOldButtons();
 
-    const userMsg = language === 'hi' 
+    const userMsg = language === 'hi'
       ? `मुझे ${documentType} बनाना है`
       : `I want to create a ${documentType}`;
-    
+
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-    
+
     try {
       setIsLoading(true);
-      const response = await axios.post(`${BASE_URL}/chat/message`, 
+      const response = await axios.post(`${BASE_URL}/chat/message`,
         { message: userMsg, language, intentOverride: 'DOCUMENT_REQUEST', sourceAction: 'CREATE_DOCUMENT', documentType: documentType },
         { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
-      
+
       if (response.data) {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
+        setMessages(prev => [...prev, {
+          role: 'assistant',
           content: response.data.response,
           suggestedActions: response.data.suggestedActions || []
         }]);
-        
-        
+
+
         if (response.data.missingFields && response.data.missingFields.length > 0 && response.data.templatePath) {
           await openFieldsModalWithSchema({
             templatePath: response.data.templatePath,
@@ -2488,22 +2488,22 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const handleGuidanceComplete = async (situation, category, details) => {
     console.log('🧭 Guidance complete:', situation, category, details);
-    
-    
+
+
     disableOldButtons();
 
     setMessages(prev => [...prev, { role: 'user', content: situation }]);
-    
+
     try {
       setIsLoading(true);
-      
-      const response = await axios.post(`${BASE_URL}/chat/message`, 
-        { 
-          message: situation, 
-          language, 
+
+      const response = await axios.post(`${BASE_URL}/chat/message`,
+        {
+          message: situation,
+          language,
           intentOverride: 'DOCUMENT_REQUEST',
           sourceAction: 'GUIDE_ME',
           guidanceContext: {
@@ -2516,10 +2516,10 @@ const ChatPage = () => {
         },
         { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
-      
+
       if (response.data) {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
+        setMessages(prev => [...prev, {
+          role: 'assistant',
           content: response.data.response,
           suggestedActions: response.data.suggestedActions || []
         }]);
@@ -2541,7 +2541,7 @@ const ChatPage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    
+
     const allowedTypes = [
       'application/pdf',
       'text/plain',
@@ -2559,7 +2559,7 @@ const ChatPage = () => {
     ];
     const allowedExtensions = ['.pdf', '.txt', '.md', '.csv', '.json', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
-    
+
     if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
       toast({
         title: 'Invalid file type',
@@ -2571,7 +2571,7 @@ const ChatPage = () => {
       return;
     }
 
-    
+
     if (file.size > 10 * 1024 * 1024) {
       toast({
         title: 'File too large',
@@ -2592,14 +2592,14 @@ const ChatPage = () => {
       setSelectedFile(response.file);
       setUploadProgress(100);
       setTimeout(() => setUploadProgress(0), 1000);
-      
-      
+
+
       if (response.remainingMessages !== null) {
         setRemainingMessages(response.remainingMessages);
       }
       setSubscriptionStatus(response.subscriptionStatus);
-      
-      
+
+
       setScanStatus('none');
       setScanResults(null);
       setFormatMetadata(null);
@@ -2607,10 +2607,10 @@ const ChatPage = () => {
       setHtmlContent('');
       setOcrConfidence(null);
       setOcrTextLength(0);
-      
+
       toast({
         title: language === 'hi' ? 'फ़ाइल अपलोड हो गई' : 'File uploaded',
-        description: language === 'hi' 
+        description: language === 'hi'
           ? 'फ़ाइल अपलोड हो गई। स्कैन या एडिट करने के लिए हेडर बटन उपयोग करें।'
           : 'Use the Smart Scanner or Edit Document buttons in the header.',
         status: 'success',
@@ -2619,10 +2619,10 @@ const ChatPage = () => {
       });
     } catch (err) {
       console.error('File upload error:', err);
-      
-      
+
+
       let errorMessage = 'Failed to upload file';
-      
+
       if (err.response?.status === 403) {
         if (err.response?.data?.message?.includes('No remaining messages')) {
           errorMessage = 'You have no remaining messages. Please upgrade to premium for unlimited access.';
@@ -2636,7 +2636,7 @@ const ChatPage = () => {
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
+
       toast({
         title: 'Upload Error',
         description: errorMessage,
@@ -2654,18 +2654,18 @@ const ChatPage = () => {
   const handleFileAnalysis = async (fileId) => {
     try {
       setAnalyzingFile(true);
-      
+
       const response = await fileService.analyzeFile(fileId, null, intentOverride);
-      
-      
+
+
       let userMessage = `Analyze this file: ${response.fileName}`;
       if (intentOverride === 'legal') {
         userMessage = `📜 Legal Analysis: ${response.fileName}`;
       } else if (intentOverride === 'draft') {
         userMessage = `📝 Extract draft info from: ${response.fileName}`;
       }
-      
-      
+
+
       setMessages(prev => [
         ...prev,
         {
@@ -2680,12 +2680,12 @@ const ChatPage = () => {
         }
       ]);
 
-      
+
       if (response.remainingMessages !== null) {
         setRemainingMessages(response.remainingMessages);
       }
 
-      
+
       setSubscriptionStatus(response.subscriptionStatus);
 
     } catch (error) {
@@ -2713,9 +2713,9 @@ const ChatPage = () => {
     }
   };
 
-  
 
-  
+
+
   const handleStartEditMode = async () => {
     if (!selectedFile || !selectedFile._id) {
       toast({
@@ -2729,40 +2729,40 @@ const ChatPage = () => {
     }
 
     try {
-      
+
       const response = await fileService.startEditSession(selectedFile._id);
-      
+
       setIsEditMode(true);
       setEditSessionActive(true);
       setEditChangesCount(0);
       setIntentOverride('EDIT_DOCUMENT');
       setIntentLabel('Edit Document');
-      
-      
+
+
       if (response.session) {
         setEditSession(response.session);
       }
-      
-      
+
+
       if (response.documentAnalysis) {
         setDocumentAnalysis(response.documentAnalysis);
       }
 
-      
+
       let analysisInfo = '';
       if (response.documentAnalysis) {
         const da = response.documentAnalysis;
         analysisInfo = `\n\n📊 **Document Analysis:**\n`;
         analysisInfo += `→ Type: ${da.type?.replace(/_/g, ' ').toUpperCase() || 'General'}\n`;
         analysisInfo += `→ Sections: ${da.sectionCount || 0} | Clauses: ${da.clauseCount || 0}\n`;
-        
+
         if (da.risks && da.risks.length > 0) {
           analysisInfo += `\n⚠️ **Risks Detected:**\n`;
           da.risks.slice(0, 3).forEach(r => {
             analysisInfo += `→ ${r.message}\n`;
           });
         }
-        
+
         if (da.suggestions && da.suggestions.length > 0) {
           analysisInfo += `\n💡 **Suggestions:**\n`;
           da.suggestions.slice(0, 3).forEach(s => {
@@ -2771,7 +2771,7 @@ const ChatPage = () => {
         }
       }
 
-      
+
       setMessages(prev => [
         ...prev,
         {
@@ -2799,7 +2799,7 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const handleSmartScan = async () => {
     if (!selectedFile || !selectedFile._id) {
       toast({
@@ -2826,8 +2826,8 @@ const ChatPage = () => {
       setFormatMetadata(result.formatMetadata || null);
       setSmartSuggestions(result.smartSuggestions || result.suggestions || []);
       setHtmlContent(result.htmlContent || '');
-      
-      
+
+
       setScanData({
         detectedDocType: result.detectedDocType || '',
         extractedParties: result.extractedParties || null,
@@ -2843,7 +2843,7 @@ const ChatPage = () => {
         scanResults: result.scanResults || null,
       });
 
-      
+
       if (result.ocrConfidence !== undefined && result.ocrConfidence !== null) {
         setOcrConfidence(result.ocrConfidence);
         setOcrTextLength(result.textLength || (result.ocrText ? result.ocrText.length : 0));
@@ -2851,11 +2851,11 @@ const ChatPage = () => {
         setOcrConfidence(null);
         setOcrTextLength(0);
       }
-      
-      
+
+
       setEditSessionActive(true);
 
-      
+
       setIsScanReportOpen(true);
 
     } catch (error) {
@@ -2870,7 +2870,7 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const handleOpenEditor = async () => {
     if (!selectedFile || !selectedFile._id) {
       toast({
@@ -2882,11 +2882,11 @@ const ChatPage = () => {
       return;
     }
 
-    
+
     if (scanStatus !== 'scanned') {
       toast({
         title: language === 'hi' ? 'पहले स्कैन करें' : 'Scan Required',
-        description: language === 'hi' 
+        description: language === 'hi'
           ? 'दस्तावेज़ संपादित करने से पहले स्मार्ट स्कैन चलाएं।'
           : 'Please run Smart Scan on the document before editing. Click the Scan button first.',
         status: 'info',
@@ -2896,7 +2896,7 @@ const ChatPage = () => {
       return;
     }
 
-    
+
     if (!editSessionActive) {
       try {
         const editResponse = await fileService.startEditSession(selectedFile._id);
@@ -2919,7 +2919,7 @@ const ChatPage = () => {
     setIsFullEditorOpen(true);
   };
 
-  
+
   const handleApplyEdit = async (editInstruction) => {
     if (!editSessionActive) {
       toast({
@@ -2934,13 +2934,13 @@ const ChatPage = () => {
     try {
       const response = await fileService.applyEdit(editInstruction);
       setEditChangesCount(response.session.changes?.length || 0);
-      
-      
+
+
       try {
         const analysisRes = await fileService.getDocumentAnalysis();
         if (analysisRes.success) {
           setDocumentAnalysis(analysisRes);
-          
+
           setEditSession(prev => prev ? {
             ...prev,
             currentText: response.textPreview?.replace('...', '') || prev.currentText,
@@ -2951,7 +2951,7 @@ const ChatPage = () => {
         console.log('Could not refresh analysis:', e);
       }
 
-      
+
       setMessages(prev => [
         ...prev,
         {
@@ -2973,8 +2973,8 @@ const ChatPage = () => {
       throw error;
     }
   };
-  
-  
+
+
   const refreshEditSession = async () => {
     try {
       const analysisRes = await fileService.getDocumentAnalysis();
@@ -2990,7 +2990,7 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const handleDownloadEdited = async (format = 'docx') => {
     if (!editSessionActive) {
       toast({
@@ -3002,7 +3002,7 @@ const ChatPage = () => {
       return;
     }
 
-    
+
     toast({
       title: `Generating ${format.toUpperCase()}...`,
       description: format === 'pdf' ? 'PDF generation may take a moment...' : 'Please wait...',
@@ -3014,15 +3014,15 @@ const ChatPage = () => {
     try {
       console.log(`Starting ${format} download...`);
       const blob = await fileService.downloadEdited(format);
-      
-      
+
+
       if (!blob || blob.size === 0) {
         throw new Error('Downloaded file is empty');
       }
-      
+
       console.log(`Received blob: ${blob.size} bytes, type: ${blob.type}`);
-      
-      
+
+
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -3031,8 +3031,8 @@ const ChatPage = () => {
       a.download = `${baseName}_edited.${format}`;
       document.body.appendChild(a);
       a.click();
-      
-      
+
+
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
         a.remove();
@@ -3047,14 +3047,14 @@ const ChatPage = () => {
       });
     } catch (error) {
       console.error('Download error:', error);
-      
-      
-      const isNetworkError = error.message === 'Network Error' || 
-                            error.code === 'ERR_NETWORK' ||
-                            error.message?.includes('network');
-      
+
+
+      const isNetworkError = error.message === 'Network Error' ||
+        error.code === 'ERR_NETWORK' ||
+        error.message?.includes('network');
+
       if (isNetworkError) {
-        
+
         toast({
           title: 'Download Started',
           description: `Your ${format.toUpperCase()} download was intercepted by your download manager.`,
@@ -3074,7 +3074,7 @@ const ChatPage = () => {
     }
   };
 
-  
+
   const handleExitEditMode = async () => {
     try {
       await fileService.clearEditSession();
@@ -3142,16 +3142,16 @@ const ChatPage = () => {
             />
           </Link>
 
-          <Tooltip 
+          <Tooltip
             label={
-              !selectedFile 
+              !selectedFile
                 ? (language === 'hi' ? 'पहले फ़ाइल अपलोड करें' : 'Upload a file first')
-                : scanStatus === 'scanning' 
+                : scanStatus === 'scanning'
                   ? (language === 'hi' ? 'स्कैन हो रहा है...' : 'Scanning...')
                   : scanStatus === 'scanned'
                     ? (language === 'hi' ? 'स्कैन पूरा ✓' : 'Scan complete ✓')
                     : (language === 'hi' ? 'स्मार्ट स्कैनर' : 'Smart Scanner')
-            } 
+            }
             placement="bottom"
           >
             <Button
@@ -3164,19 +3164,19 @@ const ChatPage = () => {
               isLoading={scanStatus === 'scanning'}
               loadingText={language === 'hi' ? 'स्कैन...' : 'Scanning'}
             >
-              {scanStatus === 'scanned' 
+              {scanStatus === 'scanned'
                 ? (language === 'hi' ? 'स्कैन ✓' : 'Scanned ✓')
                 : (language === 'hi' ? 'स्कैन' : 'Scan')
               }
             </Button>
           </Tooltip>
 
-          <Tooltip 
+          <Tooltip
             label={
-              !selectedFile 
+              !selectedFile
                 ? (language === 'hi' ? 'पहले फ़ाइल अपलोड करें' : 'Upload a file first')
                 : (language === 'hi' ? 'दस्तावेज़ संपादित करें' : 'Open document editor')
-            } 
+            }
             placement="bottom"
           >
             <Button
@@ -3226,282 +3226,282 @@ const ChatPage = () => {
       </Flex>
 
       <Container maxW="container.lg" h="calc(100vh - 100px)" pt="80px">
-          <VStack h="full" spacing={4}>
-            <Box
-              flex="1"
-              w="full"
-              overflowY="auto"
-              borderRadius="xl"
-              p={4}
-              bg={bgColor}
-              borderWidth={1}
-              borderColor={borderColor}
-              boxShadow="xl"
-              position="relative"
-              css={{
-                '&::-webkit-scrollbar': {
-                  width: '4px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  width: '6px',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  background: borderColor,
-                  borderRadius: '24px',
-                },
-              }}
-            >
-              {isInitialLoad ? (
-                <Center h="full">
-                  <Spinner size="lg" color="blue.500" />
-                </Center>
-              ) : messages.length === 0 ? (
-                <Center h="full">
-                  <Text color={textColor}>No messages yet. Start a conversation!</Text>
-                </Center>
-              ) : (
-                messages.map((msg, index) => (
-                  <ChatMessage
-                    key={index}
-                    message={msg}
-                    role={msg.role}
-                    onSuggestedActionClick={handleSuggestedActionClick}
-                    language={language}
-                  />
-                ))
-              )}
-              
-              
-              <div ref={messagesEndRef} />
-            </Box>
-          </VStack>
-
+        <VStack h="full" spacing={4}>
           <Box
-            position="fixed"
-            bottom={0}
-            left={0}
-            right={0}
-            bg={bgColor}
+            flex="1"
+            w="full"
+            overflowY="auto"
+            borderRadius="xl"
             p={4}
-            boxShadow="lg"
-            borderTop="1px"
+            bg={bgColor}
+            borderWidth={1}
             borderColor={borderColor}
+            boxShadow="xl"
+            position="relative"
+            css={{
+              '&::-webkit-scrollbar': {
+                width: '4px',
+              },
+              '&::-webkit-scrollbar-track': {
+                width: '6px',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                background: borderColor,
+                borderRadius: '24px',
+              },
+            }}
           >
-            <VStack spacing={4} maxW="1200px" mx="auto">
-              
-              {selectedFile && (
-                <HStack
-                  bg={useColorModeValue('blue.50', 'blue.900')}
-                  p={3}
-                  borderRadius="md"
-                  w="100%"
-                  justify="space-between"
-                >
-                  <HStack spacing={2}>
-                    <Icon as={FaFile} color="blue.500" />
-                    <Text color={textColor} fontSize="sm">{selectedFile.fileName}</Text>
-                    {scanStatus === 'scanned' && (
-                      <Badge colorScheme="green" fontSize="2xs">Scanned</Badge>
-                    )}
-                    {editSessionActive && (
-                      <Badge colorScheme="purple" fontSize="2xs">Edit Active</Badge>
-                    )}
-                  </HStack>
-                  <HStack spacing={1}>
-                    {editSessionActive && (
-                      <Button size="xs" variant="ghost" colorScheme="gray" onClick={handleExitEditMode}>
-                        Exit Edit
-                      </Button>
-                    )}
-                    <IconButton
-                      icon={<FaTimes />}
-                      size="sm"
-                      variant="ghost"
-                      colorScheme="blue"
-                      onClick={() => {
-                        handleExitEditMode();
-                        setSelectedFile(null);
-                      }}
-                      aria-label="Remove file"
-                    />
-                  </HStack>
+            {isInitialLoad ? (
+              <Center h="full">
+                <Spinner size="lg" color="blue.500" />
+              </Center>
+            ) : messages.length === 0 ? (
+              <Center h="full">
+                <Text color={textColor}>No messages yet. Start a conversation!</Text>
+              </Center>
+            ) : (
+              messages.map((msg, index) => (
+                <ChatMessage
+                  key={index}
+                  message={msg}
+                  role={msg.role}
+                  onSuggestedActionClick={handleSuggestedActionClick}
+                  language={language}
+                />
+              ))
+            )}
+
+
+            <div ref={messagesEndRef} />
+          </Box>
+        </VStack>
+
+        <Box
+          position="fixed"
+          bottom={0}
+          left={0}
+          right={0}
+          bg={bgColor}
+          p={4}
+          boxShadow="lg"
+          borderTop="1px"
+          borderColor={borderColor}
+        >
+          <VStack spacing={4} maxW="1200px" mx="auto">
+
+            {selectedFile && (
+              <HStack
+                bg={useColorModeValue('blue.50', 'blue.900')}
+                p={3}
+                borderRadius="md"
+                w="100%"
+                justify="space-between"
+              >
+                <HStack spacing={2}>
+                  <Icon as={FaFile} color="blue.500" />
+                  <Text color={textColor} fontSize="sm">{selectedFile.fileName}</Text>
+                  {scanStatus === 'scanned' && (
+                    <Badge colorScheme="green" fontSize="2xs">Scanned</Badge>
+                  )}
+                  {editSessionActive && (
+                    <Badge colorScheme="purple" fontSize="2xs">Edit Active</Badge>
+                  )}
+                </HStack>
+                <HStack spacing={1}>
+                  {editSessionActive && (
+                    <Button size="xs" variant="ghost" colorScheme="gray" onClick={handleExitEditMode}>
+                      Exit Edit
+                    </Button>
+                  )}
+                  <IconButton
+                    icon={<FaTimes />}
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="blue"
+                    onClick={() => {
+                      handleExitEditMode();
+                      setSelectedFile(null);
+                    }}
+                    aria-label="Remove file"
+                  />
+                </HStack>
+              </HStack>
+            )}
+            <HStack w="100%" spacing={2}>
+              <Menu>
+                <Tooltip label="Select intent type" placement="top">
+                  <MenuButton
+                    as={IconButton}
+                    icon={<AddIcon />}
+                    aria-label="Select intent"
+                    size="lg"
+                    variant={intentOverride ? 'solid' : 'ghost'}
+                    colorScheme={intentOverride ? 'purple' : 'blue'}
+                  />
+                </Tooltip>
+                <MenuList>
+                  <MenuItem
+                    onClick={() => { setIntentOverride(null); setIntentLabel(null); }}
+                    fontWeight={!intentOverride ? 'bold' : 'normal'}
+                  >
+                    💬 Auto-detect (Default)
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => { setIntentOverride('CONVERSATIONAL'); setIntentLabel('Chat'); }}
+                    fontWeight={intentOverride === 'CONVERSATIONAL' ? 'bold' : 'normal'}
+                  >
+                    🗣️ Conversational Chat
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => { setIntentOverride('LEGAL_INFORMATION'); setIntentLabel('Legal Query'); }}
+                    fontWeight={intentOverride === 'LEGAL_INFORMATION' ? 'bold' : 'normal'}
+                  >
+                    ⚖️ Legal Information
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => { setIntentOverride('DOCUMENT_REQUEST'); setIntentLabel('Draft'); }}
+                    fontWeight={intentOverride === 'DOCUMENT_REQUEST' ? 'bold' : 'normal'}
+                  >
+                    📝 Draft Document
+                  </MenuItem>
+                </MenuList>
+              </Menu>
+
+              {intentLabel && (
+                <HStack spacing={1}>
+                  <Tooltip label={language === 'hi' ? 'मोड रीसेट करें' : 'Click to reset to auto-detect'} placement="top">
+                    <Badge
+                      colorScheme="purple"
+                      variant="solid"
+                      fontSize="xs"
+                      px={2}
+                      py={1}
+                      borderRadius="full"
+                      cursor="pointer"
+                      _hover={{ opacity: 0.8 }}
+                      onClick={() => { setIntentOverride(null); setIntentLabel(null); handleHardReset(); }}
+                    >
+                      {intentLabel} ✕
+                    </Badge>
+                  </Tooltip>
                 </HStack>
               )}
-              <HStack w="100%" spacing={2}>
-                <Menu>
-                  <Tooltip label="Select intent type" placement="top">
-                    <MenuButton
-                      as={IconButton}
-                      icon={<AddIcon />}
-                      aria-label="Select intent"
-                      size="lg"
-                      variant={intentOverride ? 'solid' : 'ghost'}
-                      colorScheme={intentOverride ? 'purple' : 'blue'}
-                    />
-                  </Tooltip>
-                  <MenuList>
-                    <MenuItem 
-                      onClick={() => { setIntentOverride(null); setIntentLabel(null); }}
-                      fontWeight={!intentOverride ? 'bold' : 'normal'}
-                    >
-                      💬 Auto-detect (Default)
-                    </MenuItem>
-                    <MenuItem 
-                      onClick={() => { setIntentOverride('CONVERSATIONAL'); setIntentLabel('Chat'); }}
-                      fontWeight={intentOverride === 'CONVERSATIONAL' ? 'bold' : 'normal'}
-                    >
-                      🗣️ Conversational Chat
-                    </MenuItem>
-                    <MenuItem 
-                      onClick={() => { setIntentOverride('LEGAL_INFORMATION'); setIntentLabel('Legal Query'); }}
-                      fontWeight={intentOverride === 'LEGAL_INFORMATION' ? 'bold' : 'normal'}
-                    >
-                      ⚖️ Legal Information
-                    </MenuItem>
-                    <MenuItem 
-                      onClick={() => { setIntentOverride('DOCUMENT_REQUEST'); setIntentLabel('Draft'); }}
-                      fontWeight={intentOverride === 'DOCUMENT_REQUEST' ? 'bold' : 'normal'}
-                    >
-                      📝 Draft Document
-                    </MenuItem>
-                  </MenuList>
-                </Menu>
 
-                {intentLabel && (
-                  <HStack spacing={1}>
-                    <Tooltip label={language === 'hi' ? 'मोड रीसेट करें' : 'Click to reset to auto-detect'} placement="top">
-                      <Badge 
-                        colorScheme="purple" 
-                        variant="solid" 
-                        fontSize="xs"
-                        px={2}
-                        py={1}
-                        borderRadius="full"
-                        cursor="pointer"
-                        _hover={{ opacity: 0.8 }}
-                        onClick={() => { setIntentOverride(null); setIntentLabel(null); handleHardReset(); }}
-                      >
-                        {intentLabel} ✕
-                      </Badge>
-                    </Tooltip>
-                  </HStack>
-                )}
-
-                {(intentOverride || showPostDownloadOptions) && (
-                  <Tooltip label={language === 'hi' ? 'AI स्वचालित मोड पर वापस जाएं' : 'Return to AI auto-detect mode'} placement="top">
-                    <IconButton
-                      icon={<Icon as={FiRefreshCw} />}
-                      size="sm"
-                      colorScheme="gray"
-                      variant="ghost"
-                      aria-label="Reset to auto-detect"
-                      onClick={handleHardReset}
-                    />
-                  </Tooltip>
-                )}
-
-                <Input
-                  value={input + (interimTranscript ? ` ${interimTranscript}` : '')}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={
-                    isPendingUserChoice
-                      ? (language === 'hi' ? '👆 कृपया ऊपर दिए गए विकल्पों का उपयोग करें' : '👆 Please use the suggested actions above')
-                      : isListening 
-                        ? "🎤 Listening... speak now" 
-                        : isEditMode 
-                          ? "Describe the edit you want to make..." 
-                          : activeDraftInfo && !isFieldsModalOpen
-                            ? (language === 'hi' ? `💬 "${activeDraftInfo.templateTitle}" के बारे में पूछें या ऊपर दिए गए विकल्पों का उपयोग करें` : `💬 Ask about "${activeDraftInfo.templateTitle}" or use the options above`)
-                            : (intentLabel ? `Type your ${intentLabel.toLowerCase()} request...` : "Type your message...")
-                  }
-                  size="lg"
-                  bg={isListening ? useColorModeValue('red.50', 'red.900') : inputBg}
-                  color={textColor}
-                  opacity={isPendingUserChoice ? 0.6 : 1}
-                  cursor={isPendingUserChoice ? 'not-allowed' : 'text'}
-                  isDisabled={isPendingUserChoice || isLoading || analyzingFile}
-                  _placeholder={{ color: isPendingUserChoice ? 'orange.500' : (isListening ? 'red.400' : placeholderColor) }}
-                  _hover={{ borderColor: isPendingUserChoice ? 'orange.300' : (isListening ? 'red.300' : 'blue.300') }}
-                  _focus={{ borderColor: isPendingUserChoice ? 'orange.500' : (isListening ? 'red.500' : 'blue.500'), boxShadow: 'none' }}
-                  onKeyPress={handleKeyPress}
-                  flex={1}
-                  borderColor={isPendingUserChoice ? 'orange.300' : (isListening ? 'red.300' : undefined)}
-                  borderWidth={isPendingUserChoice ? '2px' : (isListening ? '2px' : undefined)}
-                />
-                <Input
-                  type="file"
-                  accept=".pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
-                  onChange={handleFileUpload}
-                  display="none"
-                  id="file-upload"
-                />
-                <Tooltip label="Attach file" placement="top">
-                  <label htmlFor="file-upload">
-                    <IconButton
-                      as="span"
-                      icon={<FaPaperclip />}
-                      aria-label="Attach file"
-                      size="lg"
-                      colorScheme="blue"
-                      variant="ghost"
-                      isLoading={uploading}
-                    />
-                  </label>
-                </Tooltip>
-                <Tooltip 
-                  label={
-                    !speechSupported 
-                      ? "Voice input not supported in your browser" 
-                      : isListening 
-                        ? "Stop listening" 
-                        : "Voice input (click to speak)"
-                  } 
-                  placement="top"
-                >
+              {(intentOverride || showPostDownloadOptions) && (
+                <Tooltip label={language === 'hi' ? 'AI स्वचालित मोड पर वापस जाएं' : 'Return to AI auto-detect mode'} placement="top">
                   <IconButton
-                    icon={isListening ? <FiMicOff /> : <FiMic />}
-                    aria-label={isListening ? "Stop voice input" : "Start voice input"}
-                    size="lg"
-                    colorScheme={isListening ? "red" : "blue"}
-                    variant={isListening ? "solid" : "ghost"}
-                    onClick={toggleListening}
-                    isDisabled={!speechSupported}
-                    animation={isListening ? "pulse 1.5s infinite" : undefined}
-                    sx={isListening ? {
-                      '@keyframes pulse': {
-                        '0%': { boxShadow: '0 0 0 0 rgba(229, 62, 62, 0.7)' },
-                        '70%': { boxShadow: '0 0 0 10px rgba(229, 62, 62, 0)' },
-                        '100%': { boxShadow: '0 0 0 0 rgba(229, 62, 62, 0)' },
-                      }
-                    } : {}}
+                    icon={<Icon as={FiRefreshCw} />}
+                    size="sm"
+                    colorScheme="gray"
+                    variant="ghost"
+                    aria-label="Reset to auto-detect"
+                    onClick={handleHardReset}
                   />
                 </Tooltip>
-                <Button
-                  colorScheme="blue"
-                  size="lg"
-                  onClick={handleSendMessage}
-                  isLoading={isLoading || analyzingFile}
-                  loadingText={analyzingFile ? "Analyzing..." : "Sending..."}
-                >
-                  Send
-                </Button>
-              </HStack>
-              {uploadProgress > 0 && uploadProgress < 100 && (
-                <Box w="100%" mt={2}>
-                  <Progress 
-                    value={uploadProgress} 
-                    size="sm" 
-                    colorScheme="blue"
-                    hasStripe
-                    isAnimated
-                  />
-                  <Text fontSize="sm" color="gray.500" mt={1} textAlign="center">
-                    Uploading: {uploadProgress}%
-                  </Text>
-                </Box>
               )}
-            </VStack>
-          </Box>
+
+              <Input
+                value={input + (interimTranscript ? ` ${interimTranscript}` : '')}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={
+                  isPendingUserChoice
+                    ? (language === 'hi' ? '👆 कृपया ऊपर दिए गए विकल्पों का उपयोग करें' : '👆 Please use the suggested actions above')
+                    : isListening
+                      ? "🎤 Listening... speak now"
+                      : isEditMode
+                        ? "Describe the edit you want to make..."
+                        : activeDraftInfo && !isFieldsModalOpen
+                          ? (language === 'hi' ? `💬 "${activeDraftInfo.templateTitle}" के बारे में पूछें या ऊपर दिए गए विकल्पों का उपयोग करें` : `💬 Ask about "${activeDraftInfo.templateTitle}" or use the options above`)
+                          : (intentLabel ? `Type your ${intentLabel.toLowerCase()} request...` : "Type your message...")
+                }
+                size="lg"
+                bg={isListening ? useColorModeValue('red.50', 'red.900') : inputBg}
+                color={textColor}
+                opacity={isPendingUserChoice ? 0.6 : 1}
+                cursor={isPendingUserChoice ? 'not-allowed' : 'text'}
+                isDisabled={isPendingUserChoice || isLoading || analyzingFile}
+                _placeholder={{ color: isPendingUserChoice ? 'orange.500' : (isListening ? 'red.400' : placeholderColor) }}
+                _hover={{ borderColor: isPendingUserChoice ? 'orange.300' : (isListening ? 'red.300' : 'blue.300') }}
+                _focus={{ borderColor: isPendingUserChoice ? 'orange.500' : (isListening ? 'red.500' : 'blue.500'), boxShadow: 'none' }}
+                onKeyPress={handleKeyPress}
+                flex={1}
+                borderColor={isPendingUserChoice ? 'orange.300' : (isListening ? 'red.300' : undefined)}
+                borderWidth={isPendingUserChoice ? '2px' : (isListening ? '2px' : undefined)}
+              />
+              <Input
+                type="file"
+                accept=".pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                onChange={handleFileUpload}
+                display="none"
+                id="file-upload"
+              />
+              <Tooltip label="Attach file" placement="top">
+                <label htmlFor="file-upload">
+                  <IconButton
+                    as="span"
+                    icon={<FaPaperclip />}
+                    aria-label="Attach file"
+                    size="lg"
+                    colorScheme="blue"
+                    variant="ghost"
+                    isLoading={uploading}
+                  />
+                </label>
+              </Tooltip>
+              <Tooltip
+                label={
+                  !speechSupported
+                    ? "Voice input not supported in your browser"
+                    : isListening
+                      ? "Stop listening"
+                      : "Voice input (click to speak)"
+                }
+                placement="top"
+              >
+                <IconButton
+                  icon={isListening ? <FiMicOff /> : <FiMic />}
+                  aria-label={isListening ? "Stop voice input" : "Start voice input"}
+                  size="lg"
+                  colorScheme={isListening ? "red" : "blue"}
+                  variant={isListening ? "solid" : "ghost"}
+                  onClick={toggleListening}
+                  isDisabled={!speechSupported}
+                  animation={isListening ? "pulse 1.5s infinite" : undefined}
+                  sx={isListening ? {
+                    '@keyframes pulse': {
+                      '0%': { boxShadow: '0 0 0 0 rgba(229, 62, 62, 0.7)' },
+                      '70%': { boxShadow: '0 0 0 10px rgba(229, 62, 62, 0)' },
+                      '100%': { boxShadow: '0 0 0 0 rgba(229, 62, 62, 0)' },
+                    }
+                  } : {}}
+                />
+              </Tooltip>
+              <Button
+                colorScheme="blue"
+                size="lg"
+                onClick={handleSendMessage}
+                isLoading={isLoading || analyzingFile}
+                loadingText={analyzingFile ? "Analyzing..." : "Sending..."}
+              >
+                Send
+              </Button>
+            </HStack>
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <Box w="100%" mt={2}>
+                <Progress
+                  value={uploadProgress}
+                  size="sm"
+                  colorScheme="blue"
+                  hasStripe
+                  isAnimated
+                />
+                <Text fontSize="sm" color="gray.500" mt={1} textAlign="center">
+                  Uploading: {uploadProgress}%
+                </Text>
+              </Box>
+            )}
+          </VStack>
+        </Box>
       </Container>
 
       <Modal isOpen={isClearModalOpen} onClose={onClearModalClose} isCentered>
@@ -3552,7 +3552,7 @@ const ChatPage = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
-      
+
       <Suspense fallback={
         <Modal isOpen={isFullEditorOpen} onClose={() => setIsFullEditorOpen(false)} size="full">
           <ModalOverlay />
@@ -3589,9 +3589,10 @@ const ChatPage = () => {
         initialValues={fieldsModalData?.initialValues || {}}
         language={language}
         isEditMode={isEditingDocument}
+        summaryBox={scanResults?.summary || fieldsModalData?.summary || null}
       />
 
-      
+
       <TemplateBrowser
         isOpen={isTemplateBrowserOpen}
         onClose={() => setIsTemplateBrowserOpen(false)}
@@ -3600,7 +3601,7 @@ const ChatPage = () => {
         token={token}
       />
 
-      
+
       <DocumentTypeSelector
         isOpen={isDocTypeSelectorOpen}
         onClose={() => setIsDocTypeSelectorOpen(false)}
@@ -3608,7 +3609,7 @@ const ChatPage = () => {
         language={language}
       />
 
-      
+
       <LegalGuidanceModal
         isOpen={isGuidanceModalOpen}
         onClose={() => setIsGuidanceModalOpen(false)}
@@ -3616,7 +3617,7 @@ const ChatPage = () => {
         language={language}
       />
 
-      
+
       <ComplaintFormModal
         isOpen={isComplaintFormOpen}
         onClose={handleComplaintFormClose}
@@ -3625,7 +3626,7 @@ const ChatPage = () => {
         initialContext={lastGeneratedComplaint?.data || complaintContext}
       />
 
-      
+
       <TemplateDesignSelector
         isOpen={isDesignSelectorOpen}
         onClose={handleDesignSelectorClose}
@@ -3636,7 +3637,7 @@ const ChatPage = () => {
         isLoading={isGenerating}
       />
 
-      
+
       <Modal isOpen={isScanReportOpen} onClose={() => setIsScanReportOpen(false)} size="lg" isCentered>
         <ModalOverlay bg="blackAlpha.600" />
         <ModalContent bg={useColorModeValue('white', 'gray.800')} borderRadius="xl" mx={4}>
@@ -3727,40 +3728,40 @@ const ChatPage = () => {
                       </Box>
                     </Box>
                     <Badge colorScheme={ocrConfidence >= 80 ? 'green' : ocrConfidence >= 50 ? 'orange' : 'red'} variant="solid" fontSize="xs">
-                      {ocrConfidence >= 80 
-                        ? (language === 'hi' ? 'उत्कृष्ट' : 'Excellent') 
-                        : ocrConfidence >= 60 
-                          ? (language === 'hi' ? 'अच्छा' : 'Good') 
-                          : ocrConfidence >= 40 
-                            ? (language === 'hi' ? 'ठीक' : 'Fair') 
+                      {ocrConfidence >= 80
+                        ? (language === 'hi' ? 'उत्कृष्ट' : 'Excellent')
+                        : ocrConfidence >= 60
+                          ? (language === 'hi' ? 'अच्छा' : 'Good')
+                          : ocrConfidence >= 40
+                            ? (language === 'hi' ? 'ठीक' : 'Fair')
                             : (language === 'hi' ? 'कमज़ोर' : 'Poor')}
                     </Badge>
                   </HStack>
                   {ocrTextLength > 0 && (
                     <Text fontSize="xs" color="gray.500" mt={1}>
-                      {language === 'hi' 
+                      {language === 'hi'
                         ? `${ocrTextLength.toLocaleString()} अक्षर निकाले गए`
                         : `${ocrTextLength.toLocaleString()} characters extracted`}
                     </Text>
                   )}
                   {ocrConfidence < 60 && (
                     <Text fontSize="xs" color="red.500" mt={1} fontStyle="italic">
-                      {language === 'hi' 
-                        ? '⚠️ कम स्कोर: बेहतर परिणामों के लिए एक स्पष्ट, उच्च-रिज़ॉल्यूशन छवि अपलोड करें।' 
+                      {language === 'hi'
+                        ? '⚠️ कम स्कोर: बेहतर परिणामों के लिए एक स्पष्ट, उच्च-रिज़ॉल्यूशन छवि अपलोड करें।'
                         : '⚠️ Low score: For better results, upload a clearer, high-resolution image.'}
                     </Text>
                   )}
                   {ocrConfidence >= 60 && ocrConfidence < 80 && (
                     <Text fontSize="xs" color="orange.500" mt={1} fontStyle="italic">
-                      {language === 'hi' 
-                        ? '💡 AI सहायता उपलब्ध है, लेकिन कुछ पाठ गलत हो सकता है। कृपया संपादक में सत्यापित करें।' 
+                      {language === 'hi'
+                        ? '💡 AI सहायता उपलब्ध है, लेकिन कुछ पाठ गलत हो सकता है। कृपया संपादक में सत्यापित करें।'
                         : '💡 AI assistance available, but some text may be inaccurate. Please verify in the editor.'}
                     </Text>
                   )}
                   {ocrConfidence >= 80 && (
                     <Text fontSize="xs" color="green.500" mt={1} fontStyle="italic">
-                      {language === 'hi' 
-                        ? '✅ उच्च गुणवत्ता! Law AI आश्वस्त है कि निकाला गया पाठ सटीक है।' 
+                      {language === 'hi'
+                        ? '✅ उच्च गुणवत्ता! Law AI आश्वस्त है कि निकाला गया पाठ सटीक है।'
                         : '✅ High quality! Law AI is confident the extracted text is accurate.'}
                     </Text>
                   )}
