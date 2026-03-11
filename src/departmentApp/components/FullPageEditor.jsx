@@ -95,24 +95,24 @@ const FullPageEditor = ({
   htmlContent: initialHtml,
   language = 'en',
   ocrConfidence = null,
-  
+
   scanData = null,
 }) => {
-  
+
   const aiHelperRef = useRef(null);
-  
+
   const [leftTabIndex, setLeftTabIndex] = useState(0);
 
-  
+
   const handleFollowUp = useCallback((caseData) => {
     const ctx = `Case: ${caseData.caseName || ''} — ${caseData.citation || ''}\n` +
       (caseData.relevance ? `Relevance: ${caseData.relevance}\n` : '') +
-      (caseData.summary   ? `Summary: ${caseData.summary}`       : '');
+      (caseData.summary ? `Summary: ${caseData.summary}` : '');
     aiHelperRef.current?.addContext?.(ctx);
     setLeftTabIndex(1);
   }, []);
 
-  
+
   const [suggestions, setSuggestions] = useState(initialSuggestions || []);
   const [editInstruction, setEditInstruction] = useState('');
   const [isApplyingEdit, setIsApplyingEdit] = useState(false);
@@ -136,15 +136,15 @@ const FullPageEditor = ({
   const exitDualView = useCallback(() => {
     setDualViewMode(false);
   }, []);
-  
-  const [leftSidebarWidth, setLeftSidebarWidth]   = useState(300);
+
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(300);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
-  const leftDragRef   = useRef(null);
-  const rightDragRef  = useRef(null);
-  const isDraggingLeft  = useRef(false);
+  const leftDragRef = useRef(null);
+  const rightDragRef = useRef(null);
+  const isDraggingLeft = useRef(false);
   const isDraggingRight = useRef(false);
-  const dragStartX      = useRef(0);
-  const dragStartWidth  = useRef(0);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(0);
   const [selectedText, setSelectedText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
@@ -167,20 +167,20 @@ const FullPageEditor = ({
     precedenceAnalysis: scanData?.precedenceAnalysis || [],
   }));
 
-  
+
   const bgColor = useColorModeValue('white', 'gray.900');
   const headerBg = useColorModeValue('gray.50', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
-  
+
   const { chakraTheme: appTheme } = useAppTheme();
   const editorCanvasBg = appTheme?.config?.initialColorMode === 'dark' ? '#1a1a1a' : '#ffffff';
   const sidebarBg = useColorModeValue('white', 'gray.800');
   const pageShadow = 'none';
-  
+
   const HIGHLIGHT_ADD = '#d1fae5';
   const HIGHLIGHT_REM = '#fee2e2';
 
-  
+
   useEffect(() => {
     const onMouseMove = (e) => {
       if (isDraggingLeft.current) {
@@ -195,7 +195,7 @@ const FullPageEditor = ({
       }
     };
     const onMouseUp = () => {
-      isDraggingLeft.current  = false;
+      isDraggingLeft.current = false;
       isDraggingRight.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -220,7 +220,7 @@ const FullPageEditor = ({
       .join('');
   }, []);
 
-  
+
   const getInitialContent = useCallback(() => {
     if (initialHtml && initialHtml.trim()) return initialHtml;
     if (session?.htmlContent && session.htmlContent.trim()) return session.htmlContent;
@@ -229,7 +229,7 @@ const FullPageEditor = ({
     return textToHtml(text);
   }, [initialHtml, session, textToHtml]);
 
-  
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -289,7 +289,7 @@ const FullPageEditor = ({
     },
   });
 
-  
+
   useEffect(() => {
     if (editor && session && !editor.isFocused) {
       const content = getInitialContent();
@@ -356,17 +356,17 @@ const FullPageEditor = ({
     }));
   }, []);
 
-  
+
   // formatMetadata styling is applied via pageStyle in the sx prop below — no useEffect needed
 
-  
+
   const handleRevertChange = useCallback((changeIdx) => {
     if (!editor) return;
     const change = changeHistory[changeIdx];
     if (!change || !change.originalText || !change.suggestedText || change.reverted) return;
 
     const content = editor.getHTML();
-    
+
     const highlightedPattern = `<mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${change.suggestedText}</mark>`;
     let reverted = false;
 
@@ -386,29 +386,29 @@ const FullPageEditor = ({
     }
   }, [editor, changeHistory, toast]);
 
-  
+
   useEffect(() => {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     };
   }, []);
 
-  
+
   useEffect(() => {
     if (session?.changes) setChangeHistory(session.changes);
   }, [session]);
 
-  
+
   const pageLineYs = useAutoPageBreak(editor, false, 1122);
 
-  
+
   const handleAutosave = async (ed) => {
     if (!ed) return;
     try {
       setIsSaving(true);
       const html = ed.getHTML();
       const plainText = ed.getText();
-      
+
       await fileService.saveHtmlContent(html, plainText, selectedFile?._id);
       setHasUnsavedChanges(false);
       setLastSaved(new Date());
@@ -419,25 +419,25 @@ const FullPageEditor = ({
     }
   };
 
-  
+
   const handleSave = async () => {
     if (!editor) return;
     await handleAutosave(editor);
     toast({ title: 'Document saved', status: 'success', duration: 1500 });
   };
 
-  
+
   const handleAIEdit = async () => {
     if (!editInstruction.trim() || !editor) return;
     setIsApplyingEdit(true);
     try {
       const result = await fileService.applyEdit(editInstruction);
       if (result.success) {
-        
+
         const statusRes = await fileService.getEditStatus();
         if (statusRes.hasSession) {
           const analysisRes = await fileService.getDocumentAnalysis();
-          
+
           if (result.textPreview) {
             const newHtml = textToHtml(result.textPreview);
             editor.commands.setContent(newHtml);
@@ -459,7 +459,7 @@ const FullPageEditor = ({
     }
   };
 
-  
+
   const handleCopy = async () => {
     if (!editor) return;
     try {
@@ -472,7 +472,7 @@ const FullPageEditor = ({
     }
   };
 
-  
+
   const handleDownload = (format) => {
     setPendingDownloadFormat(format);
     setIsDesignSuggestionOpen(true);
@@ -481,7 +481,7 @@ const FullPageEditor = ({
   const executeDownloadWithDesign = async (format, designConfig) => {
     setIsDesignSuggestionOpen(false);
     if (editor) await handleAutosave(editor);
-    
+
     toast({ title: `Generating ${format.toUpperCase()}...`, status: 'info', duration: 2000 });
     try {
       const finalDesignConfig = designConfig || (formatMetadata ? {
@@ -572,8 +572,8 @@ const FullPageEditor = ({
       segments.push({ start, end: fullText.length, pos, text: node.text });
     });
 
-    
-    
+
+
     const normalizeWithMap = (str) => {
       let normalized = '';
       const map = [];
@@ -581,12 +581,12 @@ const FullPageEditor = ({
       for (let i = 0; i < str.length; i += 1) {
         const code = str.charCodeAt(i);
         let ch = str[i];
-        
+
         if (code === 0x2018 || code === 0x2019 || code === 0x0060 || code === 0x00B4) ch = "'";
         else if (code === 0x201C || code === 0x201D) ch = '"';
-        
+
         else if (code === 0x200B || code === 0xFEFF || code === 0x00AD) continue;
-        
+
         else if (code === 0x00A0 || code === 0x2009 || code === 0x202F) ch = ' ';
 
         const isSpace = /\s/.test(ch);
@@ -605,27 +605,27 @@ const FullPageEditor = ({
       return { normalized: normalized.trim(), map };
     };
 
-    
+
     let startIndex = fullText.indexOf(searchText);
     let endIndex = startIndex >= 0 ? startIndex + searchText.length : -1;
 
-    
+
     if (startIndex < 0) {
       const qNorm = (s) => s
         .replace(/[\u2018\u2019\u0060\u00B4]/g, "'")
         .replace(/[\u201C\u201D]/g, '"')
         .replace(/[\u00A0\u2009\u202F]/g, ' ')
         .replace(/[\u200B\uFEFF\u00AD]/g, '');
-      const qFull   = qNorm(fullText);
+      const qFull = qNorm(fullText);
       const qSearch = qNorm(searchText);
       const qIdx = qFull.indexOf(qSearch);
       if (qIdx >= 0) {
         startIndex = qIdx;
-        endIndex   = qIdx + qSearch.length;
+        endIndex = qIdx + qSearch.length;
       }
     }
 
-    
+
     if (startIndex < 0) {
       const source = normalizeWithMap(fullText);
       const target = normalizeWithMap(searchText);
@@ -637,7 +637,7 @@ const FullPageEditor = ({
       }
     }
 
-    
+
     if (startIndex < 0 && searchText.length > 60) {
       const leadWords = searchText.trim().split(/\s+/).slice(0, 12).join(' ');
       const source = normalizeWithMap(fullText);
@@ -645,7 +645,7 @@ const FullPageEditor = ({
       const normIdx = source.normalized.indexOf(target.normalized);
       if (normIdx >= 0) {
         startIndex = source.map[normIdx] ?? -1;
-        
+
         const approxEnd = startIndex + searchText.length;
         endIndex = Math.min(approxEnd, fullText.length);
       }
@@ -665,13 +665,13 @@ const FullPageEditor = ({
     return { from, to };
   }, [editor]);
 
-  
+
   const handleApplySuggestion = async (suggestion) => {
     try {
       let applied = false;
       let toastDesc = 'Marked as reviewed';
 
-      
+
       const idKey = suggestion.idempotencyKey ||
         `${suggestion.type || 'generic'}::${(suggestion.title || '').substring(0, 60)}::${(suggestion.suggestedText || '').substring(0, 60)}`;
       if (appliedSuggestionsRef.current.has(idKey)) {
@@ -684,21 +684,21 @@ const FullPageEditor = ({
         return;
       }
 
-      
-      const hasOriginal  = !!(suggestion.originalText && suggestion.originalText.trim());
+
+      const hasOriginal = !!(suggestion.originalText && suggestion.originalText.trim());
       const hasSuggested = !!(suggestion.suggestedText && suggestion.suggestedText.trim());
 
-      
-      
+
+
       const AI_DRIVEN_TYPES = new Set([
         'contradiction_fix', 'outdated_ref', 'compliance_fix',
         'missing_clause', 'chronology_fix', 'precedence_apply', 'insert_clause',
-        
+
         'legal_compliance', 'risk_warning', 'language', 'formatting',
       ]);
       const isAIDriven = AI_DRIVEN_TYPES.has(suggestion.type);
 
-      
+
       const normalizeForSearch = (text) => text
         .replace(/[\u2018\u2019\u201A]/g, "'")
         .replace(/[\u201C\u201D\u201E]/g, '"')
@@ -707,30 +707,30 @@ const FullPageEditor = ({
         .replace(/\s+/g, ' ')
         .trim();
 
-      
-      
+
+
       const fuzzyFindRange = (text) => {
         if (!text) return null;
-        
+
         let range = findRangeInEditor(text);
         if (range) return range;
-        
+
         const normalized = normalizeForSearch(text);
         if (normalized !== text) {
           range = findRangeInEditor(normalized);
           if (range) return range;
         }
-        
+
         if (text.length > 120) {
           range = findRangeInEditor(text.substring(0, 120));
           if (range) return { from: range.from, to: range.from + text.length > range.to ? range.to : range.from + text.length };
         }
-        
+
         if (text.length > 60) {
           range = findRangeInEditor(text.substring(0, 60));
           if (range) return { from: range.from, to: Math.min(range.from + text.length, editor.state.doc.content.size) };
         }
-        
+
         const words = normalized.split(' ');
         if (words.length >= 4) {
           const chunk = words.slice(0, 4).join(' ');
@@ -740,7 +740,7 @@ const FullPageEditor = ({
         return null;
       };
 
-      
+
       const insertAtLocationOrAppend = (originalParagraph, revisedParagraph, descFound, descAppend) => {
         if (originalParagraph && revisedParagraph) {
           const range = fuzzyFindRange(originalParagraph);
@@ -753,7 +753,7 @@ const FullPageEditor = ({
             return { applied: true, desc: descFound };
           }
         }
-        
+
         if (revisedParagraph) {
           const escaped = revisedParagraph
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -765,11 +765,11 @@ const FullPageEditor = ({
       };
 
       if (editor) {
-        
-        const preApplyHtml = editor.getHTML();
-        const preApplyLen  = editor.getText().length;
 
-        
+        const preApplyHtml = editor.getHTML();
+        const preApplyLen = editor.getText().length;
+
+
         const checkAndRestore = () => {
           const postLen = editor.getText().length;
           if (preApplyLen > 20 && postLen < preApplyLen * 0.5) {
@@ -781,7 +781,7 @@ const FullPageEditor = ({
           return false;
         };
 
-        
+
         if (hasOriginal && hasSuggested && !isAIDriven) {
           const range = findRangeInEditor(suggestion.originalText);
           if (range) {
@@ -818,7 +818,7 @@ Return ONLY the improved replacement text — no explanation, no JSON, no markdo
             applied = true;
             toastDesc = 'AI-enhanced fix highlighted in green';
           } else {
-            
+
             try {
               const plainText = editor.getText();
               const aiPrompt = `You are a legal document editor. Apply this fix to the correct location in the document.
@@ -843,7 +843,7 @@ Respond ONLY in JSON (no preamble, no markdown fences):
                 if (jsonMatch) {
                   const parsed = JSON.parse(jsonMatch[0]);
                   originalParagraph = parsed.originalParagraph || '';
-                  revisedParagraph  = parsed.revisedParagraph  || suggestion.suggestedText;
+                  revisedParagraph = parsed.revisedParagraph || suggestion.suggestedText;
                 }
               } catch (_) { revisedParagraph = responseText || suggestion.suggestedText; }
 
@@ -868,7 +868,7 @@ Respond ONLY in JSON (no preamble, no markdown fences):
             reverted: false,
           }]);
 
-        
+
         } else if (hasSuggested && isAIDriven) {
           try {
             const plainText = editor.getText();
@@ -962,25 +962,27 @@ Respond ONLY in this JSON format (no preamble, no markdown fences):
 CRITICAL: originalParagraph must be verbatim from the document above. Set to "" only if truly not found.`;
 
             } else if (suggestion.type === 'precedence_apply') {
-              llmPrompt = `You are a legal document editor. A case citation must be woven into the most relevant paragraph.
-
+              llmPrompt = `You are a legal document editor. A case citation must be woven into the document.
+              
 CASE NAME: ${suggestion.caseName || ''}
 CITATION: ${suggestion.citation || ''}
 LEGAL PRINCIPLE: ${suggestion.principle || suggestion.suggestedText}
 
-DOCUMENT CONTEXT (first 4000 chars):
-${plainText.substring(0, 4000)}
+DOCUMENT CONTEXT (first 6000 chars):
+${plainText.substring(0, 6000)}
 
 Your task:
-1. Identify the single paragraph from the document that is MOST topically relevant to this legal principle.
-2. Return that paragraph unchanged as "originalParagraph".
-3. As "revisedParagraph", return the same paragraph with the citation naturally integrated at the end, formatted as: "(See: ${suggestion.caseName || 'case'}${suggestion.citation ? `, ${suggestion.citation}` : ''} — ${(suggestion.principle || '').substring(0, 120)})"
+1. Identify if there is a specific "Precedences", "Authorities", or similar section where this case should go. If so, return that section's last paragraph as "insertAfterParagraph" and the formatted citation as "clauseText".
+2. Alternatively, identify the single paragraph from the document that is MOST topically relevant to this legal principle. Return that paragraph unchanged as "originalParagraph" and as "revisedParagraph", return the same paragraph with the citation naturally integrated at the end, formatted as: "(See: ${suggestion.caseName || 'case'}${suggestion.citation ? `, ${suggestion.citation}` : ''} — ${(suggestion.principle || '').substring(0, 120)})".
 
-Respond ONLY in this JSON format (no preamble, no markdown):
-{"originalParagraph":"<exact paragraph text from document>","revisedParagraph":"<paragraph + citation appended>"}`;
+Respond ONLY in JSON (no preamble, no markdown):
+{"insertAfterParagraph":"<exact paragraph to insert after>", "clauseText":"<new case citation paragraph>"}
+OR
+{"originalParagraph":"<exact paragraph text from document>", "revisedParagraph":"<paragraph + citation appended>"}
+`;
 
             } else {
-              
+
               llmPrompt = `You are a legal document editor. Apply this fix to the correct location in the document.
 
 ISSUE TYPE: ${suggestion.type}
@@ -1008,18 +1010,18 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
             let revisedParagraph = suggestion.suggestedText;
 
             if (suggestion.type === 'missing_clause' || suggestion.type === 'insert_clause') {
-              
+
               try {
                 const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
                 if (jsonMatch) {
                   const parsed = JSON.parse(jsonMatch[0]);
                   const insertAfter = parsed.insertAfterParagraph || '';
-                  const clauseText  = parsed.clauseText || responseText || suggestion.suggestedText;
+                  const clauseText = parsed.clauseText || responseText || suggestion.suggestedText;
 
                   if (insertAfter) {
                     const range = fuzzyFindRange(insertAfter);
                     if (range) {
-                      
+
                       const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                       const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                       editor.chain().focus().insertContentAt(range.to + 1, insertHtml).run();
@@ -1028,7 +1030,7 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                     }
                   }
                   if (!applied) {
-                    
+
                     const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                     editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
@@ -1038,7 +1040,7 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   revisedParagraph = clauseText;
                 }
               } catch (_) {
-                
+
                 revisedParagraph = responseText || suggestion.suggestedText;
                 const escaped = revisedParagraph.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
@@ -1047,12 +1049,12 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                 toastDesc = 'Clause appended (highlighted green)';
               }
             } else {
-              
+
               try {
                 const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
                 if (jsonMatch) {
                   const parsed = JSON.parse(jsonMatch[0]);
-                  
+
                   if (parsed.insertAfterParagraph !== undefined && parsed.clauseText) {
                     const insertAfter = parsed.insertAfterParagraph || '';
                     const clauseText = parsed.clauseText;
@@ -1075,7 +1077,24 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                     }
                   } else {
                     originalParagraph = parsed.originalParagraph || '';
-                    revisedParagraph  = parsed.revisedParagraph  || suggestion.suggestedText;
+                    revisedParagraph = parsed.revisedParagraph || suggestion.suggestedText;
+                  }
+                }
+
+                // For precedence_apply if the AI chose insertAfterParagraph instead
+                if (suggestion.type === 'precedence_apply' && !originalParagraph && parsed && parsed.insertAfterParagraph !== undefined) {
+                  const insertAfter = parsed.insertAfterParagraph || '';
+                  const clauseText = parsed.clauseText;
+                  const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                  const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
+                  if (insertAfter) {
+                    const range = fuzzyFindRange(insertAfter);
+                    if (range) {
+                      editor.chain().focus().insertContentAt(range.to + 1, insertHtml).run();
+                      applied = true;
+                      toastDesc = 'Case citation inserted under specific section (highlighted green)';
+                      revisedParagraph = clauseText;
+                    }
                   }
                 }
               } catch (_) {
@@ -1084,13 +1103,13 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
 
               if (!applied) {
                 const result = insertAtLocationOrAppend(originalParagraph, revisedParagraph,
-                suggestion.type === 'contradiction_fix' ? 'Contradiction resolved with AI (highlighted green)' :
-                suggestion.type === 'outdated_ref' ? 'Reference updated with AI (highlighted green)' :
-                suggestion.type === 'compliance_fix' ? 'Compliance issue fixed with AI (highlighted green)' :
-                suggestion.type === 'precedence_apply' ? `Citation from ${suggestion.caseName || 'case'} woven into document` :
-                suggestion.type === 'chronology_fix' ? 'Chronology corrected with AI (highlighted green)' :
-                'AI fix applied (highlighted green)',
-                'AI fix appended — original text not found exactly, review position');
+                  suggestion.type === 'contradiction_fix' ? 'Contradiction resolved with AI (highlighted green)' :
+                    suggestion.type === 'outdated_ref' ? 'Reference updated with AI (highlighted green)' :
+                      suggestion.type === 'compliance_fix' ? 'Compliance issue fixed with AI (highlighted green)' :
+                        suggestion.type === 'precedence_apply' ? `Citation from ${suggestion.caseName || 'case'} woven into document` :
+                          suggestion.type === 'chronology_fix' ? 'Chronology corrected with AI (highlighted green)' :
+                            'AI fix applied (highlighted green)',
+                  'AI fix appended — original text not found exactly, review position');
                 applied = result.applied;
                 toastDesc = result.desc;
               }
@@ -1117,7 +1136,7 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
             toastDesc = 'Suggestion applied (fallback — LLM unavailable)';
           }
 
-        
+
         } else if (hasSuggested) {
           try {
             const plainText = editor.getText();
@@ -1151,7 +1170,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   }
                 }
               }
-            } catch (_) {  }
+            } catch (_) { }
 
             if (!clauseInserted) {
               const escaped = suggestion.suggestedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1179,7 +1198,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             reverted: false,
           }]);
 
-        
+
         } else {
           const genPrompt = suggestion.description
             ? `Based on this suggestion: "${suggestion.description}" — write the exact clause or text that should be added to this legal document. Return ONLY the clause text, no explanation.`
@@ -1189,9 +1208,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             const aiRes = await fileService.aiChatAboutDocument(genPrompt, plainText.substring(0, 500), [], language || 'en');
             const generatedText = (aiRes?.response || '').trim();
             if (generatedText) {
-              const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${
-                generatedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-              }</mark></p>`;
+              const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${generatedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                }</mark></p>`;
               editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
               applied = true;
               toastDesc = 'AI-generated clause appended (highlighted in green)';
@@ -1214,14 +1232,14 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           }
         }
 
-        
+
         if (applied && checkAndRestore()) {
           applied = false;
           toastDesc = 'Edit rolled back — content protection triggered';
         }
       }
 
-      
+
       if (applied) {
         appliedSuggestionsRef.current.add(idKey);
       }
@@ -1232,49 +1250,63 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         const desc = (suggestion.description || '').toLowerCase().trim();
         const title = (suggestion.title || '').toLowerCase();
         if (type === 'legal_compliance' || type === 'compliance_fix') {
-          return { ...prev, complianceIssues: prev.complianceIssues.filter(c =>
-            (c.description || '').toLowerCase().trim() !== desc &&
-            !title.startsWith('compliance: ' + (c.rule || '').toLowerCase().trim().substring(0, 20))
-          )};
+          return {
+            ...prev, complianceIssues: prev.complianceIssues.filter(c =>
+              (c.description || '').toLowerCase().trim() !== desc &&
+              !title.startsWith('compliance: ' + (c.rule || '').toLowerCase().trim().substring(0, 20))
+            )
+          };
         }
         if (type === 'clause_improvement') {
-          return { ...prev, clauseFlaws: prev.clauseFlaws.filter(f =>
-            (f.issue || '').toLowerCase().trim() !== desc
-          )};
+          return {
+            ...prev, clauseFlaws: prev.clauseFlaws.filter(f =>
+              (f.issue || '').toLowerCase().trim() !== desc
+            )
+          };
         }
         if (type === 'missing_clause' || type === 'insert_clause') {
-          return { ...prev, missingClauses: prev.missingClauses.filter(m =>
-            !title.includes((m.clauseType || '').toLowerCase().trim().substring(0, 20))
-          )};
+          return {
+            ...prev, missingClauses: prev.missingClauses.filter(m =>
+              !title.includes((m.clauseType || '').toLowerCase().trim().substring(0, 20))
+            )
+          };
         }
         if (type === 'contradiction_fix') {
-          return { ...prev, internalContradictions: prev.internalContradictions.filter(c =>
-            (c.description || '').toLowerCase().trim() !== desc &&
-            !(c.contradiction || '').toLowerCase().includes(desc.substring(0, 40))
-          )};
+          return {
+            ...prev, internalContradictions: prev.internalContradictions.filter(c =>
+              (c.description || '').toLowerCase().trim() !== desc &&
+              !(c.contradiction || '').toLowerCase().includes(desc.substring(0, 40))
+            )
+          };
         }
         if (type === 'outdated_ref') {
-          return { ...prev, outdatedReferences: prev.outdatedReferences.filter(o =>
-            (o.description || o.reference || '').toLowerCase().trim() !== desc
-          )};
+          return {
+            ...prev, outdatedReferences: prev.outdatedReferences.filter(o =>
+              (o.description || o.reference || '').toLowerCase().trim() !== desc
+            )
+          };
         }
         if (type === 'chronology_fix') {
-          return { ...prev, chronologicalIssues: prev.chronologicalIssues.filter(ci =>
-            (ci.description || '').toLowerCase().trim() !== desc
-          )};
+          return {
+            ...prev, chronologicalIssues: prev.chronologicalIssues.filter(ci =>
+              (ci.description || '').toLowerCase().trim() !== desc
+            )
+          };
         }
         if (type === 'precedence_apply') {
-          return { ...prev, precedenceAnalysis: prev.precedenceAnalysis.filter(p =>
-            (p.caseName || '').toLowerCase() !== (suggestion.caseName || '').toLowerCase()
-          )};
+          return {
+            ...prev, precedenceAnalysis: prev.precedenceAnalysis.filter(p =>
+              (p.caseName || '').toLowerCase() !== (suggestion.caseName || '').toLowerCase()
+            )
+          };
         }
         return prev;
       });
 
-      
+
       const sid = suggestion.suggestionId;
       if (!sid) {
-        
+
         const tempId = `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         setSuggestions(prev => prev.map(s =>
           s === suggestion ? { ...s, suggestionId: tempId, status: 'applied', _local: true } : s
@@ -1288,7 +1320,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           ));
           toast({ title: 'Suggestion applied', description: toastDesc, status: 'success', duration: 2000 });
         } catch (err) {
-          
+
           setSuggestions(prev => prev.map(s =>
             s.suggestionId === sid ? { ...s, status: 'applied' } : s
           ));
@@ -1296,22 +1328,22 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         }
       }
     } catch (outerErr) {
-      
+
       console.warn('handleApplySuggestion error:', outerErr.message);
       const sid = suggestion?.suggestionId;
       setSuggestions(prev => prev.map(s =>
         sid ? (s.suggestionId === sid ? { ...s, status: 'applied' } : s)
-             : (s === suggestion  ? { ...s, status: 'applied' } : s)
+          : (s === suggestion ? { ...s, status: 'applied' } : s)
       ));
       toast({ title: 'Applied locally', description: 'An unexpected error occurred but change was applied.', status: 'warning', duration: 3000 });
     }
   };
 
-  
+
   const handleDismissSuggestion = async (suggestion) => {
     const sid = suggestion.suggestionId;
     const match = (s) => sid ? s.suggestionId === sid : s === suggestion;
-    
+
     setSuggestions(prev => prev.map(s => match(s) ? { ...s, status: 'dismissed' } : s));
     if (sid && !suggestion._local) {
       try {
@@ -1322,7 +1354,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
     }
   };
 
-  
+
   const handleUndoSuggestion = useCallback(async (suggestion) => {
     const sid = suggestion.suggestionId;
     const match = (s) => sid ? s.suggestionId === sid : s === suggestion;
@@ -1342,7 +1374,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
   const wordCount = plainText.split(/\s+/).filter(w => w).length;
   const charCount = plainText.length;
 
-  
+
   const pageStyle = formatMetadata ? {
     fontFamily: `'${formatMetadata.defaultFont}', serif`,
     fontSize: `${formatMetadata.defaultFontSize || 12}pt`,
@@ -1495,14 +1527,14 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </InputGroup>
-              <Button size="sm" onClick={() => {}}>Find</Button>
+              <Button size="sm" onClick={() => { }}>Find</Button>
             </HStack>
           </Box>
         )}
 
         <EditorToolbar data-tour="editor-toolbar" editor={editor} />
 
-        
+
         <ModalBody p={0} display="flex" flexDirection="row" overflow="hidden" data-editor-flex-row>
           {leftSidebarOpen && (
             <Box
@@ -1519,10 +1551,10 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               position="relative"
             >
               <Tabs
-                    index={leftTabIndex}
-                    onChange={setLeftTabIndex}
-                    flex="1" minH="0" display="flex" flexDirection="column" variant="enclosed-colored" size="sm"
-                  >
+                index={leftTabIndex}
+                onChange={setLeftTabIndex}
+                flex="1" minH="0" display="flex" flexDirection="column" variant="enclosed-colored" size="sm"
+              >
                 <TabList px={1} pt={1}>
                   <Tab fontSize="xs"><Icon as={MdDescription} mr={1} /> Analysis</Tab>
                   <Tab fontSize="xs"><Icon as={MdSmartToy} mr={1} /> AI Helper</Tab>
@@ -1530,8 +1562,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 </TabList>
                 <TabPanels flex="1" minH="0" overflow="hidden">
                   <TabPanel p={0} h="100%" overflowY="auto">
-                    <DocumentAnalysisPanel 
-                      scanResults={scanResults} 
+                    <DocumentAnalysisPanel
+                      scanResults={scanResults}
                       formatMetadata={formatMetadata}
                       ocrConfidence={ocrConfidence}
                     />
@@ -1634,16 +1666,16 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               transition="background 0.15s"
               onMouseDown={(e) => {
                 isDraggingLeft.current = true;
-                dragStartX.current    = e.clientX;
+                dragStartX.current = e.clientX;
                 dragStartWidth.current = leftSidebarWidth;
-                document.body.style.cursor    = 'col-resize';
+                document.body.style.cursor = 'col-resize';
                 document.body.style.userSelect = 'none';
                 e.preventDefault();
               }}
             />
           )}
 
-          
+
           <Box
             flex={dualViewMode ? undefined : '1'}
             style={dualViewMode ? { flex: 'var(--editor-flex, 1 1 50%)' } : undefined}
@@ -1680,22 +1712,22 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               overflow="visible"
               style={{
                 '--page-canvas-bg': editorCanvasBg,
-                '--pad-left':   pageStyle.paddingLeft   || '72px',
-                '--pad-right':  pageStyle.paddingRight  || '72px',
-                '--pad-top':    pageStyle.paddingTop    || '72px',
+                '--pad-left': pageStyle.paddingLeft || '72px',
+                '--pad-right': pageStyle.paddingRight || '72px',
+                '--pad-top': pageStyle.paddingTop || '72px',
                 '--pad-bottom': pageStyle.paddingBottom || '72px',
               }}
               sx={{
                 '.tiptap-editor': {
                   outline: 'none',
-                    minHeight: '1000px',
-                    overflow: 'visible',
-                    padding: pageStyle.paddingTop ? undefined : '72px 72px 72px 72px',
-                    fontFamily: pageStyle.fontFamily || "'Times New Roman', serif",
-                    fontSize: pageStyle.fontSize || '12pt',
-                    lineHeight: pageStyle.lineHeight || 1.5,
-                    
-                    color: '#1a1a1a',
+                  minHeight: '1000px',
+                  overflow: 'visible',
+                  padding: pageStyle.paddingTop ? undefined : '72px 72px 72px 72px',
+                  fontFamily: pageStyle.fontFamily || "'Times New Roman', serif",
+                  fontSize: pageStyle.fontSize || '12pt',
+                  lineHeight: pageStyle.lineHeight || 1.5,
+
+                  color: '#1a1a1a',
                   ...(pageStyle.paddingTop ? {
                     paddingTop: pageStyle.paddingTop,
                     paddingRight: pageStyle.paddingRight,
@@ -1833,16 +1865,16 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               transition="background 0.15s"
               onMouseDown={(e) => {
                 isDraggingRight.current = true;
-                dragStartX.current     = e.clientX;
-                dragStartWidth.current  = rightSidebarWidth;
-                document.body.style.cursor    = 'col-resize';
+                dragStartX.current = e.clientX;
+                dragStartWidth.current = rightSidebarWidth;
+                document.body.style.cursor = 'col-resize';
                 document.body.style.userSelect = 'none';
                 e.preventDefault();
               }}
             />
           )}
 
-          
+
           {rightSidebarOpen && (
             <Box
               w={`${rightSidebarWidth}px`}
@@ -1874,20 +1906,20 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   const flashHighlight = (range) => {
                     editor.commands.setTextSelection(range);
                     editor.commands.scrollIntoView();
-                    
+
                     editor.chain().focus().setHighlight({ color: '#FFEB3B' }).run();
                     setTimeout(() => {
-                      try { editor.chain().focus().setTextSelection(range).unsetHighlight().run(); } catch (e) {  }
+                      try { editor.chain().focus().setTextSelection(range).unsetHighlight().run(); } catch (e) { }
                     }, 2000);
                   };
 
-                  
+
                   const range = findRangeInEditor(caseName);
                   if (range) {
                     flashHighlight(range);
                     toast({ title: `Found: ${caseName}`, status: 'info', duration: 2000 });
                   } else {
-                    
+
                     const shortName = caseName.split(' ').slice(0, 3).join(' ');
                     const shortRange = findRangeInEditor(shortName);
                     if (shortRange) {

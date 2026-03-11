@@ -9,7 +9,7 @@ import {
   MdDescription, MdSecurity, MdWarning, MdCheckCircle,
   MdGavel, MdCategory, MdArticle, MdPeople
 } from 'react-icons/md';
-import { FaExclamationTriangle, FaInfoCircle, FaShieldAlt, FaFileAlt } from 'react-icons/fa';
+import { FaExclamationTriangle, FaInfoCircle, FaShieldAlt, FaFileAlt, FaBullseye } from 'react-icons/fa';
 
 const RISK_COLORS = {
   high: 'red',
@@ -68,6 +68,18 @@ const DocumentAnalysisPanel = ({ scanResults, formatMetadata, ocrConfidence }) =
               </Badge>
             )}
           </Box>
+
+          {scanResults.summary && (
+            <Box bg={cardBg} p={3} borderRadius="md" border="1px solid" borderColor={borderColor}>
+              <HStack spacing={2} mb={1}>
+                <Icon as={FaBullseye} color="teal.500" />
+                <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color={mutedColor}>Summary of File (SOF)</Text>
+              </HStack>
+              <Text fontSize="sm" color={textColor} fontStyle="italic">
+                "{scanResults.summary}"
+              </Text>
+            </Box>
+          )}
 
           {ocrConfidence !== null && ocrConfidence !== undefined && (
             <Box bg={cardBg} p={3} borderRadius="md" border="1px solid" borderColor={borderColor}>
@@ -160,8 +172,8 @@ const DocumentAnalysisPanel = ({ scanResults, formatMetadata, ocrConfidence }) =
                     <AccordionItem key={idx} border="none" mb={1}>
                       <AccordionButton px={2} py={1.5} borderRadius="sm" _hover={{ bg: 'blackAlpha.100' }}>
                         <HStack flex={1} spacing={2}>
-                          <Icon 
-                            as={FaExclamationTriangle} 
+                          <Icon
+                            as={FaExclamationTriangle}
                             color={`${RISK_COLORS[risk.severity] || 'gray'}.400`}
                             boxSize={3}
                           />
