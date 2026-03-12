@@ -16,20 +16,49 @@ const wikiCache = {};
 async function fetchWikiSummary(caseName) {
   if (!caseName) return null;
   if (wikiCache[caseName] !== undefined) return wikiCache[caseName];
-  const encoded = encodeURIComponent(caseName.trim());
-  try {
+  const trimmed = caseName.trim();
+  const opts = { headers: { Accept: 'application/json' } };
+
+  const tryFetch = async (title) => {
+    const encoded = encodeURIComponent(title);
     const res = await fetch(
       `https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`,
-      { headers: { Accept: 'application/json' } }
+      opts
     );
-    if (!res.ok) { wikiCache[caseName] = null; return null; }
+    if (!res.ok) return null;
     const d = await res.json();
-    const result = {
+    return {
       extract: d.extract || '',
       thumbnail: d.thumbnail?.source || d.originalimage?.source || null,
       wikiUrl: d.content_urls?.desktop?.page || null,
     };
-    wikiCache[caseName] = result;
+  };
+
+  try {
+    let result = await tryFetch(trimmed);
+    if (!result && trimmed.includes(' ')) {
+      const wikiTitle = trimmed.replace(/\s+/g, '_');
+      result = await tryFetch(wikiTitle);
+    }
+    if (!result) {
+      const mediaWikiRes = await fetch(
+        `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(trimmed.replace(/\s+/g, '_'))}&prop=extracts|pageimages&exintro=1&explaintext=1&exchars=500&format=json&origin=*`,
+        opts
+      );
+      if (mediaWikiRes.ok) {
+        const mw = await mediaWikiRes.json();
+        const pages = mw?.query?.pages || {};
+        const page = Object.values(pages).find((p) => p.pageid > 0 && p.extract);
+        if (page) {
+          result = {
+            extract: page.extract || '',
+            thumbnail: page.thumbnail?.source || null,
+            wikiUrl: page.pageid ? `https://en.wikipedia.org/wiki/?curid=${page.pageid}` : null,
+          };
+        }
+      }
+    }
+    wikiCache[caseName] = result || null;
     return result;
   } catch {
     wikiCache[caseName] = null;

@@ -1,9 +1,8 @@
 import axios from 'axios';
-
+import { addRefreshInterceptors } from './axiosWithRefresh.js';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${BASE_URL}/api/subscription`;
-
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -11,7 +10,6 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
 
 api.interceptors.request.use(
   (config) => {
@@ -29,6 +27,8 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+addRefreshInterceptors(api);
 
 export const createOrder = async (amount, couponCode) => {
   try {

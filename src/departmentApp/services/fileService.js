@@ -1,9 +1,8 @@
 import axios from 'axios';
-
+import { addRefreshInterceptors } from './axiosWithRefresh.js';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${BASE_URL}/api/files`;
-
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -11,7 +10,6 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
 
 api.interceptors.request.use(
   (config) => {
@@ -30,56 +28,7 @@ api.interceptors.request.use(
   }
 );
 
-// Auto-refresh CSRF token on 403 CSRF errors and retry the original request once
-let isRefreshingCsrf = false;
-let csrfRetryQueue = [];
-
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    const isCsrfError =
-      error.response?.status === 403 &&
-      (error.response?.data?.message === 'Invalid CSRF token' ||
-       error.response?.data?.error === 'Invalid CSRF token');
-
-    if (isCsrfError && !originalRequest._csrfRetried) {
-      originalRequest._csrfRetried = true;
-
-      if (!isRefreshingCsrf) {
-        isRefreshingCsrf = true;
-        try {
-          const token = localStorage.getItem('token');
-          const resp = await axios.post(
-            `${BASE_URL}/api/auth/refresh-csrf`,
-            {},
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          const newCsrf = resp.data.csrfToken;
-          localStorage.setItem('csrfToken', newCsrf);
-          axios.defaults.headers.common['x-csrf-token'] = newCsrf;
-          // Flush queued requests
-          csrfRetryQueue.forEach(cb => cb(newCsrf));
-          csrfRetryQueue = [];
-        } catch (refreshErr) {
-          csrfRetryQueue = [];
-          return Promise.reject(refreshErr);
-        } finally {
-          isRefreshingCsrf = false;
-        }
-      } else {
-        // Queue this request until CSRF is refreshed
-        await new Promise(resolve => csrfRetryQueue.push(resolve));
-      }
-
-      // Retry with new CSRF token
-      originalRequest.headers['x-csrf-token'] = localStorage.getItem('csrfToken');
-      return api(originalRequest);
-    }
-
-    return Promise.reject(error);
-  }
-);
+addRefreshInterceptors(api);
 
 
 export const uploadFile = async (file, onProgress) => {
@@ -459,28 +408,29 @@ const fileService = {
         }
         return { success: true, message: 'Download with design complete' };
       }
-      
-      
-      const token = localStorage.getItem('token');
-      
-      const timestamp = Date.now();
-      const downloadUrl = `${API_URL}/edit/download?format=${format}&token=${token}&t=${timestamp}`;
-      
-      
-      
-      let iframe = document.getElementById('download-iframe');
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'download-iframe';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
+
+      // Use axios for download so JWT/CSRF refresh interceptor can retry on 403
+      const response = await api.get(`${API_URL}/edit/download?format=${format}`, {
+        responseType: 'blob',
+        timeout: 60000,
+      });
+
+      const contentType = response.headers['content-type'];
+      if (contentType && contentType.includes('application/json')) {
+        const text = await response.data.text();
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.message || 'Download failed');
       }
-      
-      
-      iframe.src = downloadUrl;
-      
-      
-      return { success: true, message: 'Download initiated' };
+
+      if (response.data && response.data.size > 0) {
+        const url = window.URL.createObjectURL(response.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `document.${format}`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+      return { success: true, message: 'Download complete' };
     } catch (error) {
       console.error('Download error:', error);
       
