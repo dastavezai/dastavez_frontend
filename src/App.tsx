@@ -4,7 +4,12 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { ChakraProvider } from "@chakra-ui/react";
+import { ChakraProvider, extendTheme } from "@chakra-ui/react";
+
+// Force light mode and disable system preference to prevent white-on-white text on macOS
+const appTheme = extendTheme({
+  config: { initialColorMode: 'light', useSystemColorMode: false },
+});
 import { useEffect, useState } from "react";
 import { useToast } from "./hooks/use-toast";
 import Index from "./pages/Index";
@@ -119,7 +124,7 @@ const FeedbackPopup = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ChakraProvider>
+    <ChakraProvider theme={appTheme}>
       <ThemeProvider defaultTheme="light" storageKey="dastavez-theme">
         <TooltipProvider>
           <Toaster />

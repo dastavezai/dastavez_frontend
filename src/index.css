@@ -3,53 +3,54 @@
 @tailwind utilities;
 
 @layer base {
+  /* Default to light theme (dark text) to prevent white-on-white text on macOS/Safari */
   :root {
-    --background: 220 20% 15%;
-    --foreground: 0 0% 98%;
+    --background: 0 0% 98%;
+    --foreground: 220 20% 15%;
 
-    --card: 223 25% 18%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 15%;
 
-    --popover: 223 25% 18%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 15%;
 
     --primary: 42 60% 58%;
     --primary-foreground: 220 20% 15%;
 
-    --secondary: 215 30% 25%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 215 25% 25%;
 
-    --muted: 223 25% 25%;
-    --muted-foreground: 0 0% 80%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 25% 40%;
 
-    --accent: 42 40% 40%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 215 25% 25%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 215 25% 27%;
-    --input: 215 25% 22%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
     --ring: 42 60% 58%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 223 30% 15%;
-    --sidebar-foreground: 0 0% 95%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 220 20% 15%;
     --sidebar-primary: 42 60% 58%;
     --sidebar-primary-foreground: 220 20% 15%;
-    --sidebar-accent: 215 28% 20%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 215 25% 20%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 220 20% 15%;
+    --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 42 60% 58%;
 
-    /* Dark theme judicial colors (default) */
-    --judicial-dark: 220 20% 10%;
-    --judicial-navy: 215 25% 15%;
-    --judicial-blue: 210 30% 25%;
+    /* Light theme judicial colors (default) */
+    --judicial-dark: 220 15% 25%;
+    --judicial-navy: 215 20% 35%;
+    --judicial-blue: 210 25% 50%;
     --judicial-gold: 42 60% 58%;
-    --judicial-lightGold: 45 65% 75%;
-    --judicial-accent: 42 50% 45%;
+    --judicial-lightGold: 45 65% 85%;
+    --judicial-accent: 42 50% 55%;
   }
 
   .light {
@@ -97,6 +98,44 @@
     --judicial-gold: 42 60% 58%;
     --judicial-lightGold: 45 65% 85%;
     --judicial-accent: 42 50% 55%;
+  }
+
+  .dark {
+    --background: 220 20% 15%;
+    --foreground: 0 0% 98%;
+
+    --card: 223 25% 18%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 223 25% 18%;
+    --popover-foreground: 0 0% 98%;
+
+    --secondary: 215 30% 25%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 223 25% 25%;
+    --muted-foreground: 0 0% 80%;
+
+    --accent: 42 40% 40%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 215 25% 27%;
+    --input: 215 25% 22%;
+
+    --sidebar-background: 223 30% 15%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-accent: 215 28% 20%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 215 25% 20%;
+
+    --judicial-dark: 220 20% 10%;
+    --judicial-navy: 215 25% 15%;
+    --judicial-blue: 210 30% 25%;
+    --judicial-lightGold: 45 65% 75%;
+    --judicial-accent: 42 50% 45%;
   }
 }
 

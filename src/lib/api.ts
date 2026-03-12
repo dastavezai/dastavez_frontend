@@ -73,19 +73,43 @@ export interface AdminCoupon {
   updatedAt?: string;
 }
 
-// Helper function for authenticated API requests
-export async function apiFetch(url: string, options: RequestInit = {}) {
+// Helper function for authenticated API requests (with CSRF retry on 403)
+export async function apiFetch(url: string, options: RequestInit = {}, retried = false): Promise<any> {
   const token = localStorage.getItem('jwt');
-  const headers = {
-    ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const csrfToken = localStorage.getItem('csrfToken');
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> || {}),
     'Content-Type': 'application/json',
   };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (csrfToken) headers['x-csrf-token'] = csrfToken;
 
   const response = await fetch(`${API_BASE_URL}${url}`, {
     ...options,
     headers
   });
+
+  // On 403 CSRF error, refresh token and retry once
+  if (response.status === 403 && !retried && token) {
+    const errorData = await response.json().catch(() => ({}));
+    const isCsrfError =
+      errorData?.message === 'Invalid CSRF token' || errorData?.error === 'Invalid CSRF token';
+    if (isCsrfError) {
+      try {
+        const refreshResp = await fetch(`${API_BASE_URL}/auth/refresh-csrf`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const refreshData = await refreshResp.json();
+        if (refreshData?.csrfToken) {
+          localStorage.setItem('csrfToken', refreshData.csrfToken);
+          return apiFetch(url, options, true);
+        }
+      } catch {
+        // fall through to throw original error
+      }
+    }
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -115,6 +139,12 @@ export const authAPI = {
     if (response.token) {
       localStorage.setItem('jwt', response.token);
     }
+    if (response.csrfToken) {
+      localStorage.setItem('csrfToken', response.csrfToken);
+    }
+    if (response.refreshToken) {
+      localStorage.setItem('refreshToken', response.refreshToken);
+    }
 
     return response;
   },
@@ -135,6 +165,12 @@ export const authAPI = {
 
     if (response.token) {
       localStorage.setItem('jwt', response.token);
+    }
+    if (response.csrfToken) {
+      localStorage.setItem('csrfToken', response.csrfToken);
+    }
+    if (response.refreshToken) {
+      localStorage.setItem('refreshToken', response.refreshToken);
     }
 
     return response;
@@ -174,15 +210,29 @@ export const authAPI = {
 
   // Google OAuth login/signup
   googleAuth: async (idToken: string) => {
-    return apiFetch('/auth/google', {
+    const response = await apiFetch('/auth/google', {
       method: 'POST',
       body: JSON.stringify({ idToken })
     });
+
+    if (response.token) {
+      localStorage.setItem('jwt', response.token);
+    }
+    if (response.csrfToken) {
+      localStorage.setItem('csrfToken', response.csrfToken);
+    }
+    if (response.refreshToken) {
+      localStorage.setItem('refreshToken', response.refreshToken);
+    }
+
+    return response;
   },
 
   // Logout
   logout: () => {
     localStorage.removeItem('jwt');
+    localStorage.removeItem('csrfToken');
+    localStorage.removeItem('refreshToken');
   }
 };
 
@@ -217,11 +267,15 @@ export const fileAPI = {
     formData.append('file', file);
 
     const token = localStorage.getItem('jwt');
+    const csrfToken = localStorage.getItem('csrfToken');
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`
+    };
+    if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
     const response = await fetch(`${API_BASE_URL}/files/upload`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
+      headers,
       body: formData
     });
 
@@ -335,11 +389,15 @@ export const profileAPI = {
     formData.append('image', image);
 
     const token = localStorage.getItem('jwt');
+    const csrfToken = localStorage.getItem('csrfToken');
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`
+    };
+    if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
     const response = await fetch(`${API_BASE_URL}/profile/profile-image`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
+      headers,
       body: formData
     });
 
