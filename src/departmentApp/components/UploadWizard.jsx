@@ -948,7 +948,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
             )}
 
             <Text fontSize="xs" color={textMuted} textAlign="center" maxW="400px">
-              Powered by Gemini 1.5 Flash &amp; Llama 3.1. Checking compliance, clauses, precedences, and timeline.
+              Powered by Dastavezai LLM.  Checking compliance, clauses, precedences, and timeline.
             </Text>
           </VStack>
         </MotionBox>
