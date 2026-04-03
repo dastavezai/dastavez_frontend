@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -25,6 +25,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
   const { login: authLogin, signup: authSignup, user, setSession } = useAuth();
@@ -53,14 +54,19 @@ const Login = () => {
 
   
   useEffect(() => {
-    if (user) {
-      if (user.isAdmin) {
-        navigate('/department/admin/dashboard');
-      } else {
-        navigate('/department');
-      }
+    if (!user) return;
+    const state = location?.state || {};
+    const from = state?.from;
+    const openWizard = Boolean(state?.openWizard);
+
+    if (from) {
+      navigate(from, { state: { ...state, openWizard }, replace: true });
+      return;
     }
-  }, [user, navigate]);
+
+    if (user.isAdmin) navigate('/department/admin/dashboard', { state: { ...state, openWizard }, replace: true });
+    else navigate('/department', { state: { ...state, openWizard }, replace: true });
+  }, [user, navigate, location?.state]);
 
   const handleEmailCheck = async () => {
     try {
@@ -113,10 +119,14 @@ const Login = () => {
         });
         
         
+        const state = location?.state || {};
+        const from = state?.from;
+        const openWizard = Boolean(state?.openWizard);
+
         if (result.isAdmin) {
-          navigate('/department/admin/dashboard');
+          navigate(from || '/department/admin/dashboard', { state: { ...state, openWizard }, replace: true });
         } else {
-          navigate('/department');
+          navigate(from || '/department', { state: { ...state, openWizard }, replace: true });
         }
       } else {
         toast({
@@ -156,10 +166,14 @@ const Login = () => {
         duration: 3000,
         isClosable: true,
       });
+      const state = location?.state || {};
+      const from = state?.from;
+      const openWizard = Boolean(state?.openWizard);
+
       if (user?.isAdmin) {
-        navigate('/department/admin/dashboard');
+        navigate(from || '/department/admin/dashboard', { state: { ...state, openWizard }, replace: true });
       } else {
-        navigate('/department');
+        navigate(from || '/department', { state: { ...state, openWizard }, replace: true });
       }
     } catch (error) {
       toast({

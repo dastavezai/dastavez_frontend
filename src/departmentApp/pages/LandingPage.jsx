@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, VStack, HStack, Heading, Text, Button, Icon, Flex,
   SimpleGrid, Badge, Avatar,
   Menu, MenuButton, MenuList, MenuItem, MenuDivider,
   Container, Tooltip, Divider,
 } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FaBalanceScale, FaShieldAlt, FaBrain,
   FaArrowRight,
@@ -106,6 +106,7 @@ const LandingPage = () => {
   const { user, logout } = useAuth();
   const { activeTheme, chakraTheme } = useAppTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [wizardOpen, setWizardOpen] = useState(false);
 
   
@@ -123,6 +124,10 @@ const LandingPage = () => {
     '#a67c1d';
 
   const handleOpenEditor = (params) => navigate('/department/editor', { state: params });
+
+  useEffect(() => {
+    if (location?.state?.openWizard) setWizardOpen(true);
+  }, [location?.state?.openWizard]);
 
   return (
     <Box minH="100vh" bg={bg} color={textColor}>
@@ -217,7 +222,7 @@ const LandingPage = () => {
               ) : (
                 <Button size="lg" bg={accentColor} color={isDark ? '#0d1b2a' : '#ffffff'}
                   fontWeight="800" rightIcon={<Icon as={FaArrowRight} />}
-                  onClick={() => navigate('/department/login')} px={8} py={6} borderRadius="xl"
+                  onClick={() => navigate('/department/login', { state: { from: '/department', openWizard: true } })} px={8} py={6} borderRadius="xl"
                   _hover={{ opacity: 0.88, transform: 'translateY(-2px)' }} transition="all 0.2s">
                   Sign In to Get Started
                 </Button>
