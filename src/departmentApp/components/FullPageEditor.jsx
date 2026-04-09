@@ -83,6 +83,67 @@ import DocumentConverter from './editor/DocumentConverter.jsx';
 import { useAppTheme } from '../context/ThemeContext';
 import DemoLauncher from './DemoMode/DemoLauncher';
 import './FullPageEditor.css';
+import * as pdfjsLib from 'pdfjs-dist';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
+
+const resolvePdfUrl = (rawUrl) => {
+  const u = String(rawUrl || '').trim();
+  if (!u) return '';
+  if (/^https?:\/\//i.test(u)) return u;
+  const base = import.meta.env.VITE_API_URL || window.location.origin;
+  return `${String(base).replace(/\/+$/, '')}/${u.replace(/^\/+/, '')}`;
+};
+
+const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx }) => {
+  const canvasRef = useRef(null);
+  const [renderErr, setRenderErr] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        setRenderErr('');
+        if (!pdfUrl) return;
+        const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(pageNumber);
+        const viewport1 = page.getViewport({ scale: 1 });
+        const scale = targetWidthPx && viewport1?.width
+          ? (Number(targetWidthPx) / Number(viewport1.width))
+          : 1;
+        const viewport = page.getViewport({ scale });
+        const canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        const context = canvas.getContext('2d', { alpha: false });
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        const renderTask = page.render({ canvasContext: context, viewport });
+        await renderTask.promise;
+      } catch (e) {
+        if (!cancelled) setRenderErr(e?.message || 'PDF render failed');
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [pdfUrl, pageNumber, targetWidthPx]);
+
+  return (
+    <Box position="absolute" inset={0}>
+      <canvas ref={canvasRef} style={{ display: 'block' }} />
+      {renderErr ? (
+        <Box position="absolute" inset={0} bg="red.50" border="1px solid" borderColor="red.200" p={2}>
+          <Text fontSize="xs" color="red.600">PDF render error: {renderErr}</Text>
+        </Box>
+      ) : null}
+    </Box>
+  );
+};
 
 
 const FullPageEditor = ({
@@ -446,6 +507,9 @@ const FullPageEditor = ({
   ), [session?.layoutModel, scanData?.layoutModel]);
 
   const hasFidelityLayout = !!(fidelityLayout && Array.isArray(fidelityLayout.pages) && fidelityLayout.pages.length > 0);
+  const pdfCanvasUrl = useMemo(() => (
+    resolvePdfUrl(selectedFile?.fileUrl || selectedFile?.url || session?.fileUrl || '')
+  ), [selectedFile?.fileUrl, selectedFile?.url, session?.fileUrl]);
 
   const getFidelityBlockKey = useCallback((pageNumber, blockIdx, block = null) => {
     if (block?.id) return String(block.id);
@@ -1895,6 +1959,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       <Box key={`fpage-${pageNumber}`} border="1px solid" borderColor={borderColor} borderRadius="md" bg="white" p={3}>
                         <Text fontSize="xs" color="gray.500" mb={2}>Page {pageNumber}</Text>
                         <Box position="relative" w={`${pageWidth}px`} maxW="100%" h={`${pageHeight}px`} overflow="hidden" bg="gray.50">
+                          <PdfPageCanvas pdfUrl={pdfCanvasUrl} pageNumber={pageNumber} targetWidthPx={pageWidth} />
                           {blocks.map((block, bIdx) => {
                             const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
                             const [x1, y1, x2, y2] = bbox;
