@@ -2841,7 +2841,47 @@ const ChatPage = () => {
         governmentCompliance: result.governmentCompliance || null,
         smartSuggestions: result.smartSuggestions || [],
         scanResults: result.scanResults || null,
+        // Needed for Canva-like Fidelity mode (PDF canvas + block overlays)
+        layoutModel: result.layoutModel || null,
+        layoutDiagnostics: result.layoutDiagnostics || null,
       });
+
+      try {
+        const layoutPages = Array.isArray(result?.layoutModel?.pages)
+          ? result.layoutModel.pages.length
+          : 0;
+        const hasLayoutModel = !!(result?.layoutModel && layoutPages > 0);
+        const diagnostics = result?.layoutDiagnostics || null;
+        const exportMode = result?.exportMode || result?.mode || null;
+        const textLength =
+          typeof result?.textLength === 'number'
+            ? result.textLength
+            : result?.ocrText
+              ? result.ocrText.length
+              : null;
+
+        // Alignment/fidelity QA logging — no behavior change
+        console.log('[SMARTSCAN-FIDELITY-QA]', {
+          event: 'smart-scan-success',
+          fileId: selectedFile?._id || null,
+          fileName: selectedFile?.fileName || selectedFile?.originalName || null,
+          hasLayoutModel,
+          layoutPages,
+          layoutDiagnosticsSummary: diagnostics
+            ? {
+                hasWarnings: Array.isArray(diagnostics.warnings) && diagnostics.warnings.length > 0,
+                hasErrors: Array.isArray(diagnostics.errors) && diagnostics.errors.length > 0,
+              }
+            : null,
+          exportMode,
+          ocrConfidence: result?.ocrConfidence ?? null,
+          textLength,
+          detectedDocType: result?.detectedDocType || null,
+          scanResultsDocType: result?.scanResults?.documentType || null,
+        });
+      } catch (logErr) {
+        console.warn('[SMARTSCAN-FIDELITY-QA] log-error', logErr);
+      }
 
 
       if (result.ocrConfidence !== undefined && result.ocrConfidence !== null) {

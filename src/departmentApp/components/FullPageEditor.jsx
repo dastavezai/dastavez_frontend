@@ -106,8 +106,19 @@ const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx }) => {
     let cancelled = false;
     const run = async () => {
       try {
+        console.log('[PDF-CANVAS]', 'render-start', {
+          pdfUrl,
+          pageNumber,
+          targetWidthPx,
+        });
         setRenderErr('');
-        if (!pdfUrl) return;
+        if (!pdfUrl) {
+          console.log('[PDF-CANVAS]', 'render-skip-no-url', {
+            pageNumber,
+            targetWidthPx,
+          });
+          return;
+        }
         const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(pageNumber);
@@ -125,7 +136,21 @@ const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx }) => {
         canvas.style.height = `${Math.floor(viewport.height)}px`;
         const renderTask = page.render({ canvasContext: context, viewport });
         await renderTask.promise;
+        if (!cancelled) {
+          console.log('[PDF-CANVAS]', 'render-success', {
+            pdfUrl,
+            pageNumber,
+            width: Math.floor(viewport.width),
+            height: Math.floor(viewport.height),
+            scale,
+          });
+        }
       } catch (e) {
+        console.error('[PDF-CANVAS]', 'render-error', {
+          message: e?.message || String(e),
+          pdfUrl,
+          pageNumber,
+        });
         if (!cancelled) setRenderErr(e?.message || 'PDF render failed');
       }
     };
@@ -510,6 +535,68 @@ const FullPageEditor = ({
   const pdfCanvasUrl = useMemo(() => (
     resolvePdfUrl(selectedFile?.fileUrl || selectedFile?.url || session?.fileUrl || '')
   ), [selectedFile?.fileUrl, selectedFile?.url, session?.fileUrl]);
+
+  try {
+    const layoutPages = Array.isArray(fidelityLayout?.pages)
+      ? fidelityLayout.pages.length
+      : 0;
+    console.log('[EDITOR-FIDELITY-QA]', 'fidelity-layout-compute', {
+      editorViewMode,
+      hasFidelityLayout,
+      layoutPages,
+      layoutModelSource: session?.layoutModel
+        ? 'session'
+        : scanData?.layoutModel
+          ? 'scanData'
+          : 'none',
+      pdfCanvasUrl,
+      selectedFileMeta: selectedFile
+        ? {
+            id: selectedFile._id || null,
+            fileName: selectedFile.fileName || selectedFile.originalName || null,
+            hasFileUrl: !!selectedFile.fileUrl,
+            hasUrl: !!selectedFile.url,
+          }
+        : null,
+      sessionId: session?._id || session?.sessionId || null,
+    });
+  } catch (logErr) {
+    console.warn('[EDITOR-FIDELITY-QA] fidelity-log-error', logErr);
+  }
+
+  useEffect(() => {
+    try {
+      const layoutPages = Array.isArray(fidelityLayout?.pages)
+        ? fidelityLayout.pages.length
+        : 0;
+      console.log('[EDITOR-FIDELITY-QA]', 'editor-mount-or-props-change', {
+        editorViewMode,
+        hasFidelityLayout,
+        layoutPages,
+        pdfCanvasUrl,
+        sessionSummary: session
+          ? {
+              id: session._id || session.sessionId || null,
+              hasLayoutModel: !!session.layoutModel,
+              hasFidelityEdits: !!session.fidelityEdits,
+            }
+          : null,
+        selectedFileSummary: selectedFile
+          ? {
+              id: selectedFile._id || null,
+              fileName: selectedFile.fileName || selectedFile.originalName || null,
+              hasFileUrl: !!selectedFile.fileUrl,
+              hasUrl: !!selectedFile.url,
+            }
+          : null,
+        hasScanData: !!scanData,
+        scanDetectedDocType: scanData?.detectedDocType || null,
+        scanResultsDocType: scanData?.scanResults?.documentType || null,
+      });
+    } catch (logErr) {
+      console.warn('[EDITOR-FIDELITY-QA] mount-log-error', logErr);
+    }
+  }, [editorViewMode, fidelityLayout, hasFidelityLayout, pdfCanvasUrl, session, selectedFile, scanData]);
 
   const getFidelityBlockKey = useCallback((pageNumber, blockIdx, block = null) => {
     if (block?.id) return String(block.id);

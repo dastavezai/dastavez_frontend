@@ -67,6 +67,35 @@ const EditorPage = () => {
     ? { _id: sessionId, sessionId, fileName, htmlContent }
     : null;
 
+  try {
+    const hasScanData = !!scanData;
+    const layoutPages = Array.isArray(scanData?.layoutModel?.pages)
+      ? scanData.layoutModel.pages.length
+      : 0;
+    const hasLayoutModel = !!(scanData?.layoutModel && layoutPages > 0);
+    const scanResultsDocType =
+      scanData?.scanResults?.documentType || scanData?.detectedDocType || null;
+
+    // Fidelity/prop QA logging — no behavior change
+    console.log('[EDITOR-PROPS-FIDELITY]', {
+      event: 'editor-page-props',
+      fileId,
+      sessionId,
+      fileName: fileName || selectedFileObj.fileName,
+      isBlank,
+      isTemplate: !!selectedFileObj.isTemplate,
+      hasScanData,
+      hasLayoutModel,
+      layoutPages,
+      scanResultsDocType,
+      hasHtmlContent: !!htmlContent,
+      hasTemplateHtml:
+        !!(templateData?.htmlContent || templateData?.content),
+    });
+  } catch (logErr) {
+    console.warn('[EDITOR-PROPS-FIDELITY] log-error', logErr);
+  }
+
   return (
     <FullPageEditor
       isOpen={true}
