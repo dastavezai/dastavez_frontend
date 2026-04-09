@@ -78,6 +78,7 @@ import AIHelperPanel from './AIHelperPanel';
 import AnalysisDashboard from './analysis/AnalysisDashboard';
 import PageBreakExtension, { useAutoPageBreak } from './editor/PageBreakExtension.jsx';
 import FontSize from './editor/FontSizeExtension.jsx';
+import LegalParagraphStyle from './editor/LegalParagraphStyleExtension.jsx';
 import DocumentConverter from './editor/DocumentConverter.jsx';
 import { useAppTheme } from '../context/ThemeContext';
 import DemoLauncher from './DemoMode/DemoLauncher';
@@ -150,6 +151,10 @@ const FullPageEditor = ({
   const [selectedText, setSelectedText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  const [editorViewMode, setEditorViewMode] = useState('editable');
+  const [fidelityEdits, setFidelityEdits] = useState({});
+  const [selectedFidelityBlock, setSelectedFidelityBlock] = useState(null);
+  const fidelityAutosaveTimerRef = useRef(null);
 
   const toast = useToast();
   const { colorMode, toggleColorMode } = useColorMode();
@@ -240,7 +245,9 @@ const FullPageEditor = ({
       Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
+        alignments: ['left', 'center', 'right', 'justify'],
       }),
+      LegalParagraphStyle,
       FontFamily,
       FontSize,
       TextStyle.configure({
@@ -410,8 +417,14 @@ const FullPageEditor = ({
       setIsSaving(true);
       const html = ed.getHTML();
       const plainText = ed.getText();
-
-      await fileService.saveHtmlContent(html, plainText, selectedFile?._id);
+      if (editorViewMode === 'fidelity') {
+        await fileService.saveHtmlContent('', '', selectedFile?._id, {
+          mode: 'fidelity',
+          fidelityEdits,
+        });
+      } else {
+        await fileService.saveHtmlContent(html, plainText, selectedFile?._id, { mode: 'editable' });
+      }
       setHasUnsavedChanges(false);
       setLastSaved(new Date());
     } catch (err) {
@@ -427,6 +440,47 @@ const FullPageEditor = ({
     await handleAutosave(editor);
     toast({ title: 'Document saved', status: 'success', duration: 1500 });
   };
+
+  const fidelityLayout = useMemo(() => (
+    session?.layoutModel || scanData?.layoutModel || null
+  ), [session?.layoutModel, scanData?.layoutModel]);
+
+  const hasFidelityLayout = !!(fidelityLayout && Array.isArray(fidelityLayout.pages) && fidelityLayout.pages.length > 0);
+
+  const getFidelityBlockKey = useCallback((pageNumber, blockIdx, block = null) => {
+    if (block?.id) return String(block.id);
+    return `${pageNumber}:${blockIdx}`;
+  }, []);
+
+  const getFidelityText = useCallback((pageNumber, blockIdx, fallbackText, block = null) => {
+    const key = getFidelityBlockKey(pageNumber, blockIdx, block);
+    return Object.prototype.hasOwnProperty.call(fidelityEdits, key) ? fidelityEdits[key] : fallbackText;
+  }, [fidelityEdits, getFidelityBlockKey]);
+
+  useEffect(() => {
+    if (session?.fidelityEdits && typeof session.fidelityEdits === 'object') {
+      setFidelityEdits(session.fidelityEdits);
+    }
+  }, [session?.fidelityEdits]);
+
+  useEffect(() => {
+    if (editorViewMode !== 'fidelity') return undefined;
+    if (fidelityAutosaveTimerRef.current) clearTimeout(fidelityAutosaveTimerRef.current);
+    fidelityAutosaveTimerRef.current = setTimeout(async () => {
+      try {
+        await fileService.saveHtmlContent('', '', selectedFile?._id, {
+          mode: 'fidelity',
+          fidelityEdits,
+        });
+        setLastSaved(new Date());
+      } catch (err) {
+        console.warn('Fidelity autosave failed:', err.message);
+      }
+    }, 1800);
+    return () => {
+      if (fidelityAutosaveTimerRef.current) clearTimeout(fidelityAutosaveTimerRef.current);
+    };
+  }, [editorViewMode, fidelityEdits, selectedFile?._id]);
 
 
   const handleAIEdit = async () => {
@@ -502,7 +556,7 @@ const FullPageEditor = ({
         paragraphSpacing: formatMetadata.paragraphSpacing || undefined,
       } : undefined);
 
-      const blob = await fileService.downloadEdited(format, finalDesignConfig, selectedFile?._id);
+      const blob = await fileService.downloadEdited(format, finalDesignConfig, selectedFile?._id, editorViewMode);
       if (blob && blob.size > 0) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1451,6 +1505,25 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               </Tooltip>
 
               <Divider orientation="vertical" h="20px" />
+              <HStack spacing={1}>
+                <Button
+                  size="xs"
+                  variant={editorViewMode === 'fidelity' ? 'solid' : 'outline'}
+                  colorScheme={editorViewMode === 'fidelity' ? 'purple' : 'gray'}
+                  onClick={() => setEditorViewMode('fidelity')}
+                  isDisabled={!hasFidelityLayout}
+                >
+                  Fidelity
+                </Button>
+                <Button
+                  size="xs"
+                  variant={editorViewMode === 'editable' ? 'solid' : 'outline'}
+                  colorScheme={editorViewMode === 'editable' ? 'blue' : 'gray'}
+                  onClick={() => setEditorViewMode('editable')}
+                >
+                  Editable
+                </Button>
+              </HStack>
 
               <Tooltip label="Search" fontSize="xs">
                 <IconButton
@@ -1811,7 +1884,69 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 },
               }}
             >
-              <EditorContent editor={editor} />
+              {editorViewMode === 'fidelity' && hasFidelityLayout ? (
+                <VStack align="stretch" spacing={6} p={4}>
+                  {fidelityLayout.pages.map((page) => {
+                    const pageNumber = Number(page?.pageNumber || 1);
+                    const pageWidth = Number(page?.width || 794);
+                    const pageHeight = Number(page?.height || 1123);
+                    const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+                    return (
+                      <Box key={`fpage-${pageNumber}`} border="1px solid" borderColor={borderColor} borderRadius="md" bg="white" p={3}>
+                        <Text fontSize="xs" color="gray.500" mb={2}>Page {pageNumber}</Text>
+                        <Box position="relative" w={`${pageWidth}px`} maxW="100%" h={`${pageHeight}px`} overflow="hidden" bg="gray.50">
+                          {blocks.map((block, bIdx) => {
+                            const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
+                            const [x1, y1, x2, y2] = bbox;
+                            const blockKey = getFidelityBlockKey(pageNumber, bIdx, block);
+                            const text = getFidelityText(pageNumber, bIdx, block?.text || '', block);
+                            const width = Math.max(30, x2 - x1);
+                            const height = Math.max(18, y2 - y1);
+                            return (
+                              <Box
+                                key={blockKey}
+                                position="absolute"
+                                left={`${x1}px`}
+                                top={`${y1}px`}
+                                w={`${width}px`}
+                                minH={`${height}px`}
+                                px={1}
+                                py={0.5}
+                                border="1px dashed"
+                                borderColor={selectedFidelityBlock?.id === blockKey ? 'purple.500' : 'transparent'}
+                                bg={selectedFidelityBlock?.id === blockKey ? 'purple.50' : 'transparent'}
+                                fontSize={`${Math.max(9, Number(block?.style?.fontSize || 11))}px`}
+                                textAlign={block?.style?.align || 'left'}
+                                whiteSpace="pre-wrap"
+                                onClick={() => setSelectedFidelityBlock({
+                                  id: blockKey,
+                                  page: pageNumber,
+                                  bbox,
+                                  role: block?.role || 'body',
+                                  confidence: block?.confidence ?? null,
+                                  type: block?.type || 'line',
+                                })}
+                              >
+                                <Input
+                                  variant="unstyled"
+                                  value={text}
+                                  onChange={(e) => {
+                                    const next = e.target.value;
+                                    setFidelityEdits((prev) => ({ ...prev, [blockKey]: next }));
+                                    setHasUnsavedChanges(true);
+                                  }}
+                                />
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </VStack>
+              ) : (
+                <EditorContent editor={editor} />
+              )}
             </Box>
           </Box>
 
@@ -1965,6 +2100,11 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               )}
               {formatMetadata?.defaultFont && (
                 <Text>{formatMetadata.defaultFont} {formatMetadata.defaultFontSize}pt</Text>
+              )}
+              {editorViewMode === 'fidelity' && selectedFidelityBlock && (
+                <Text color="purple.600">
+                  Block Inspector: {selectedFidelityBlock.id} | p{selectedFidelityBlock.page} | role {selectedFidelityBlock.role}
+                </Text>
               )}
             </HStack>
             <HStack spacing={4}>

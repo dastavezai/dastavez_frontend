@@ -237,10 +237,12 @@ const fileService = {
   },
 
   
-  saveHtmlContent: async (htmlContent, plainText, fileId = null) => {
+  saveHtmlContent: async (htmlContent, plainText, fileId = null, options = {}) => {
     try {
       const body = { htmlContent, plainText };
       if (fileId) body.fileId = fileId;
+      if (options.mode) body.mode = options.mode;
+      if (options.fidelityEdits) body.fidelityEdits = options.fidelityEdits;
       const response = await api.post(`${API_URL}/edit/save-html`, body);
       return response.data;
     } catch (error) {
@@ -311,19 +313,19 @@ const fileService = {
   },
   
   
-  downloadEdited: async (format = 'docx', designConfig = null, fileId = null) => {
+  downloadEdited: async (format = 'docx', designConfig = null, fileId = null, exportMode = 'fidelity') => {
     try {
       
       let response;
       if (designConfig && (format === 'docx' || format === 'pdf')) {
-        const body = { format, designConfig };
+        const body = { format, designConfig, exportMode };
         if (fileId) body.fileId = fileId;
         response = await api.post(`${API_URL}/edit/download`, 
           body,
           { responseType: 'blob', timeout: 60000 }
         );
       } else {
-        const params = `format=${format}${fileId ? `&fileId=${encodeURIComponent(fileId)}` : ''}`;
+        const params = `format=${format}${fileId ? `&fileId=${encodeURIComponent(fileId)}` : ''}&exportMode=${encodeURIComponent(exportMode || 'fidelity')}`;
         response = await api.get(`${API_URL}/edit/download?${params}`, {
           responseType: 'blob',
           timeout: 60000,

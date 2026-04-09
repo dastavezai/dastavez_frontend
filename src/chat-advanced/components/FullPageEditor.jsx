@@ -62,6 +62,10 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
+import LegalParagraphStyle from '../../departmentApp/components/editor/LegalParagraphStyleExtension.jsx';
+import HardBreak from '@tiptap/extension-hard-break';
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
+import PageBreakExtension from '../../departmentApp/components/editor/PageBreakExtension.jsx';
 import fileService from '../services/fileService';
 import DesignSuggestionModal from './DesignSuggestionModal';
 import EditorToolbar from './EditorToolbar';
@@ -134,7 +138,9 @@ const FullPageEditor = ({
       Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
+        alignments: ['left', 'center', 'right', 'justify'],
       }),
+      LegalParagraphStyle,
       FontFamily,
       TextStyle.configure({
         types: ['textStyle'],
@@ -145,9 +151,15 @@ const FullPageEditor = ({
       Highlight.configure({
         multicolor: true,
       }),
+      HardBreak,
       Placeholder.configure({
         placeholder: 'Start typing your document...',
       }),
+      PageBreakExtension,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: getInitialContent(),
     onUpdate: ({ editor: ed }) => {

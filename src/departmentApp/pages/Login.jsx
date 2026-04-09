@@ -45,12 +45,89 @@ const Login = () => {
   const [resetOtp, setResetOtp] = useState('');
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [googleReady, setGoogleReady] = useState(false);
 
   
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const textColor = useColorModeValue('gray.600', 'gray.300');
   const headingColor = useColorModeValue('gray.800', 'white');
+
+  useEffect(() => {
+    if (window.google?.accounts?.id) {
+      setGoogleReady(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setGoogleReady(true);
+    document.body.appendChild(script);
+    return () => {
+      try { document.body.removeChild(script); } catch (_) { }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!googleReady) return;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId || !window.google?.accounts?.id) return;
+
+    const handleGoogleCredential = async (resp) => {
+      try {
+        const response = await axios.post('/api/auth/google', { idToken: resp.credential });
+        const { token, refreshToken, csrfToken, user } = response.data || {};
+        if (!token || !user) throw new Error('Google login failed');
+        setSession({ token, refreshToken, csrfToken, user });
+        toast({
+          title: 'Success',
+          description: 'Logged in with Google',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        });
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error.response?.data?.message || 'Google login failed',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    };
+
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleGoogleCredential,
+    });
+
+    const mountButton = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      while (el.firstChild) el.removeChild(el.firstChild);
+      const parentWidth = el.parentElement?.clientWidth || el.clientWidth || 320;
+      const width = Math.min(400, Math.max(220, parentWidth));
+      window.google.accounts.id.renderButton(el, {
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'rectangular',
+        width,
+      });
+    };
+
+    mountButton('google-btn-step1');
+    mountButton('google-btn-step2');
+
+    const onResize = () => {
+      mountButton('google-btn-step1');
+      mountButton('google-btn-step2');
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [googleReady, setSession, toast]);
 
   
   useEffect(() => {
@@ -296,7 +373,7 @@ const Login = () => {
             {step === 1 && (
               <VStack spacing={8} align="stretch">
                 <Text textAlign="center" color={textColor} fontSize="lg">
-                  Enter your email to continue
+                  Enter your email and password to sign in
                 </Text>
                 <FormControl>
                   <FormLabel color={textColor} mb={2}>Email</FormLabel>
@@ -313,10 +390,28 @@ const Login = () => {
                     }}
                   />
                 </FormControl>
+                <FormControl>
+                  <FormLabel color={textColor} mb={2}>Password</FormLabel>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    size="lg"
+                    borderRadius="md"
+                    _focus={{
+                      borderColor: 'blue.400',
+                      boxShadow: 'outline',
+                    }}
+                  />
+                </FormControl>
                 <Button
                   colorScheme="blue"
                   size="lg"
-                  onClick={handleEmailCheck}
+                  onClick={() => {
+                    if (email && password) handleLogin();
+                    else handleEmailCheck();
+                  }}
                   isLoading={loading}
                   w="full"
                   borderRadius="md"
@@ -326,8 +421,9 @@ const Login = () => {
                   }}
                   transition="all 0.2s"
                 >
-                  Continue
+                  {email && password ? 'Login' : 'Continue'}
                 </Button>
+                <Box id="google-btn-step1" w="100%" />
               </VStack>
             )}
 
@@ -400,6 +496,7 @@ const Login = () => {
                       >
                         Forgot Password?
                       </Button>
+                      <Box id="google-btn-step2" w="100%" />
                     </VStack>
                   </>
                 ) : (
