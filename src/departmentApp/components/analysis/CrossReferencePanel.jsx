@@ -27,6 +27,10 @@ const CrossReferencePanel = ({ compact = false, onApplySuggestion, currentFileId
   const mutedColor = useColorModeValue('gray.500', 'gray.400');
   const textColor = useColorModeValue('gray.800', 'gray.100');
   const headingColor = useColorModeValue('blue.700', 'blue.300');
+  const selectedFileBg = useColorModeValue('blue.50', 'blue.900');
+  const fileRowHoverBg = useColorModeValue('gray.50', 'gray.700');
+  const currentClauseBg = useColorModeValue('red.50', 'red.900');
+  const referenceClauseBg = useColorModeValue('blue.50', 'blue.900');
 
   
   useEffect(() => {
@@ -200,11 +204,11 @@ Provide 5-10 findings. Return ONLY JSON.`;
                   key={f._id}
                   spacing={2}
                   p={1.5}
-                  bg={selectedFiles.includes(f._id) ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
+                  bg={selectedFiles.includes(f._id) ? selectedFileBg : 'transparent'}
                   borderRadius="md"
                   cursor="pointer"
                   onClick={() => toggleFile(f._id)}
-                  _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                  _hover={{ bg: fileRowHoverBg }}
                 >
                   <Checkbox
                     size="sm"
@@ -319,7 +323,7 @@ Provide 5-10 findings. Return ONLY JSON.`;
                       {finding.currentDocClause && (
                         <Box mt={1}>
                           <Text fontSize="2xs" fontWeight="bold" color={mutedColor}>In this document:</Text>
-                          <Text fontSize="2xs" color={textColor} bg={useColorModeValue('red.50', 'red.900')} p={1} borderRadius="sm">
+                          <Text fontSize="2xs" color={textColor} bg={currentClauseBg} p={1} borderRadius="sm">
                             {finding.currentDocClause}
                           </Text>
                         </Box>
@@ -329,7 +333,7 @@ Provide 5-10 findings. Return ONLY JSON.`;
                           <Text fontSize="2xs" fontWeight="bold" color={mutedColor}>
                             In {finding.referenceDoc || 'referenced doc'}:
                           </Text>
-                          <Text fontSize="2xs" color={textColor} bg={useColorModeValue('blue.50', 'blue.900')} p={1} borderRadius="sm">
+                          <Text fontSize="2xs" color={textColor} bg={referenceClauseBg} p={1} borderRadius="sm">
                             {finding.referenceClause}
                           </Text>
                         </Box>

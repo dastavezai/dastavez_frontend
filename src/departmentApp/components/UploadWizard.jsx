@@ -139,6 +139,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
   const [selectedFile, setSelectedFile]   = useState(null);
   const [uploadPct, setUploadPct]         = useState(0);
   const [uploadedFileId, setUploadedFileId] = useState(null);
+  const [uploadedFileMeta, setUploadedFileMeta] = useState(null);
   const [scanStage, setScanStage]         = useState(0);
   const [scanError, setScanError]         = useState(null);
   const [scanData, setScanData]           = useState(null);
@@ -251,6 +252,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       const fid = uploadResult?.file?._id || uploadResult?._id;
       if (!fid) throw new Error('Upload did not return a file ID');
       setUploadedFileId(fid);
+      setUploadedFileMeta(uploadResult?.file || null);
 
       
       setScanStage(2);
@@ -347,6 +349,10 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       extractedDocumentFields: session?.extractedDocumentFields || data?.extractedDocumentFields || null,
       isCompleteDocument: session?.isCompleteDocument || data?.isCompleteDocument || false,
       aiSuggestedPrecedents: session?.aiSuggestedPrecedents || data?.aiSuggestedPrecedents || [],
+      layoutModel: session?.layoutModel || data?.layoutModel || null,
+      layoutDiagnostics: session?.layoutDiagnostics || data?.layoutDiagnostics || null,
+      exportMode: session?.exportMode || data?.exportMode || 'fidelity',
+      fidelityEdits: session?.fidelityEdits || data?.fidelityEdits || null,
     };
     setScanData(merged);
     setEditedSof(merged?.scanResults?.summary ?? '');
@@ -436,10 +442,11 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
       scanData: scanDataWithSof,
       htmlContent: overrideHtml || htmlContent,
       fileName,
+      fileUrl: uploadedFileMeta?.fileUrl || uploadedFileMeta?.url || null,
       isBlank: false,
     });
     onClose();
-  }, [onOpenEditor, uploadedFileId, sessionId, scanData, editedSof, htmlContent, fileName, onClose]);
+  }, [onOpenEditor, uploadedFileId, sessionId, scanData, editedSof, htmlContent, fileName, uploadedFileMeta, onClose]);
 
   const handleOpenEditor = () => {
     if (showFieldChoice) {

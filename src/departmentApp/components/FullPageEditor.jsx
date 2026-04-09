@@ -13,6 +13,7 @@ import {
   Button,
   IconButton,
   Input,
+  Textarea,
   InputGroup,
   InputLeftElement,
   Badge,
@@ -59,8 +60,8 @@ import {
 } from 'react-icons/md';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
+import Underline from '@tiptap/extension-underline';
 import FontFamily from '@tiptap/extension-font-family';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
@@ -93,12 +94,294 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 const resolvePdfUrl = (rawUrl) => {
   const u = String(rawUrl || '').trim();
   if (!u) return '';
-  if (/^https?:\/\//i.test(u)) return u;
-  const base = import.meta.env.VITE_API_URL || window.location.origin;
-  return `${String(base).replace(/\/+$/, '')}/${u.replace(/^\/+/, '')}`;
+  const normalizeUploadsPath = (pathname = '') => {
+    const p = String(pathname || '');
+    // Backend serves local files on /uploads/:filename (not /uploads/files/:filename)
+    return p.replace(/^\/uploads\/files\//i, '/uploads/');
+  };
+  if (/^https?:\/\//i.test(u)) {
+    try {
+      const parsed = new URL(u);
+      const normalizedPath = normalizeUploadsPath(parsed.pathname);
+      const isUploadsPath = /^\/uploads\//i.test(normalizedPath);
+      const isFrontendDev = /:(5173|4173|3000)$/.test(window.location.origin);
+      if (isUploadsPath && isFrontendDev) {
+        const envBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiBase = String(envBase).replace(/\/+$/, '');
+        return `${apiBase}${normalizedPath}${parsed.search || ''}`;
+      }
+      if (normalizedPath !== parsed.pathname) {
+        return `${parsed.origin}${normalizedPath}${parsed.search || ''}`;
+      }
+    } catch (_) {
+      // Keep original URL on parse issues.
+    }
+    return u;
+  }
+  const envBase = import.meta.env.VITE_API_URL || '';
+  const isDevFrontend = /:\d+/.test(window.location.origin) && /:(5173|4173|3000)/.test(window.location.origin);
+  const fallbackApiBase = isDevFrontend ? 'http://localhost:5000' : window.location.origin;
+  const base = String(envBase || fallbackApiBase).replace(/\/+$/, '');
+  const normalized = normalizeUploadsPath(`/${u.replace(/^\/+/, '')}`);
+  return `${base}${normalized}`;
 };
 
-const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx }) => {
+const isSeparatorText = (text = '') => /^[-=_]{5,}$/.test(String(text || '').trim());
+
+const documentGraphToLayoutModel = (documentGraph) => {
+  if (!documentGraph || !Array.isArray(documentGraph.pages)) return null;
+  return {
+    provider: documentGraph.provider || 'graph',
+    pages: documentGraph.pages.map((page) => ({
+      pageNumber: Number(page?.pageNumber || 0),
+      width: Number(page?.width || 0),
+      height: Number(page?.height || 0),
+      blocks: (Array.isArray(page?.blocks) ? page.blocks : []).map((b) => ({
+        id: b?.id,
+        type: b?.type || 'line',
+        role: b?.role || 'body',
+        text: String(b?.text || ''),
+        bbox: Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0],
+        style: b?.style || {},
+        border: b?.border || null,
+        table: b?.table || null,
+        confidence: b?.confidence ?? null,
+        runs: Array.isArray(b?.runs) ? b.runs : [],
+      })),
+    })),
+  };
+};
+
+const escHtml = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const runStyleToCss = (style = {}) => {
+  const css = [];
+  if (style?.fontFamily) css.push(`font-family:${String(style.fontFamily).replace(/"/g, '')}`);
+  if (style?.fontSize) css.push(`font-size:${Math.max(8, Math.min(24, Number(style.fontSize)))}pt`);
+  if (style?.lineHeight) {
+    const lh = Number(style.lineHeight);
+    if (Number.isFinite(lh) && lh > 0) css.push(`line-height:${Math.max(1, Math.min(2.5, lh / Math.max(10, Number(style.fontSize || 12))))}`);
+  }
+  if (style?.color) css.push(`color:${String(style.color)}`);
+  return css.join(';');
+};
+const renderStyledRun = (run = {}, fallbackStyle = {}) => {
+  const text = escHtml(String(run?.text || ''));
+  if (!text) return '';
+  const style = run?.style || {};
+  const fontWeight = Number(style?.fontWeight || fallbackStyle?.fontWeight || 400);
+  const isBold = fontWeight >= 600 || !!style?.bold || !!fallbackStyle?.bold;
+  const fontStyle = String(style?.fontStyle || fallbackStyle?.fontStyle || '').toLowerCase();
+  const isItalic = fontStyle.includes('italic') || !!style?.italic || !!fallbackStyle?.italic;
+  const isUnderline = !!style?.underline || !!fallbackStyle?.underline;
+  const css = runStyleToCss(style);
+  let out = css ? `<span style="${css}">${text}</span>` : text;
+  if (isUnderline) out = `<u>${out}</u>`;
+  if (isItalic) out = `<em>${out}</em>`;
+  if (isBold) out = `<strong>${out}</strong>`;
+  return out;
+};
+const parseListMarker = (text = '') => {
+  const t = String(text || '').trim();
+  const ordered = t.match(/^(\(?\d+[\).\:]|[a-zA-Z][\).\:])\s+(.*)$/);
+  if (ordered) return { kind: 'ol', content: ordered[2] || '' };
+  const bullet = t.match(/^([•\-–*])\s+(.*)$/);
+  if (bullet) return { kind: 'ul', content: bullet[2] || '' };
+  return null;
+};
+const closeListTag = (state) => {
+  if (!state.currentListTag) return '';
+  const tag = state.currentListTag;
+  state.currentListTag = null;
+  return `</${tag}>`;
+};
+
+const documentGraphToEditableHtml = (documentGraph) => {
+  if (!documentGraph || !Array.isArray(documentGraph.pages) || documentGraph.pages.length === 0) return '';
+  const parts = [];
+  const listState = { currentListTag: null };
+  for (const page of documentGraph.pages) {
+    const width = Number(page?.width || 600);
+    const blocks = (Array.isArray(page?.blocks) ? page.blocks : [])
+      .map((b, idx) => {
+        const bbox = Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0];
+        return {
+          idx,
+          id: b?.id || `${Number(page?.pageNumber || 0)}:${idx}`,
+          type: String(b?.type || 'line'),
+          role: String(b?.role || 'body'),
+          text: String(b?.text || '').trim(),
+          x: Number(bbox[0] || 0),
+          y: Number(bbox[1] || 0),
+          right: Number(bbox[2] || 0),
+          style: b?.style || {},
+          runs: Array.isArray(b?.runs) ? b.runs : [],
+          table: b?.table || null,
+        };
+      })
+      .filter((b) => b.text && b.role !== 'pageHeader' && b.role !== 'pageFooter')
+      .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
+
+    let i = 0;
+    while (i < blocks.length) {
+      const row = blocks[i];
+      if (isSeparatorText(row.text)) {
+        parts.push(closeListTag(listState));
+        parts.push('<hr style="border:none;border-top:1px solid #000;margin:4px 0;" />');
+        i += 1;
+        continue;
+      }
+
+      // Canonical table projection: build contiguous table cells into <table>
+      if (row.type === 'tableCell') {
+        parts.push(closeListTag(listState));
+        const chunk = [];
+        let j = i;
+        while (j < blocks.length && blocks[j].type === 'tableCell') {
+          chunk.push(blocks[j]);
+          j += 1;
+        }
+        const grid = new Map();
+        let maxRow = 0;
+        let maxCol = 0;
+        for (const cell of chunk) {
+          const r = Number(cell?.table?.rowIndex ?? 0);
+          const c = Number(cell?.table?.columnIndex ?? 0);
+          if (!Number.isFinite(r) || !Number.isFinite(c)) continue;
+          maxRow = Math.max(maxRow, r);
+          maxCol = Math.max(maxCol, c);
+          if (!grid.has(r)) grid.set(r, new Map());
+          grid.get(r).set(c, cell);
+        }
+        const tableParts = ['<table style="border-collapse:collapse;width:100%;margin:4px 0;">'];
+        for (let r = 0; r <= maxRow; r += 1) {
+          tableParts.push('<tr>');
+          for (let c = 0; c <= maxCol; c += 1) {
+            const cell = grid.get(r)?.get(c) || null;
+            if (!cell) {
+              tableParts.push('<td style="border:1px solid #111;padding:2px 4px;"><p></p></td>');
+              continue;
+            }
+            const runs = cell.runs.length > 0 ? cell.runs : [{ text: cell.text, style: cell.style }];
+            const inline = runs.map((run) => renderStyledRun(run, cell.style)).join('');
+            const rowSpan = Math.max(1, Number(cell?.table?.rowSpan || 1));
+            const colSpan = Math.max(1, Number(cell?.table?.columnSpan || 1));
+            const spanAttrs = `${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ''}${colSpan > 1 ? ` colspan="${colSpan}"` : ''}`;
+            tableParts.push(`<td${spanAttrs} style="border:1px solid #111;padding:2px 4px;vertical-align:top;">${inline || '<p></p>'}</td>`);
+          }
+          tableParts.push('</tr>');
+        }
+        tableParts.push('</table>');
+        parts.push(tableParts.join(''));
+        i = j;
+        continue;
+      }
+
+      const isListType = /list/i.test(row.type);
+      const marker = parseListMarker(row.text);
+      const listMarker = marker || (isListType ? { kind: 'ul', content: row.text } : null);
+      const textForList = listMarker ? listMarker.content : row.text;
+      const bodyRuns = row.runs.length > 0 ? row.runs : [{ text: textForList, style: row.style }];
+      const inlineHtml = bodyRuns.map((run) => renderStyledRun(run, row.style)).join('');
+      const align = row.style?.align || (row.x / width > 0.62 ? 'right' : 'left');
+      const indentPt = Math.max(0, Math.min(72, Math.round((row.x / width) * 72)));
+      const fontSize = Math.max(9, Math.min(18, Math.round(Number(row.style?.fontSize || 12))));
+      const fontWeight = Number(row.style?.fontWeight || (row.style?.bold ? 700 : 400));
+      const lineHeight = Math.max(1.0, Math.min(2.0, Number(row.style?.lineHeight || 14) / Math.max(10, fontSize)));
+      const fontFamily = row.style?.fontFamily ? `font-family:${String(row.style.fontFamily).replace(/"/g, '')};` : '';
+      if (listMarker) {
+        if (listState.currentListTag !== listMarker.kind) {
+          parts.push(closeListTag(listState));
+          listState.currentListTag = listMarker.kind;
+          parts.push(`<${listMarker.kind}>`);
+        }
+        parts.push(
+          `<li style="text-align:${align};margin:0 0 2px 0;text-indent:${Math.max(0, indentPt - 10)}pt;font-size:${fontSize}pt;` +
+          `font-weight:${fontWeight >= 600 ? 700 : 400};line-height:${lineHeight};${fontFamily}">${inlineHtml}</li>`
+        );
+      } else {
+        parts.push(closeListTag(listState));
+        parts.push(
+          `<p style="text-align:${align};margin:0 0 2px 0;text-indent:${indentPt}pt;font-size:${fontSize}pt;` +
+          `font-weight:${fontWeight >= 600 ? 700 : 400};line-height:${lineHeight};${fontFamily}">${inlineHtml}</p>`
+        );
+      }
+      i += 1;
+    }
+    parts.push(closeListTag(listState));
+    parts.push('<p><br></p>');
+  }
+  parts.push(closeListTag(listState));
+  return parts.join('\n');
+};
+
+const layoutModelToEditableHtml = (layoutModel) => {
+  if (!layoutModel || !Array.isArray(layoutModel.pages) || layoutModel.pages.length === 0) return '';
+  const parts = [];
+  const listState = { currentListTag: null };
+  for (const page of layoutModel.pages) {
+    const width = Number(page?.width || 600);
+    const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+    const ordered = blocks
+      .map((b, idx) => {
+        const bbox = Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0];
+        return {
+          idx,
+          type: String(b?.type || 'line'),
+          role: String(b?.role || 'body'),
+          text: String(b?.text || '').trim(),
+          x: Number(bbox[0] || 0),
+          y: Number(bbox[1] || 0),
+          right: Number(bbox[2] || 0),
+          style: b?.style || {},
+          runs: Array.isArray(b?.runs) ? b.runs : [],
+        };
+      })
+      .filter((b) => b.text && b.role !== 'pageHeader' && b.role !== 'pageFooter')
+      .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
+    for (const row of ordered) {
+      if (isSeparatorText(row.text)) {
+        parts.push(closeListTag(listState));
+        parts.push('<hr style="border:none;border-top:1px solid #000;margin:4px 0;" />');
+        continue;
+      }
+      const listMarker = parseListMarker(row.text);
+      const textForList = listMarker ? listMarker.content : row.text;
+      const bodyRuns = row.runs.length > 0
+        ? row.runs
+        : [{ text: textForList, style: row.style }];
+      const inlineHtml = bodyRuns.map((run) => renderStyledRun(run, row.style)).join('');
+      const align = row.style?.align || (row.x / width > 0.62 ? 'right' : 'left');
+      const indentPt = Math.max(0, Math.min(72, Math.round((row.x / width) * 72)));
+      const fontSize = Math.max(9, Math.min(18, Math.round(Number(row.style?.fontSize || 12))));
+      const fontWeight = Number(row.style?.fontWeight || (row.style?.bold ? 700 : 400));
+      const lineHeight = Math.max(1.0, Math.min(2.0, Number(row.style?.lineHeight || 14) / Math.max(10, fontSize)));
+      const fontFamily = row.style?.fontFamily ? `font-family:${String(row.style.fontFamily).replace(/"/g, '')};` : '';
+      if (listMarker) {
+        if (listState.currentListTag !== listMarker.kind) {
+          parts.push(closeListTag(listState));
+          listState.currentListTag = listMarker.kind;
+          parts.push(`<${listMarker.kind}>`);
+        }
+        parts.push(
+          `<li style="text-align:${align};margin:0 0 2px 0;text-indent:${Math.max(0, indentPt - 10)}pt;font-size:${fontSize}pt;` +
+          `font-weight:${fontWeight >= 600 ? 700 : 400};line-height:${lineHeight};${fontFamily}">${inlineHtml}</li>`
+        );
+      } else {
+        parts.push(closeListTag(listState));
+        parts.push(
+          `<p style="text-align:${align};margin:0 0 2px 0;text-indent:${indentPt}pt;font-size:${fontSize}pt;` +
+          `font-weight:${fontWeight >= 600 ? 700 : 400};line-height:${lineHeight};${fontFamily}">${inlineHtml}</p>`
+        );
+      }
+    }
+    parts.push(closeListTag(listState));
+    parts.push('<p><br></p>');
+  }
+  parts.push(closeListTag(listState));
+  return parts.join('\n');
+};
+
+const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx, fileId }) => {
   const canvasRef = useRef(null);
   const [renderErr, setRenderErr] = useState('');
 
@@ -119,8 +402,32 @@ const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx }) => {
           });
           return;
         }
-        const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
-        const pdf = await loadingTask.promise;
+        let pdf = null;
+        try {
+          const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
+          pdf = await loadingTask.promise;
+        } catch (urlErr) {
+          const canFallbackToApi = !!fileId;
+          const isLikely404 = /404|not found|MissingPDF|ResponseException/i.test(String(urlErr?.message || ''));
+          console.warn('[PDF-CANVAS]', 'url-load-failed', {
+            fileId,
+            pageNumber,
+            pdfUrl,
+            message: urlErr?.message || String(urlErr),
+            canFallbackToApi,
+            isLikely404,
+          });
+          if (!canFallbackToApi) throw urlErr;
+          const blob = await fileService.downloadFile(fileId, 'pdf');
+          const arr = await blob.arrayBuffer();
+          const dataTask = pdfjsLib.getDocument({ data: new Uint8Array(arr) });
+          pdf = await dataTask.promise;
+          console.log('[PDF-CANVAS]', 'api-download-fallback-success', {
+            fileId,
+            pageNumber,
+            bytes: arr.byteLength,
+          });
+        }
         const page = await pdf.getPage(pageNumber);
         const viewport1 = page.getViewport({ scale: 1 });
         const scale = targetWidthPx && viewport1?.width
@@ -147,7 +454,9 @@ const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx }) => {
         }
       } catch (e) {
         console.error('[PDF-CANVAS]', 'render-error', {
+          name: e?.name || null,
           message: e?.message || String(e),
+          stackTop: e?.stack ? String(e.stack).split('\n').slice(0, 2).join(' | ') : null,
           pdfUrl,
           pageNumber,
         });
@@ -156,14 +465,18 @@ const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx }) => {
     };
     run();
     return () => { cancelled = true; };
-  }, [pdfUrl, pageNumber, targetWidthPx]);
+  }, [pdfUrl, pageNumber, targetWidthPx, fileId]);
 
   return (
     <Box position="absolute" inset={0}>
       <canvas ref={canvasRef} style={{ display: 'block' }} />
       {renderErr ? (
-        <Box position="absolute" inset={0} bg="red.50" border="1px solid" borderColor="red.200" p={2}>
-          <Text fontSize="xs" color="red.600">PDF render error: {renderErr}</Text>
+        <Box position="absolute" inset={0} bg="orange.50" border="1px solid" borderColor="orange.200" p={2}>
+          <Text fontSize="xs" color="orange.700" fontWeight="600">PDF preview fallback mode</Text>
+          <Text fontSize="xs" color="orange.700">
+            PDF.js could not parse this file in browser. You can still edit blocks; export stamping will use backend source PDF.
+          </Text>
+          <Text fontSize="xs" color="orange.700">Error: {renderErr}</Text>
         </Box>
       ) : null}
     </Box>
@@ -315,12 +628,20 @@ const FullPageEditor = ({
 
 
   const getInitialContent = useCallback(() => {
-    if (initialHtml && initialHtml.trim()) return initialHtml;
-    if (session?.htmlContent && session.htmlContent.trim()) return session.htmlContent;
+    const graph = session?.documentGraph || scanData?.documentGraph || null;
+    const graphHtml = documentGraphToEditableHtml(graph);
+    const layoutFromGraph = documentGraphToLayoutModel(graph);
+    const layout = layoutFromGraph || session?.layoutModel || scanData?.layoutModel || null;
+    const layoutHtml = layoutModelToEditableHtml(layout);
+    const htmlCandidate = (initialHtml && initialHtml.trim()) ? initialHtml : (session?.htmlContent || '');
+    const htmlLooksFlat = htmlCandidate && !/text-indent:|font-weight:|font-size:|text-align:|line-height:/i.test(htmlCandidate);
+    if (graphHtml && graphHtml.trim()) return graphHtml;
+    if (layoutHtml && (!htmlCandidate || htmlLooksFlat)) return layoutHtml;
+    if (htmlCandidate && htmlCandidate.trim()) return htmlCandidate;
     const text = session?.currentText || session?.originalText || '';
     if (!text) return '<p></p>';
     return textToHtml(text);
-  }, [initialHtml, session, textToHtml]);
+  }, [initialHtml, session, scanData?.layoutModel, scanData?.documentGraph, textToHtml]);
 
 
   const editor = useEditor({
@@ -328,11 +649,11 @@ const FullPageEditor = ({
       StarterKit.configure({
         history: { depth: 100 },
       }),
-      Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
         alignments: ['left', 'center', 'right', 'justify'],
       }),
+      Underline,
       LegalParagraphStyle,
       FontFamily,
       FontSize,
@@ -527,11 +848,43 @@ const FullPageEditor = ({
     toast({ title: 'Document saved', status: 'success', duration: 1500 });
   };
 
-  const fidelityLayout = useMemo(() => (
-    session?.layoutModel || scanData?.layoutModel || null
-  ), [session?.layoutModel, scanData?.layoutModel]);
+  const fidelityLayout = useMemo(() => {
+    const graph = session?.documentGraph || scanData?.documentGraph || null;
+    const layoutFromGraph = documentGraphToLayoutModel(graph);
+    return layoutFromGraph || session?.layoutModel || scanData?.layoutModel || null;
+  }, [session?.documentGraph, scanData?.documentGraph, session?.layoutModel, scanData?.layoutModel]);
+  const fidelityPagesToRender = useMemo(() => {
+    const pages = Array.isArray(fidelityLayout?.pages) ? fidelityLayout.pages : [];
+    const pageMap = new Map(pages.map((p) => [Number(p?.pageNumber || 0), p]));
+    const diagTotal = Number(
+      scanData?.scanResults?.layoutDiagnostics?.pages
+      || scanResults?.layoutDiagnostics?.pages
+      || session?.scanResults?.layoutDiagnostics?.pages
+      || 0
+    );
+    const layoutTotal = pages.length > 0 ? Math.max(...pages.map((p) => Number(p?.pageNumber || 0))) : 0;
+    const totalPages = Math.max(diagTotal, layoutTotal);
+    if (totalPages <= 0) return pages;
+    const baseWidth = Number(pages[0]?.width || 794);
+    const baseHeight = Number(pages[0]?.height || 1123);
+    const out = [];
+    for (let p = 1; p <= totalPages; p += 1) {
+      if (pageMap.has(p)) {
+        out.push(pageMap.get(p));
+      } else {
+        out.push({
+          pageNumber: p,
+          width: baseWidth,
+          height: baseHeight,
+          blocks: [],
+          _placeholder: true,
+        });
+      }
+    }
+    return out;
+  }, [fidelityLayout, scanData?.scanResults?.layoutDiagnostics?.pages, scanResults?.layoutDiagnostics?.pages, session?.scanResults?.layoutDiagnostics?.pages]);
 
-  const hasFidelityLayout = !!(fidelityLayout && Array.isArray(fidelityLayout.pages) && fidelityLayout.pages.length > 0);
+  const hasFidelityLayout = fidelityPagesToRender.length > 0;
   const pdfCanvasUrl = useMemo(() => (
     resolvePdfUrl(selectedFile?.fileUrl || selectedFile?.url || session?.fileUrl || '')
   ), [selectedFile?.fileUrl, selectedFile?.url, session?.fileUrl]);
@@ -544,11 +897,15 @@ const FullPageEditor = ({
       editorViewMode,
       hasFidelityLayout,
       layoutPages,
-      layoutModelSource: session?.layoutModel
-        ? 'session'
-        : scanData?.layoutModel
-          ? 'scanData'
-          : 'none',
+      layoutModelSource: session?.documentGraph
+        ? 'session.documentGraph'
+        : scanData?.documentGraph
+          ? 'scanData.documentGraph'
+          : session?.layoutModel
+            ? 'session.layoutModel'
+            : scanData?.layoutModel
+              ? 'scanData.layoutModel'
+              : 'none',
       pdfCanvasUrl,
       selectedFileMeta: selectedFile
         ? {
@@ -2037,7 +2394,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             >
               {editorViewMode === 'fidelity' && hasFidelityLayout ? (
                 <VStack align="stretch" spacing={6} p={4}>
-                  {fidelityLayout.pages.map((page) => {
+                  {fidelityPagesToRender.map((page) => {
                     const pageNumber = Number(page?.pageNumber || 1);
                     const pageWidth = Number(page?.width || 794);
                     const pageHeight = Number(page?.height || 1123);
@@ -2045,15 +2402,23 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                     return (
                       <Box key={`fpage-${pageNumber}`} border="1px solid" borderColor={borderColor} borderRadius="md" bg="white" p={3}>
                         <Text fontSize="xs" color="gray.500" mb={2}>Page {pageNumber}</Text>
-                        <Box position="relative" w={`${pageWidth}px`} maxW="100%" h={`${pageHeight}px`} overflow="hidden" bg="gray.50">
-                          <PdfPageCanvas pdfUrl={pdfCanvasUrl} pageNumber={pageNumber} targetWidthPx={pageWidth} />
+                        <Box position="relative" w={`${pageWidth}px`} maxW="none" h={`${pageHeight}px`} overflow="hidden" bg="gray.50">
+                          <PdfPageCanvas
+                            pdfUrl={pdfCanvasUrl}
+                            pageNumber={pageNumber}
+                            targetWidthPx={pageWidth}
+                            fileId={selectedFile?._id || session?.fileId}
+                          />
                           {blocks.map((block, bIdx) => {
                             const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
                             const [x1, y1, x2, y2] = bbox;
                             const blockKey = getFidelityBlockKey(pageNumber, bIdx, block);
-                            const text = getFidelityText(pageNumber, bIdx, block?.text || '', block);
+                            const originalText = String(block?.text || '');
+                            const hasManualEdit = Object.prototype.hasOwnProperty.call(fidelityEdits, blockKey);
+                            const text = hasManualEdit ? getFidelityText(pageNumber, bIdx, originalText, block) : '';
                             const width = Math.max(30, x2 - x1);
                             const height = Math.max(18, y2 - y1);
+                            const isSep = isSeparatorText(originalText);
                             return (
                               <Box
                                 key={blockKey}
@@ -2068,6 +2433,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                 borderColor={selectedFidelityBlock?.id === blockKey ? 'purple.500' : 'transparent'}
                                 bg={selectedFidelityBlock?.id === blockKey ? 'purple.50' : 'transparent'}
                                 fontSize={`${Math.max(9, Number(block?.style?.fontSize || 11))}px`}
+                                fontFamily={block?.style?.fontFamily || undefined}
+                                lineHeight={block?.style?.lineHeight ? `${Math.max(10, Number(block.style.lineHeight))}px` : undefined}
+                                fontWeight={Number(block?.style?.fontWeight || 0) >= 600 || block?.style?.bold ? 700 : 400}
                                 textAlign={block?.style?.align || 'left'}
                                 whiteSpace="pre-wrap"
                                 onClick={() => setSelectedFidelityBlock({
@@ -2079,18 +2447,45 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                   type: block?.type || 'line',
                                 })}
                               >
-                                <Input
-                                  variant="unstyled"
-                                  value={text}
-                                  onChange={(e) => {
-                                    const next = e.target.value;
-                                    setFidelityEdits((prev) => ({ ...prev, [blockKey]: next }));
-                                    setHasUnsavedChanges(true);
-                                  }}
-                                />
+                                {isSep ? (
+                                  <Box
+                                    position="absolute"
+                                    left="0"
+                                    right="0"
+                                    top="50%"
+                                    transform="translateY(-50%)"
+                                    borderTop="1px solid"
+                                    borderColor="black"
+                                    opacity={0.9}
+                                  />
+                                ) : (
+                                  <Textarea
+                                    variant="unstyled"
+                                    resize="none"
+                                    overflow="hidden"
+                                    value={text}
+                                    placeholder={hasManualEdit ? '' : ''}
+                                    minH={`${height}px`}
+                                    onFocus={() => {
+                                      if (!hasManualEdit) {
+                                        setFidelityEdits((prev) => ({ ...prev, [blockKey]: originalText }));
+                                      }
+                                    }}
+                                    onChange={(e) => {
+                                      const next = e.target.value;
+                                      setFidelityEdits((prev) => ({ ...prev, [blockKey]: next }));
+                                      setHasUnsavedChanges(true);
+                                    }}
+                                  />
+                                )}
                               </Box>
                             );
                           })}
+                          {page?._placeholder ? (
+                            <Text position="absolute" left="8px" bottom="8px" fontSize="10px" color="gray.500" bg="whiteAlpha.800" px={1.5} py={0.5} borderRadius="sm">
+                              Page rendered from source PDF; block extraction missing for this page
+                            </Text>
+                          ) : null}
                         </Box>
                       </Box>
                     );
