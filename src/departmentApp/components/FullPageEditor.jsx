@@ -61,7 +61,6 @@ import {
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
-import Underline from '@tiptap/extension-underline';
 import FontFamily from '@tiptap/extension-font-family';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
@@ -1029,7 +1028,6 @@ const FullPageEditor = ({
         types: ['heading', 'paragraph'],
         alignments: ['left', 'center', 'right', 'justify'],
       }),
-      Underline,
       LegalParagraphStyle,
       FontFamily,
       FontSize,
@@ -1270,75 +1268,6 @@ const FullPageEditor = ({
 
   const hasFidelityLayout = fidelityPagesToRender.length > 0;
 
-  // ── Fidelity vertical collision detection ────────────────────────────────
-  // OCR bounding boxes are tight and HTML font rendering may be slightly wider
-  // than the PDF font, causing text to wrap and overlap neighbouring blocks.
-  // For each page, sort blocks by Y and nudge any block whose top falls inside
-  // the estimated bottom of a preceding horizontally-overlapping block.
-  const fidelityCollisionNudges = useMemo(() => {
-    const nudges = {}; // blockKey -> nudgeY px
-    for (const page of fidelityPagesToRender) {
-      const pageNumber = Number(page?.pageNumber || 1);
-      const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
-
-      // Build working list with estimated geometry
-      const items = blocks
-        .map((block, bIdx) => {
-          const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
-          const [bx1, by1, bx2, by2] = bbox;
-          const blockKey = getFidelityBlockKey(pageNumber, bIdx, block);
-          const offset = fidelityOffsets?.[blockKey] || { x: 0, y: 0 };
-          const fontSizePx = Math.max(9, Number(block?.style?.fontSize || 11));
-          const width = Math.max(30, bx2 - bx1);
-          const text = String(block?.text || '');
-          const bboxH = Math.max(fontSizePx, by2 - by1);
-          // Rough char-per-line estimate (average char ≈ 0.55× font size)
-          const charsPerLine = Math.max(1, Math.floor(width / (fontSizePx * 0.55)));
-          const estLines = Math.max(1, Math.ceil(text.length / charsPerLine));
-          const lineH = fontSizePx * 1.4;
-          const estimatedH = Math.max(bboxH, estLines * lineH);
-          return {
-            blockKey,
-            x1: bx1 + Number(offset.x || 0),
-            y1: by1 + Number(offset.y || 0),
-            x2: bx2 + Number(offset.x || 0),
-            estimatedH,
-            fontSizePx,
-            skip: isImageLikeBlock(block) || isSeparatorText(text),
-          };
-        })
-        .filter((it) => !it.skip);
-
-      // Sort top-to-bottom, left-to-right
-      items.sort((a, b) => (a.y1 - b.y1) || (a.x1 - b.x1));
-
-      for (let i = 0; i < items.length - 1; i += 1) {
-        const curr = items[i];
-        for (let j = i + 1; j < items.length; j += 1) {
-          const next = items[j];
-          // If next block starts well below curr's estimated bottom, stop inner loop
-          if (next.y1 > curr.y1 + curr.estimatedH + curr.fontSizePx * 2) break;
-
-          // Only nudge if the two blocks SHARE horizontal space (not side-by-side columns)
-          const xOverlap = curr.x1 < next.x2 - 4 && curr.x2 > next.x1 + 4;
-          if (!xOverlap) continue;
-
-          const currBottom = curr.y1 + curr.estimatedH;
-          const minGap = curr.fontSizePx * 0.2;
-          if (next.y1 < currBottom + minGap) {
-            const shift = (currBottom + minGap) - next.y1;
-            // Cap nudge to avoid runaway layout (max 3 lines)
-            const cappedShift = Math.min(shift, curr.fontSizePx * 3);
-            if (cappedShift > 0) {
-              nudges[next.blockKey] = (nudges[next.blockKey] || 0) + cappedShift;
-              next.y1 += cappedShift; // propagate to subsequent comparisons
-            }
-          }
-        }
-      }
-    }
-    return nudges;
-  }, [fidelityPagesToRender, fidelityOffsets]);
 
   const pdfCanvasUrl = useMemo(() => (
     resolvePdfUrl(selectedFile?.fileUrl || selectedFile?.url || session?.fileUrl || '')
@@ -1425,6 +1354,65 @@ const FullPageEditor = ({
     const r = String(block?.role || '').toLowerCase();
     return /image|figure|photo|graphic|signature|stamp/.test(t) || /image|figure|graphic|signature|stamp/.test(r);
   }, []);
+
+  // ── Fidelity vertical collision detection ────────────────────────────────
+  // Must be defined after getFidelityBlockKey/isImageLikeBlock to avoid TDZ.
+  const fidelityCollisionNudges = useMemo(() => {
+    const nudges = {}; // blockKey -> nudgeY px
+    for (const page of fidelityPagesToRender) {
+      const pageNumber = Number(page?.pageNumber || 1);
+      const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+
+      const items = blocks
+        .map((block, bIdx) => {
+          const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
+          const [bx1, by1, bx2, by2] = bbox;
+          const blockKey = getFidelityBlockKey(pageNumber, bIdx, block);
+          const offset = fidelityOffsets?.[blockKey] || { x: 0, y: 0 };
+          const fontSizePx = Math.max(9, Number(block?.style?.fontSize || 11));
+          const width = Math.max(30, bx2 - bx1);
+          const text = String(block?.text || '');
+          const bboxH = Math.max(fontSizePx, by2 - by1);
+          const charsPerLine = Math.max(1, Math.floor(width / (fontSizePx * 0.55)));
+          const estLines = Math.max(1, Math.ceil(text.length / charsPerLine));
+          const lineH = fontSizePx * 1.4;
+          const estimatedH = Math.max(bboxH, estLines * lineH);
+          return {
+            blockKey,
+            x1: bx1 + Number(offset.x || 0),
+            y1: by1 + Number(offset.y || 0),
+            x2: bx2 + Number(offset.x || 0),
+            estimatedH,
+            fontSizePx,
+            skip: isImageLikeBlock(block) || isSeparatorText(text),
+          };
+        })
+        .filter((it) => !it.skip);
+
+      items.sort((a, b) => (a.y1 - b.y1) || (a.x1 - b.x1));
+
+      for (let i = 0; i < items.length - 1; i += 1) {
+        const curr = items[i];
+        for (let j = i + 1; j < items.length; j += 1) {
+          const next = items[j];
+          if (next.y1 > curr.y1 + curr.estimatedH + curr.fontSizePx * 2) break;
+          const xOverlap = curr.x1 < next.x2 - 4 && curr.x2 > next.x1 + 4;
+          if (!xOverlap) continue;
+          const currBottom = curr.y1 + curr.estimatedH;
+          const minGap = curr.fontSizePx * 0.2;
+          if (next.y1 < currBottom + minGap) {
+            const shift = (currBottom + minGap) - next.y1;
+            const cappedShift = Math.min(shift, curr.fontSizePx * 3);
+            if (cappedShift > 0) {
+              nudges[next.blockKey] = (nudges[next.blockKey] || 0) + cappedShift;
+              next.y1 += cappedShift;
+            }
+          }
+        }
+      }
+    }
+    return nudges;
+  }, [fidelityPagesToRender, fidelityOffsets, getFidelityBlockKey, isImageLikeBlock]);
 
   const pushFidelityUndoSnapshot = useCallback((snapshot) => {
     const safe = snapshot && typeof snapshot === 'object' ? snapshot : {};
