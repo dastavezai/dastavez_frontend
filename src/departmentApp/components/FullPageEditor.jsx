@@ -1161,7 +1161,7 @@ const FullPageEditor = ({
       (caseData.summary ? `Summary: ${caseData.summary}` : '');
     aiHelperRef.current?.addContext?.(ctx);
     setLeftTabIndex(1);
-  }, [fidelitySnapEnabled, fidelityGridSnapEnabled, fidelityGridSize, fidelityZoom]);
+  }, []);
 
 
   const [suggestions, setSuggestions] = useState(initialSuggestions || []);
