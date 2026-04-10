@@ -36,7 +36,15 @@ const HIGHLIGHT_COLORS = [
   '#fff3cd', '#cce5ff', '#e2e3e5', '#fce4ec', '#e8f5e9',
 ];
 
-const EditorToolbar = ({ editor }) => {
+const EditorToolbar = ({
+  editor,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  undoLabel = 'Undo (Ctrl+Z)',
+  redoLabel = 'Redo (Ctrl+Y)',
+}) => {
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const hoverBg = useColorModeValue('gray.100', 'gray.700');
@@ -105,6 +113,11 @@ const EditorToolbar = ({ editor }) => {
     }
   };
 
+  const resolvedCanUndo = typeof canUndo === 'boolean' ? canUndo : editor.can().undo();
+  const resolvedCanRedo = typeof canRedo === 'boolean' ? canRedo : editor.can().redo();
+  const handleUndo = onUndo || (() => editor.chain().focus().undo().run());
+  const handleRedo = onRedo || (() => editor.chain().focus().redo().run());
+
   return (
     <Box
       bg={bgColor}
@@ -119,15 +132,15 @@ const EditorToolbar = ({ editor }) => {
       <HStack spacing={1} flexWrap="wrap" align="center">
         <ToolBtn
           icon={<FaUndo />}
-          label="Undo (Ctrl+Z)"
-          onClick={() => editor.chain().focus().undo().run()}
-          isDisabled={!editor.can().undo()}
+          label={undoLabel}
+          onClick={handleUndo}
+          isDisabled={!resolvedCanUndo}
         />
         <ToolBtn
           icon={<FaRedo />}
-          label="Redo (Ctrl+Y)"
-          onClick={() => editor.chain().focus().redo().run()}
-          isDisabled={!editor.can().redo()}
+          label={redoLabel}
+          onClick={handleRedo}
+          isDisabled={!resolvedCanRedo}
         />
 
         <Divider orientation="vertical" h="24px" mx={1} />

@@ -188,197 +188,531 @@ const parseListMarker = (text = '') => {
   if (bullet) return { kind: 'ul', content: bullet[2] || '' };
   return null;
 };
+const listMarkerToken = (text = '') => {
+  const t = String(text || '').trim();
+  const m = t.match(/^(\(?\d+[\).\:]|[a-zA-Z][\).\:]|[•\-–*])$/);
+  return m ? m[1] : '';
+};
+const isLikelyListMarkerOnly = (text = '') => !!listMarkerToken(text);
+const detectBoldFromStyle = (style = {}) => {
+  const fw = Number(style?.fontWeight || style?.weight || 0);
+  const fwRaw = String(style?.fontWeight || style?.weight || '').toLowerCase();
+  return (
+    fw >= 600 ||
+    fwRaw.includes('bold') ||
+    !!style?.bold ||
+    !!style?.isBold ||
+    !!style?.strong
+  );
+};
+const detectItalicFromStyle = (style = {}) => {
+  const fs = String(style?.fontStyle || '').toLowerCase();
+  return fs.includes('italic') || !!style?.italic || !!style?.isItalic;
+};
+const detectUnderlineFromStyle = (style = {}) => {
+  const td = String(style?.textDecoration || '').toLowerCase();
+  return td.includes('underline') || !!style?.underline || !!style?.isUnderline;
+};
+const normalizeSplitListRows = (rows = []) => {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+  const out = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const cur = rows[i];
+    const next = rows[i + 1];
+    if (
+      next &&
+      isLikelyListMarkerOnly(cur?.text) &&
+      !isSeparatorText(next?.text) &&
+      !isLikelyListMarkerOnly(next?.text)
+    ) {
+      const sameLineish = Math.abs(Number(next?.y || 0) - Number(cur?.y || 0)) <= 10;
+      const nextToRight = Number(next?.x || 0) >= Number(cur?.x || 0);
+      if (sameLineish && nextToRight) {
+        const marker = listMarkerToken(cur.text);
+        out.push({
+          ...next,
+          text: `${marker} ${String(next?.text || '').trim()}`.trim(),
+          x: Math.min(Number(cur?.x || 0), Number(next?.x || 0)),
+          runs: [],
+        });
+        i += 1;
+        continue;
+      }
+    }
+    out.push(cur);
+  }
+  return out;
+};
 const closeListTag = (state) => {
   if (!state.currentListTag) return '';
   const tag = state.currentListTag;
   state.currentListTag = null;
+  // Keep olCounter so we can resume with start= if the list reopens later
   return `</${tag}>`;
+};
+const resolveHeadingTag = ({ role = '', fontWeight = 400, fontSize = 12, text = '', align = 'left' }) => {
+  const t = String(text || '').trim();
+  const r = String(role || '').toLowerCase();
+  const isUpper = t.length > 0 && t === t.toUpperCase() && /[A-Z]/.test(t);
+  const isShort = t.length > 0 && t.length <= 120;
+  const isHeadingLikeRole = r.includes('title') || r.includes('heading') || r.includes('header');
+  const isHeadingLikeStyle = fontWeight >= 700 && fontSize >= 13 && isShort;
+  const centeredStrong = align === 'center' && fontWeight >= 700 && isShort;
+  if (!(isHeadingLikeRole || isHeadingLikeStyle || centeredStrong)) return null;
+  if (fontSize >= 17 || (isUpper && fontSize >= 14)) return 'h1';
+  if (fontSize >= 15) return 'h2';
+  return 'h3';
+};
+const isAzureLayoutModel = (layoutModel) => {
+  const provider = String(layoutModel?.provider || '').toLowerCase();
+  return provider.includes('azure');
+};
+
+// ─── Robust editable HTML reconstruction ─────────────────────────────────────
+// Single shared pipeline used by both documentGraph and layoutModel sources.
+
+const inferAlign = (x, right, width) => {
+  if (width <= 0) return 'left';
+  const mid = (x + right) / 2 / width;
+  if (mid > 0.4 && mid < 0.6 && (right - x) < width * 0.7) return 'center';
+  if (x / width > 0.58) return 'right';
+  return 'left';
+};
+
+const computePageFontStats = (rows) => {
+  const sizes = rows
+    .filter((r) => r.type !== 'tableCell' && !isSeparatorText(r.text))
+    .map((r) => Math.max(9, Math.round(Number(r.style?.fontSize || 12))));
+  if (!sizes.length) return { median: 12, p90: 14, max: 14 };
+  const sorted = [...sizes].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const p90 = sorted[Math.floor(sorted.length * 0.9)];
+  const max = sorted[sorted.length - 1];
+  return { median, p90, max };
+};
+
+const resolveHeadingTagRobust = ({ role = '', fontWeight = 400, fontSize = 12, text = '', align = 'left', fontStats = {} }) => {
+  const t = String(text || '').trim();
+  const r = String(role || '').toLowerCase();
+  const isShort = t.length > 0 && t.length <= 200;
+  const isUpperCase = t.length >= 3 && t === t.toUpperCase() && /[A-Z]/.test(t);
+  const { median = 12, max = 14 } = fontStats;
+  const isLargerThanBody = fontSize > median + 1;
+  const isMuchLarger = fontSize > median + 2.5;
+  const isRoleHeading = /title|heading|sectionhead/.test(r);
+  const isCentered = align === 'center';
+  const isBold = fontWeight >= 700;
+
+  if (!isShort) return null;
+  if (!isRoleHeading && !isLargerThanBody && !(isCentered && isBold) && !isUpperCase) return null;
+
+  if (fontSize >= max - 0.5 || (isUpperCase && isMuchLarger) || (isCentered && isBold && isUpperCase)) return 'h1';
+  if (isMuchLarger || isRoleHeading) return 'h2';
+  if (isLargerThanBody || (isCentered && isBold)) return 'h3';
+  return null;
+};
+
+const mergeSameLineFragments = (rows, yTolerance = 3) => {
+  if (!rows.length) return rows;
+  const out = [];
+  let group = [rows[0]];
+  for (let i = 1; i < rows.length; i += 1) {
+    const prev = group[group.length - 1];
+    const cur = rows[i];
+    const yDiff = Math.abs(Number(cur.y || 0) - Number(prev.y || 0));
+    const sameType = cur.type === prev.type && cur.type !== 'tableCell';
+    const isTextLike = !/tableCell/.test(cur.type);
+    if (isTextLike && sameType && yDiff <= yTolerance) {
+      group.push(cur);
+    } else {
+      out.push(mergeFragmentGroup(group));
+      group = [cur];
+    }
+  }
+  out.push(mergeFragmentGroup(group));
+  return out;
+};
+
+const mergeFragmentGroup = (group) => {
+  if (group.length === 1) return group[0];
+  group.sort((a, b) => (a.x || 0) - (b.x || 0));
+  const base = group[0];
+  const mergedText = group.map((g) => String(g.text || '').trim()).join(' ').trim();
+  const mergedRuns = group.flatMap((g) =>
+    Array.isArray(g.runs) && g.runs.length > 0
+      ? g.runs
+      : [{ text: g.text, style: g.style || {} }]
+  );
+  return {
+    ...base,
+    text: mergedText,
+    right: Math.max(...group.map((g) => Number(g.right || g.x || 0))),
+    runs: mergedRuns,
+  };
+};
+
+const buildTableHtml = (chunk) => {
+  const grid = new Map();
+  let maxRow = 0;
+  let maxCol = 0;
+  for (const cell of chunk) {
+    const r = Number(cell?.table?.rowIndex ?? cell?.table?.row ?? 0);
+    const c = Number(cell?.table?.columnIndex ?? cell?.table?.col ?? 0);
+    if (!Number.isFinite(r) || !Number.isFinite(c)) continue;
+    maxRow = Math.max(maxRow, r);
+    maxCol = Math.max(maxCol, c);
+    if (!grid.has(r)) grid.set(r, new Map());
+    if (!grid.get(r).has(c)) grid.get(r).set(c, cell);
+  }
+  const tParts = ['<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:11pt;">'];
+  for (let r = 0; r <= maxRow; r += 1) {
+    tParts.push('<tr>');
+    for (let c = 0; c <= maxCol; c += 1) {
+      const cell = grid.get(r)?.get(c) || null;
+      if (!cell) {
+        tParts.push('<td style="border:1px solid #333;padding:4px 8px;vertical-align:top;"> </td>');
+        continue;
+      }
+      const runs = Array.isArray(cell.runs) && cell.runs.length > 0
+        ? cell.runs
+        : [{ text: cell.text, style: cell.style || {} }];
+      const inline = runs.map((run) => renderStyledRun(run, cell.style || {})).join('');
+      const rowSpan = Math.max(1, Number(cell?.table?.rowSpan || 1));
+      const colSpan = Math.max(1, Number(cell?.table?.columnSpan || cell?.table?.colSpan || 1));
+      const spanAttrs = `${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ''}${colSpan > 1 ? ` colspan="${colSpan}"` : ''}`;
+      tParts.push(`<td${spanAttrs} style="border:1px solid #333;padding:4px 8px;vertical-align:top;">${inline || '&nbsp;'}</td>`);
+    }
+    tParts.push('</tr>');
+  }
+  tParts.push('</table>');
+  return tParts.join('');
+};
+
+// ── Line → Paragraph grouping (fallback for non-Azure sources) ───────────────
+// Groups consecutive OCR lines that belong to the same logical paragraph.
+// Key signals: small Y-gap, same indent zone, same font size, same bold state.
+const groupLinesIntoParagraphs = (lines, width) => {
+  if (!lines.length) return lines;
+  const INDENT_ZONE = width * 0.04; // 4% of page width = same indent
+  const out = [];
+
+  const finalizeGroup = (grp) => {
+    if (grp.length === 1) return grp[0];
+    grp.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    const base = grp[0];
+    const mergedText = grp.map((l) => String(l.text || '').trim()).filter(Boolean).join(' ');
+    const mergedRuns = grp.flatMap((l) =>
+      Array.isArray(l.runs) && l.runs.length > 0
+        ? l.runs
+        : [{ text: l.text, style: l.style || {} }]
+    );
+    return {
+      ...base,
+      text: mergedText,
+      right: Math.max(...grp.map((l) => Number(l.right || 0))),
+      y: grp[0].y,
+      runs: mergedRuns,
+    };
+  };
+
+  let group = [lines[0]];
+
+  for (let i = 1; i < lines.length; i += 1) {
+    const prev = group[group.length - 1];
+    const cur = lines[i];
+
+    // Never merge table cells or already-paragraph blocks
+    if (cur.type === 'tableCell' || cur.type === 'paragraph' || prev.type === 'tableCell' || prev.type === 'paragraph') {
+      out.push(finalizeGroup(group));
+      group = [cur];
+      continue;
+    }
+
+    // Never merge list items
+    if (parseListMarker(cur.text) || parseListMarker(prev.text)) {
+      out.push(finalizeGroup(group));
+      group = [cur];
+      continue;
+    }
+
+    const prevFontSize = Math.max(9, Math.round(Number(prev.style?.fontSize || 12)));
+    const curFontSize  = Math.max(9, Math.round(Number(cur.style?.fontSize  || 12)));
+    const estimatedLineH = prevFontSize * 1.35;
+    const yGap = Number(cur.y || 0) - Number(prev.y || 0);
+
+    // Position-based continuation: small gap, same indent zone, same font size & bold
+    const smallGap     = yGap > 0 && yGap <= estimatedLineH * 1.6;
+    const sameIndent   = Math.abs(Number(cur.x || 0) - Number(group[0].x || 0)) <= INDENT_ZONE;
+    const sameFontSize = Math.abs(prevFontSize - curFontSize) <= 1;
+    const prevBold     = detectBoldFromStyle(prev.style || {});
+    const curBold      = detectBoldFromStyle(cur.style  || {});
+    const sameBold     = prevBold === curBold;
+    const sameRole     = String(cur.role || 'body') === String(prev.role || 'body');
+
+    if (smallGap && sameIndent && sameFontSize && sameBold && sameRole) {
+      group.push(cur);
+    } else {
+      out.push(finalizeGroup(group));
+      group = [cur];
+    }
+  }
+
+  out.push(finalizeGroup(group));
+  return out;
+};
+
+const blocksToEditableHtml = (rawBlocks, pageWidth) => {
+  const width = Number(pageWidth || 600);
+  // 1) Normalize and sort
+  const normalized = rawBlocks
+    .map((b, idx) => {
+      const bbox = Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0];
+      const rawStyle = b?.style || {};
+      // Merge top-level font props into style for blocks (Azure paragraph path)
+      const style = {
+        ...rawStyle,
+        fontSize:   rawStyle.fontSize   || b?.fontSize   || null,
+        fontFamily: rawStyle.fontFamily || b?.fontFamily || null,
+        fontStyle:  rawStyle.fontStyle  || b?.fontStyle  || null,
+        fontWeight: rawStyle.fontWeight || b?.fontWeight || b?.bold ? (b?.bold ? 700 : rawStyle.fontWeight) : null,
+        align:      rawStyle.align      || null,
+        lineHeight: rawStyle.lineHeight || b?.lineHeight || null,
+        bold:       rawStyle.bold       || b?.bold       || null,
+      };
+      return {
+        idx,
+        type: String(b?.type || 'line'),
+        role: String(b?.role || 'body'),
+        text: String(b?.text || '').trim(),
+        x: Number(bbox[0] || 0),
+        y: Number(bbox[1] || 0),
+        right: Number(bbox[2] || 0),
+        style,
+        runs: Array.isArray(b?.runs) ? b.runs : [],
+        table: b?.table || null,
+      };
+    })
+    .filter((b) => b.text && b.role !== 'pageHeader' && b.role !== 'pageFooter')
+    .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
+
+  // 2) Decide processing path:
+  //    - If blocks already come as 'paragraph' type (Azure DI path), they are
+  //      pre-grouped — just fix same-line fragments within table cells.
+  //    - If blocks are raw 'line' type (documentGraph / prebuilt-read lines),
+  //      group them into logical paragraphs first.
+  const hasParagraphBlocks = normalized.some((b) => b.type === 'paragraph');
+
+  let grouped;
+  if (hasParagraphBlocks) {
+    // Azure paragraph path: blocks already logically grouped — no additional merging needed
+    grouped = normalized;
+  } else {
+    // Line path: merge same-line OCR fragments, then group into paragraphs
+    const sameLine = mergeSameLineFragments(normalized);
+    grouped = groupLinesIntoParagraphs(sameLine, width);
+  }
+
+  // 3) Merge split list markers
+  const rows = normalizeSplitListRows(grouped);
+
+  // 4) Compute page-level font stats for relative heading detection
+  const fontStats = computePageFontStats(rows);
+
+  const parts = [];
+  // olCounter tracks the running ordered-list item number so that if a list is
+  // interrupted by a continuation line and reopened, we resume with the correct
+  // start= value instead of resetting to 1.
+  const listState = { currentListTag: null, indentLevel: 0, olCounter: 1 };
+  let prevY = null;
+  let i = 0;
+
+  while (i < rows.length) {
+    const row = rows[i];
+
+    // ── Separator ──
+    if (isSeparatorText(row.text)) {
+      parts.push(closeListTag(listState));
+      parts.push('<hr style="border:none;border-top:2px solid #222;margin:10px 0;" />');
+      prevY = Number(row.y || 0);
+      i += 1;
+      continue;
+    }
+
+    // ── Table ──
+    if (row.type === 'tableCell') {
+      parts.push(closeListTag(listState));
+      const chunk = [];
+      let j = i;
+      while (j < rows.length && rows[j].type === 'tableCell') { chunk.push(rows[j]); j += 1; }
+      parts.push(buildTableHtml(chunk));
+      prevY = Number(rows[j - 1]?.y || row.y || 0);
+      i = j;
+      continue;
+    }
+
+    // ── Detect list ──
+    const isListType = /list/i.test(row.type);
+    const listMarker = parseListMarker(row.text) || (isListType ? { kind: 'ul', content: row.text } : null);
+    const textForRender = listMarker ? listMarker.content : row.text;
+
+    // ── Inline runs ──
+    const bodyRuns = listMarker
+      ? [{ text: textForRender, style: row.style }]
+      : (row.runs.length > 0 ? row.runs : [{ text: textForRender, style: row.style }]);
+
+    const isBold = detectBoldFromStyle(row.style) || bodyRuns.some((r) => detectBoldFromStyle(r?.style || {}));
+    const isItalic = detectItalicFromStyle(row.style) || bodyRuns.some((r) => detectItalicFromStyle(r?.style || {}));
+    const isUnderline = detectUnderlineFromStyle(row.style) || bodyRuns.some((r) => detectUnderlineFromStyle(r?.style || {}));
+
+    const inlineHtml = bodyRuns.map((run) => {
+      const s = run?.style || {};
+      const runBold = isBold || detectBoldFromStyle(s);
+      const runItalic = isItalic || detectItalicFromStyle(s);
+      const runUnderline = isUnderline || detectUnderlineFromStyle(s);
+      const css = runStyleToCss({ ...row.style, ...s, bold: runBold, italic: runItalic, underline: runUnderline });
+      let out = css ? `<span style="${css}">${escHtml(String(run?.text || ''))}</span>` : escHtml(String(run?.text || ''));
+      if (runUnderline) out = `<u>${out}</u>`;
+      if (runItalic) out = `<em>${out}</em>`;
+      if (runBold) out = `<strong>${out}</strong>`;
+      return out;
+    }).join('');
+
+    // ── Layout properties ──
+    const rawAlign = row.style?.align || inferAlign(row.x, row.right, width);
+    // fontSize: prefer style.fontSize, fall back to page median
+    const rawFontSize = Number(row.style?.fontSize || fontStats.median || 12);
+    const fontSize = Math.max(9, Math.min(24, Math.round(rawFontSize)));
+    const fontWeight = isBold ? 700 : 400;
+    const fontFamily = row.style?.fontFamily
+      ? `font-family:'${String(row.style.fontFamily).replace(/['"]/g, '')}';`
+      : '';
+    const rawLH = Number(row.style?.lineHeight || 0);
+    const lineHeight = rawLH > 1 && rawLH < 4
+      ? rawLH
+      : (rawLH >= 8 ? Math.max(1.1, Math.min(2.0, rawLH / Math.max(8, fontSize))) : 1.4);
+
+    // ── Indent: map pixel X to em (1 em ≈ fontSize px) ──
+    const indentEm = Math.max(0, Math.min(6, Math.round((row.x / width) * 8 * 10) / 10));
+
+    // ── Vertical spacing from Y-gap ──
+    const yGap = prevY == null ? 0 : Math.max(0, Number(row.y || 0) - Number(prevY || 0));
+    const paraBreak = yGap > fontSize * 1.8;
+    const sectionBreak = yGap > fontSize * 4;
+    prevY = Number(row.y || 0);
+
+    // ── Heading detection ──
+    const role = String(row.role || '').toLowerCase();
+    // Azure DI already classified title/heading roles — trust them directly
+    let headingTag;
+    if (role === 'title') {
+      headingTag = 'h1';
+    } else if (role === 'heading' || role === 'sectionheading') {
+      headingTag = 'h2';
+    } else {
+      headingTag = resolveHeadingTagRobust({ role, fontWeight, fontSize, text: row.text, align: rawAlign, fontStats });
+    }
+
+    // ── Alignment: body paragraphs → justify if not centered/right ──
+    const effectiveAlign = headingTag
+      ? rawAlign
+      : (rawAlign === 'left' && textForRender.length > 60 && !listMarker ? 'justify' : rawAlign);
+
+    // ── List rendering ──
+    if (listMarker) {
+      // Extract numeric index from the marker text (e.g. "3." → 3)
+      const markerNum = listMarker.kind === 'ol'
+        ? (Number(String(listMarker.text || '').replace(/\D/g, '') || 0) || listState.olCounter)
+        : null;
+
+      // Close and reopen only when switching list type or if the list was closed
+      // by an intervening non-list block (closeListTag set currentListTag=null).
+      if (!listState.currentListTag || listState.currentListTag !== listMarker.kind) {
+        parts.push(closeListTag(listState));
+        listState.currentListTag = listMarker.kind;
+        const listStyle = listMarker.kind === 'ol'
+          ? 'list-style-type:decimal;'
+          : 'list-style-type:disc;';
+        // If OL: use start= to continue the counter from where we left off
+        const startAttr = listMarker.kind === 'ol' && markerNum > 1 ? ` start="${markerNum}"` : '';
+        parts.push(
+          `<${listMarker.kind}${startAttr} style="${listStyle}padding-left:${Math.max(1.5, indentEm + 1.5)}em;margin:${paraBreak ? 8 : 2}px 0 4px 0;">`
+        );
+      }
+
+      if (markerNum !== null) listState.olCounter = markerNum + 1;
+
+      parts.push(
+        `<li style="font-size:${fontSize}pt;font-weight:${fontWeight};` +
+        `font-style:${isItalic ? 'italic' : 'normal'};` +
+        `text-decoration:${isUnderline ? 'underline' : 'none'};` +
+        `line-height:${lineHeight};${fontFamily}margin-bottom:2px;">${inlineHtml}</li>`
+      );
+    } else {
+      // ── Close any open list ──
+      parts.push(closeListTag(listState));
+      const tag = headingTag || 'p';
+      // sectionBreak → large gap; paraBreak (new paragraph) → moderate gap for headings,
+      // small gap for body text; same-paragraph continuation → zero margin so lines
+      // rendered as individual OCR blocks don't show as double-spaced.
+      const topMargin = sectionBreak
+        ? 16
+        : (paraBreak
+            ? (headingTag ? 10 : 4)
+            : (headingTag ? 6 : 0));
+      const bottomMargin = headingTag ? 4 : 1;
+
+      let styleAttr =
+        `text-align:${effectiveAlign};` +
+        `margin:${topMargin}px 0 ${bottomMargin}px 0;` +
+        `font-size:${fontSize}pt;` +
+        `font-weight:${fontWeight};` +
+        `font-style:${isItalic ? 'italic' : 'normal'};` +
+        `text-decoration:${isUnderline ? 'underline' : 'none'};` +
+        `line-height:${lineHeight};` +
+        fontFamily;
+
+      // Indent only for non-headings and non-centered
+      if (!headingTag && effectiveAlign === 'left' && indentEm > 0.5) {
+        styleAttr += `padding-left:${indentEm}em;`;
+      }
+
+      parts.push(`<${tag} style="${styleAttr}">${inlineHtml}</${tag}>`);
+    }
+    i += 1;
+  }
+
+  parts.push(closeListTag(listState));
+  return parts.join('\n');
 };
 
 const documentGraphToEditableHtml = (documentGraph) => {
   if (!documentGraph || !Array.isArray(documentGraph.pages) || documentGraph.pages.length === 0) return '';
-  const parts = [];
-  const listState = { currentListTag: null };
+  const allParts = [];
   for (const page of documentGraph.pages) {
-    const width = Number(page?.width || 600);
-    const blocks = (Array.isArray(page?.blocks) ? page.blocks : [])
-      .map((b, idx) => {
-        const bbox = Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0];
-        return {
-          idx,
-          id: b?.id || `${Number(page?.pageNumber || 0)}:${idx}`,
-          type: String(b?.type || 'line'),
-          role: String(b?.role || 'body'),
-          text: String(b?.text || '').trim(),
-          x: Number(bbox[0] || 0),
-          y: Number(bbox[1] || 0),
-          right: Number(bbox[2] || 0),
-          style: b?.style || {},
-          runs: Array.isArray(b?.runs) ? b.runs : [],
-          table: b?.table || null,
-        };
-      })
-      .filter((b) => b.text && b.role !== 'pageHeader' && b.role !== 'pageFooter')
-      .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
-
-    let i = 0;
-    while (i < blocks.length) {
-      const row = blocks[i];
-      if (isSeparatorText(row.text)) {
-        parts.push(closeListTag(listState));
-        parts.push('<hr style="border:none;border-top:1px solid #000;margin:4px 0;" />');
-        i += 1;
-        continue;
-      }
-
-      // Canonical table projection: build contiguous table cells into <table>
-      if (row.type === 'tableCell') {
-        parts.push(closeListTag(listState));
-        const chunk = [];
-        let j = i;
-        while (j < blocks.length && blocks[j].type === 'tableCell') {
-          chunk.push(blocks[j]);
-          j += 1;
-        }
-        const grid = new Map();
-        let maxRow = 0;
-        let maxCol = 0;
-        for (const cell of chunk) {
-          const r = Number(cell?.table?.rowIndex ?? 0);
-          const c = Number(cell?.table?.columnIndex ?? 0);
-          if (!Number.isFinite(r) || !Number.isFinite(c)) continue;
-          maxRow = Math.max(maxRow, r);
-          maxCol = Math.max(maxCol, c);
-          if (!grid.has(r)) grid.set(r, new Map());
-          grid.get(r).set(c, cell);
-        }
-        const tableParts = ['<table style="border-collapse:collapse;width:100%;margin:4px 0;">'];
-        for (let r = 0; r <= maxRow; r += 1) {
-          tableParts.push('<tr>');
-          for (let c = 0; c <= maxCol; c += 1) {
-            const cell = grid.get(r)?.get(c) || null;
-            if (!cell) {
-              tableParts.push('<td style="border:1px solid #111;padding:2px 4px;"><p></p></td>');
-              continue;
-            }
-            const runs = cell.runs.length > 0 ? cell.runs : [{ text: cell.text, style: cell.style }];
-            const inline = runs.map((run) => renderStyledRun(run, cell.style)).join('');
-            const rowSpan = Math.max(1, Number(cell?.table?.rowSpan || 1));
-            const colSpan = Math.max(1, Number(cell?.table?.columnSpan || 1));
-            const spanAttrs = `${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ''}${colSpan > 1 ? ` colspan="${colSpan}"` : ''}`;
-            tableParts.push(`<td${spanAttrs} style="border:1px solid #111;padding:2px 4px;vertical-align:top;">${inline || '<p></p>'}</td>`);
-          }
-          tableParts.push('</tr>');
-        }
-        tableParts.push('</table>');
-        parts.push(tableParts.join(''));
-        i = j;
-        continue;
-      }
-
-      const isListType = /list/i.test(row.type);
-      const marker = parseListMarker(row.text);
-      const listMarker = marker || (isListType ? { kind: 'ul', content: row.text } : null);
-      const textForList = listMarker ? listMarker.content : row.text;
-      const bodyRuns = row.runs.length > 0 ? row.runs : [{ text: textForList, style: row.style }];
-      const inlineHtml = bodyRuns.map((run) => renderStyledRun(run, row.style)).join('');
-      const align = row.style?.align || (row.x / width > 0.62 ? 'right' : 'left');
-      const indentPt = Math.max(0, Math.min(72, Math.round((row.x / width) * 72)));
-      const fontSize = Math.max(9, Math.min(18, Math.round(Number(row.style?.fontSize || 12))));
-      const fontWeight = Number(row.style?.fontWeight || (row.style?.bold ? 700 : 400));
-      const lineHeight = Math.max(1.0, Math.min(2.0, Number(row.style?.lineHeight || 14) / Math.max(10, fontSize)));
-      const fontFamily = row.style?.fontFamily ? `font-family:${String(row.style.fontFamily).replace(/"/g, '')};` : '';
-      if (listMarker) {
-        if (listState.currentListTag !== listMarker.kind) {
-          parts.push(closeListTag(listState));
-          listState.currentListTag = listMarker.kind;
-          parts.push(`<${listMarker.kind}>`);
-        }
-        parts.push(
-          `<li style="text-align:${align};margin:0 0 2px 0;text-indent:${Math.max(0, indentPt - 10)}pt;font-size:${fontSize}pt;` +
-          `font-weight:${fontWeight >= 600 ? 700 : 400};line-height:${lineHeight};${fontFamily}">${inlineHtml}</li>`
-        );
-      } else {
-        parts.push(closeListTag(listState));
-        parts.push(
-          `<p style="text-align:${align};margin:0 0 2px 0;text-indent:${indentPt}pt;font-size:${fontSize}pt;` +
-          `font-weight:${fontWeight >= 600 ? 700 : 400};line-height:${lineHeight};${fontFamily}">${inlineHtml}</p>`
-        );
-      }
-      i += 1;
+    const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+    const pageWidth = Number(page?.width || 600);
+    const pageHtml = blocksToEditableHtml(blocks, pageWidth);
+    if (pageHtml.trim()) {
+      allParts.push(pageHtml);
+      allParts.push('<p style="margin:0;font-size:1px;line-height:0;">&nbsp;</p>');
     }
-    parts.push(closeListTag(listState));
-    parts.push('<p><br></p>');
   }
-  parts.push(closeListTag(listState));
-  return parts.join('\n');
+  return allParts.join('\n');
 };
 
 const layoutModelToEditableHtml = (layoutModel) => {
   if (!layoutModel || !Array.isArray(layoutModel.pages) || layoutModel.pages.length === 0) return '';
-  const parts = [];
-  const listState = { currentListTag: null };
+  const allParts = [];
   for (const page of layoutModel.pages) {
-    const width = Number(page?.width || 600);
     const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
-    const ordered = blocks
-      .map((b, idx) => {
-        const bbox = Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0];
-        return {
-          idx,
-          type: String(b?.type || 'line'),
-          role: String(b?.role || 'body'),
-          text: String(b?.text || '').trim(),
-          x: Number(bbox[0] || 0),
-          y: Number(bbox[1] || 0),
-          right: Number(bbox[2] || 0),
-          style: b?.style || {},
-          runs: Array.isArray(b?.runs) ? b.runs : [],
-        };
-      })
-      .filter((b) => b.text && b.role !== 'pageHeader' && b.role !== 'pageFooter')
-      .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
-    for (const row of ordered) {
-      if (isSeparatorText(row.text)) {
-        parts.push(closeListTag(listState));
-        parts.push('<hr style="border:none;border-top:1px solid #000;margin:4px 0;" />');
-        continue;
-      }
-      const listMarker = parseListMarker(row.text);
-      const textForList = listMarker ? listMarker.content : row.text;
-      const bodyRuns = row.runs.length > 0
-        ? row.runs
-        : [{ text: textForList, style: row.style }];
-      const inlineHtml = bodyRuns.map((run) => renderStyledRun(run, row.style)).join('');
-      const align = row.style?.align || (row.x / width > 0.62 ? 'right' : 'left');
-      const indentPt = Math.max(0, Math.min(72, Math.round((row.x / width) * 72)));
-      const fontSize = Math.max(9, Math.min(18, Math.round(Number(row.style?.fontSize || 12))));
-      const fontWeight = Number(row.style?.fontWeight || (row.style?.bold ? 700 : 400));
-      const lineHeight = Math.max(1.0, Math.min(2.0, Number(row.style?.lineHeight || 14) / Math.max(10, fontSize)));
-      const fontFamily = row.style?.fontFamily ? `font-family:${String(row.style.fontFamily).replace(/"/g, '')};` : '';
-      if (listMarker) {
-        if (listState.currentListTag !== listMarker.kind) {
-          parts.push(closeListTag(listState));
-          listState.currentListTag = listMarker.kind;
-          parts.push(`<${listMarker.kind}>`);
-        }
-        parts.push(
-          `<li style="text-align:${align};margin:0 0 2px 0;text-indent:${Math.max(0, indentPt - 10)}pt;font-size:${fontSize}pt;` +
-          `font-weight:${fontWeight >= 600 ? 700 : 400};line-height:${lineHeight};${fontFamily}">${inlineHtml}</li>`
-        );
-      } else {
-        parts.push(closeListTag(listState));
-        parts.push(
-          `<p style="text-align:${align};margin:0 0 2px 0;text-indent:${indentPt}pt;font-size:${fontSize}pt;` +
-          `font-weight:${fontWeight >= 600 ? 700 : 400};line-height:${lineHeight};${fontFamily}">${inlineHtml}</p>`
-        );
-      }
+    const pageWidth = Number(page?.width || 600);
+    const pageHtml = blocksToEditableHtml(blocks, pageWidth);
+    if (pageHtml.trim()) {
+      allParts.push(pageHtml);
+      allParts.push('<p style="margin:0;font-size:1px;line-height:0;">&nbsp;</p>');
     }
-    parts.push(closeListTag(listState));
-    parts.push('<p><br></p>');
   }
-  parts.push(closeListTag(listState));
-  return parts.join('\n');
+  return allParts.join('\n');
 };
 
 const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx, fileId }) => {
@@ -552,8 +886,17 @@ const FullPageEditor = ({
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
   const [fidelityEdits, setFidelityEdits] = useState({});
+  const [fidelityOffsets, setFidelityOffsets] = useState({});
+  const [isFidelityApplying, setIsFidelityApplying] = useState(false);
+  const [appliedFidelityPdfUrl, setAppliedFidelityPdfUrl] = useState(null);
+  // "Select All" mode: all text blocks show their outlines simultaneously (like ilovepdf)
+  const [fidelitySelectAll, setFidelitySelectAll] = useState(false);
   const [selectedFidelityBlock, setSelectedFidelityBlock] = useState(null);
   const fidelityAutosaveTimerRef = useRef(null);
+  const fidelityUndoStackRef = useRef([]);
+  const fidelityRedoStackRef = useRef([]);
+  const [, setFidelityHistoryTick] = useState(0);
+  const fidelityDragRef = useRef(null);
 
   const toast = useToast();
   const { colorMode, toggleColorMode } = useColorMode();
@@ -585,6 +928,7 @@ const FullPageEditor = ({
 
   const HIGHLIGHT_ADD = '#d1fae5';
   const HIGHLIGHT_REM = '#fee2e2';
+  const FIDELITY_LOCKED = false;
 
 
   useEffect(() => {
@@ -628,20 +972,52 @@ const FullPageEditor = ({
 
 
   const getInitialContent = useCallback(() => {
+    // ── Priority 0: Gemini layout-aware HTML (best quality) ───────────────────
+    // Gemini sees both the PDF visually and the Azure markdown text, producing
+    // HTML that matches the original layout at ~80-85%.  Only use if it contains
+    // real structural elements (headings / bold / lists / tables).
+    const gHtml = scanData?.geminiHtml || session?.geminiHtml || '';
+    const geminiHasStructure = gHtml.length > 200 &&
+      /<h[1-6][\s>]|<strong[\s>]|<b[\s>]|<ul[\s>]|<ol[\s>]|<table[\s>]|font-weight\s*:\s*bold/i.test(gHtml);
+    if (geminiHasStructure) return gHtml;
+
+    // ── Priority 1: Azure DI Markdown→HTML ───────────────────────────────────
+    // Azure DI with 2024+ API returns structured Markdown.  Only use if it
+    // contains real structural elements (not just plain <p>-wrapped text).
+    const mdHtml = scanData?.markdownHtml || session?.markdownHtml || '';
+    const mdHasStructure = mdHtml.length > 100 && /<h[1-6][\s>]|<strong[\s>]|<em[\s>]|<ul[\s>]|<ol[\s>]|<table[\s>]/i.test(mdHtml);
+    if (mdHasStructure) return mdHtml;
+
+    // ── Priority 2: Layout-model reconstruction (paragraph path) ─────────────
     const graph = session?.documentGraph || scanData?.documentGraph || null;
-    const graphHtml = documentGraphToEditableHtml(graph);
     const layoutFromGraph = documentGraphToLayoutModel(graph);
-    const layout = layoutFromGraph || session?.layoutModel || scanData?.layoutModel || null;
+    const sessionLayout = session?.layoutModel || null;
+    const scanLayout = scanData?.layoutModel || null;
+    const layoutCandidates = [sessionLayout, scanLayout, layoutFromGraph].filter(Boolean);
+    const azureLayout = layoutCandidates.find((l) => isAzureLayoutModel(l)) || null;
+    const layout = azureLayout || layoutCandidates[0] || null;
     const layoutHtml = layoutModelToEditableHtml(layout);
-    const htmlCandidate = (initialHtml && initialHtml.trim()) ? initialHtml : (session?.htmlContent || '');
-    const htmlLooksFlat = htmlCandidate && !/text-indent:|font-weight:|font-size:|text-align:|line-height:/i.test(htmlCandidate);
+    if (layoutHtml && layoutHtml.trim()) return layoutHtml;
+
+    // ── Priority 3: Document graph reconstruction ─────────────────────────────
+    const graphHtml = documentGraphToEditableHtml(graph);
     if (graphHtml && graphHtml.trim()) return graphHtml;
-    if (layoutHtml && (!htmlCandidate || htmlLooksFlat)) return layoutHtml;
+
+    // ── Priority 4: Raw htmlContent from session ──────────────────────────────
+    const htmlCandidate = (initialHtml && initialHtml.trim()) ? initialHtml : (session?.htmlContent || '');
     if (htmlCandidate && htmlCandidate.trim()) return htmlCandidate;
+
+    // ── Priority 5: Plain text fallback ──────────────────────────────────────
     const text = session?.currentText || session?.originalText || '';
     if (!text) return '<p></p>';
     return textToHtml(text);
-  }, [initialHtml, session, scanData?.layoutModel, scanData?.documentGraph, textToHtml]);
+  }, [initialHtml, session, scanData?.layoutModel, scanData?.documentGraph, scanData?.markdownHtml, scanData?.geminiHtml, textToHtml]);
+
+  useEffect(() => {
+    if (FIDELITY_LOCKED && editorViewMode === 'fidelity') {
+      setEditorViewMode('editable');
+    }
+  }, [editorViewMode, FIDELITY_LOCKED]);
 
 
   const editor = useEditor({
@@ -828,6 +1204,7 @@ const FullPageEditor = ({
         await fileService.saveHtmlContent('', '', selectedFile?._id, {
           mode: 'fidelity',
           fidelityEdits,
+          fidelityOffsets,
         });
       } else {
         await fileService.saveHtmlContent(html, plainText, selectedFile?._id, { mode: 'editable' });
@@ -849,10 +1226,17 @@ const FullPageEditor = ({
   };
 
   const fidelityLayout = useMemo(() => {
+    // ALWAYS prefer the Azure layoutModel — its bounding boxes are in the same
+    // coordinate space as the pdf.js canvas (both derived from the PDF units).
+    // documentGraph uses a different pixel scale and causes severe misalignment.
+    const sessionLayout = session?.layoutModel || null;
+    const scanLayout    = scanData?.layoutModel  || null;
+    if (sessionLayout?.pages?.length) return sessionLayout;
+    if (scanLayout?.pages?.length)    return scanLayout;
+    // Only fall back to documentGraph conversion if no layoutModel exists at all
     const graph = session?.documentGraph || scanData?.documentGraph || null;
-    const layoutFromGraph = documentGraphToLayoutModel(graph);
-    return layoutFromGraph || session?.layoutModel || scanData?.layoutModel || null;
-  }, [session?.documentGraph, scanData?.documentGraph, session?.layoutModel, scanData?.layoutModel]);
+    return documentGraphToLayoutModel(graph) || null;
+  }, [session?.layoutModel, scanData?.layoutModel, session?.documentGraph, scanData?.documentGraph]);
   const fidelityPagesToRender = useMemo(() => {
     const pages = Array.isArray(fidelityLayout?.pages) ? fidelityLayout.pages : [];
     const pageMap = new Map(pages.map((p) => [Number(p?.pageNumber || 0), p]));
@@ -885,6 +1269,77 @@ const FullPageEditor = ({
   }, [fidelityLayout, scanData?.scanResults?.layoutDiagnostics?.pages, scanResults?.layoutDiagnostics?.pages, session?.scanResults?.layoutDiagnostics?.pages]);
 
   const hasFidelityLayout = fidelityPagesToRender.length > 0;
+
+  // ── Fidelity vertical collision detection ────────────────────────────────
+  // OCR bounding boxes are tight and HTML font rendering may be slightly wider
+  // than the PDF font, causing text to wrap and overlap neighbouring blocks.
+  // For each page, sort blocks by Y and nudge any block whose top falls inside
+  // the estimated bottom of a preceding horizontally-overlapping block.
+  const fidelityCollisionNudges = useMemo(() => {
+    const nudges = {}; // blockKey -> nudgeY px
+    for (const page of fidelityPagesToRender) {
+      const pageNumber = Number(page?.pageNumber || 1);
+      const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+
+      // Build working list with estimated geometry
+      const items = blocks
+        .map((block, bIdx) => {
+          const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
+          const [bx1, by1, bx2, by2] = bbox;
+          const blockKey = getFidelityBlockKey(pageNumber, bIdx, block);
+          const offset = fidelityOffsets?.[blockKey] || { x: 0, y: 0 };
+          const fontSizePx = Math.max(9, Number(block?.style?.fontSize || 11));
+          const width = Math.max(30, bx2 - bx1);
+          const text = String(block?.text || '');
+          const bboxH = Math.max(fontSizePx, by2 - by1);
+          // Rough char-per-line estimate (average char ≈ 0.55× font size)
+          const charsPerLine = Math.max(1, Math.floor(width / (fontSizePx * 0.55)));
+          const estLines = Math.max(1, Math.ceil(text.length / charsPerLine));
+          const lineH = fontSizePx * 1.4;
+          const estimatedH = Math.max(bboxH, estLines * lineH);
+          return {
+            blockKey,
+            x1: bx1 + Number(offset.x || 0),
+            y1: by1 + Number(offset.y || 0),
+            x2: bx2 + Number(offset.x || 0),
+            estimatedH,
+            fontSizePx,
+            skip: isImageLikeBlock(block) || isSeparatorText(text),
+          };
+        })
+        .filter((it) => !it.skip);
+
+      // Sort top-to-bottom, left-to-right
+      items.sort((a, b) => (a.y1 - b.y1) || (a.x1 - b.x1));
+
+      for (let i = 0; i < items.length - 1; i += 1) {
+        const curr = items[i];
+        for (let j = i + 1; j < items.length; j += 1) {
+          const next = items[j];
+          // If next block starts well below curr's estimated bottom, stop inner loop
+          if (next.y1 > curr.y1 + curr.estimatedH + curr.fontSizePx * 2) break;
+
+          // Only nudge if the two blocks SHARE horizontal space (not side-by-side columns)
+          const xOverlap = curr.x1 < next.x2 - 4 && curr.x2 > next.x1 + 4;
+          if (!xOverlap) continue;
+
+          const currBottom = curr.y1 + curr.estimatedH;
+          const minGap = curr.fontSizePx * 0.2;
+          if (next.y1 < currBottom + minGap) {
+            const shift = (currBottom + minGap) - next.y1;
+            // Cap nudge to avoid runaway layout (max 3 lines)
+            const cappedShift = Math.min(shift, curr.fontSizePx * 3);
+            if (cappedShift > 0) {
+              nudges[next.blockKey] = (nudges[next.blockKey] || 0) + cappedShift;
+              next.y1 += cappedShift; // propagate to subsequent comparisons
+            }
+          }
+        }
+      }
+    }
+    return nudges;
+  }, [fidelityPagesToRender, fidelityOffsets]);
+
   const pdfCanvasUrl = useMemo(() => (
     resolvePdfUrl(selectedFile?.fileUrl || selectedFile?.url || session?.fileUrl || '')
   ), [selectedFile?.fileUrl, selectedFile?.url, session?.fileUrl]);
@@ -965,11 +1420,161 @@ const FullPageEditor = ({
     return Object.prototype.hasOwnProperty.call(fidelityEdits, key) ? fidelityEdits[key] : fallbackText;
   }, [fidelityEdits, getFidelityBlockKey]);
 
+  const isImageLikeBlock = useCallback((block = {}) => {
+    const t = String(block?.type || '').toLowerCase();
+    const r = String(block?.role || '').toLowerCase();
+    return /image|figure|photo|graphic|signature|stamp/.test(t) || /image|figure|graphic|signature|stamp/.test(r);
+  }, []);
+
+  const pushFidelityUndoSnapshot = useCallback((snapshot) => {
+    const safe = snapshot && typeof snapshot === 'object' ? snapshot : {};
+    const undo = fidelityUndoStackRef.current;
+    undo.push(safe);
+    if (undo.length > 100) undo.shift();
+    fidelityRedoStackRef.current = [];
+    setFidelityHistoryTick((n) => n + 1);
+  }, []);
+
+  const handleFidelityUndo = useCallback(() => {
+    const undo = fidelityUndoStackRef.current;
+    if (undo.length === 0) return;
+    const current = fidelityEdits && typeof fidelityEdits === 'object' ? fidelityEdits : {};
+    const prev = undo.pop() || {};
+    fidelityRedoStackRef.current.push(current);
+    setFidelityEdits(prev);
+    setHasUnsavedChanges(true);
+    setFidelityHistoryTick((n) => n + 1);
+  }, [fidelityEdits]);
+
+  const handleFidelityRedo = useCallback(() => {
+    const redo = fidelityRedoStackRef.current;
+    if (redo.length === 0) return;
+    const current = fidelityEdits && typeof fidelityEdits === 'object' ? fidelityEdits : {};
+    const next = redo.pop() || {};
+    fidelityUndoStackRef.current.push(current);
+    setFidelityEdits(next);
+    setHasUnsavedChanges(true);
+    setFidelityHistoryTick((n) => n + 1);
+  }, [fidelityEdits]);
+
+  const applySuggestionToFidelity = useCallback((suggestion) => {
+    const suggested = String(suggestion?.suggestedText || '').trim();
+    if (!suggested) return false;
+
+    const normalized = suggested.replace(/\r\n/g, '\n');
+    let targetId = selectedFidelityBlock?.id || null;
+    let targetKey = targetId || null;
+
+    if (!targetKey) {
+      const firstPage = Array.isArray(fidelityPagesToRender) ? fidelityPagesToRender.find((p) => Array.isArray(p?.blocks) && p.blocks.length > 0) : null;
+      if (firstPage) {
+        targetKey = getFidelityBlockKey(Number(firstPage.pageNumber || 1), 0, firstPage.blocks[0]);
+      }
+    }
+    if (!targetKey) return false;
+
+    const existing = Object.prototype.hasOwnProperty.call(fidelityEdits, targetKey)
+      ? String(fidelityEdits[targetKey] || '')
+      : '';
+    const next = existing.trim()
+      ? `${existing.replace(/\s+$/, '')}\n${normalized}`
+      : normalized;
+
+    pushFidelityUndoSnapshot(fidelityEdits);
+    setFidelityEdits((prev) => ({ ...prev, [targetKey]: next }));
+    setSelectedFidelityBlock((prev) => prev?.id === targetKey ? prev : (prev || { id: targetKey }));
+    setHasUnsavedChanges(true);
+    return true;
+  }, [selectedFidelityBlock, fidelityPagesToRender, getFidelityBlockKey, fidelityEdits, pushFidelityUndoSnapshot]);
+
   useEffect(() => {
     if (session?.fidelityEdits && typeof session.fidelityEdits === 'object') {
       setFidelityEdits(session.fidelityEdits);
+      fidelityUndoStackRef.current = [];
+      fidelityRedoStackRef.current = [];
+      setFidelityHistoryTick((n) => n + 1);
     }
   }, [session?.fidelityEdits]);
+
+  useEffect(() => {
+    if (session?.fidelityOffsets && typeof session.fidelityOffsets === 'object') {
+      setFidelityOffsets(session.fidelityOffsets);
+    } else if (!session?.fidelityOffsets) {
+      setFidelityOffsets({});
+    }
+  }, [session?.fidelityOffsets]);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (editorViewMode !== 'fidelity') return;
+      const isMod = e.ctrlKey || e.metaKey;
+      if (!isMod) return;
+      const key = String(e.key || '').toLowerCase();
+      if (key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        handleFidelityRedo();
+        return;
+      }
+      if (key === 'y') {
+        e.preventDefault();
+        handleFidelityRedo();
+        return;
+      }
+      if (key === 'z') {
+        e.preventDefault();
+        handleFidelityUndo();
+        return;
+      }
+      // Ctrl/Cmd+A → toggle Select All boxes
+      if (key === 'a') {
+        e.preventDefault();
+        setFidelitySelectAll((v) => !v);
+      }
+      // Escape → deselect / exit select-all
+    };
+    const onKeyUp = (e) => {
+      if (editorViewMode !== 'fidelity') return;
+      if (e.key === 'Escape') {
+        setSelectedFidelityBlock(null);
+        setFidelitySelectAll(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [editorViewMode, handleFidelityRedo, handleFidelityUndo]);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!fidelityDragRef.current) return;
+      const { key, startX, startY, baseX, baseY } = fidelityDragRef.current;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      setFidelityOffsets((prev) => ({
+        ...prev,
+        [key]: {
+          x: Math.round(baseX + dx),
+          y: Math.round(baseY + dy),
+        },
+      }));
+      setHasUnsavedChanges(true);
+    };
+    const onUp = () => {
+      if (!fidelityDragRef.current) return;
+      fidelityDragRef.current = null;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
 
   useEffect(() => {
     if (editorViewMode !== 'fidelity') return undefined;
@@ -979,6 +1584,7 @@ const FullPageEditor = ({
         await fileService.saveHtmlContent('', '', selectedFile?._id, {
           mode: 'fidelity',
           fidelityEdits,
+          fidelityOffsets,
         });
         setLastSaved(new Date());
       } catch (err) {
@@ -988,7 +1594,7 @@ const FullPageEditor = ({
     return () => {
       if (fidelityAutosaveTimerRef.current) clearTimeout(fidelityAutosaveTimerRef.current);
     };
-  }, [editorViewMode, fidelityEdits, selectedFile?._id]);
+  }, [editorViewMode, fidelityEdits, fidelityOffsets, selectedFile?._id]);
 
 
   const handleAIEdit = async () => {
@@ -1232,6 +1838,39 @@ const FullPageEditor = ({
 
   const handleApplySuggestion = async (suggestion) => {
     try {
+      if (editorViewMode === 'fidelity') {
+        const fidelityApplied = applySuggestionToFidelity(suggestion);
+        if (fidelityApplied) {
+          setChangeHistory(prev => [...prev, {
+            type: 'suggestion',
+            instruction: suggestion.title || 'Suggestion Applied',
+            summary: `Inserted in fidelity view: "${(suggestion.suggestedText || '').substring(0, 80)}..."`,
+            originalText: suggestion.originalText || '',
+            suggestedText: suggestion.suggestedText || '',
+            timestamp: new Date().toISOString(),
+            applied: true,
+            reverted: false,
+            mode: 'fidelity',
+          }]);
+          toast({
+            title: 'Suggestion inserted in fidelity view',
+            description: selectedFidelityBlock?.id
+              ? 'Applied to selected block.'
+              : 'No block selected, so applied to the first text block.',
+            status: 'success',
+            duration: 2500,
+          });
+          return;
+        }
+        toast({
+          title: 'No fidelity block available',
+          description: 'Could not find a target block to insert the suggestion.',
+          status: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
       let applied = false;
       let toastDesc = 'Marked as reviewed';
 
@@ -2115,7 +2754,14 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           </Box>
         )}
 
-        <EditorToolbar data-tour="editor-toolbar" editor={editor} />
+        <EditorToolbar
+          data-tour="editor-toolbar"
+          editor={editor}
+          onUndo={editorViewMode === 'fidelity' ? handleFidelityUndo : undefined}
+          onRedo={editorViewMode === 'fidelity' ? handleFidelityRedo : undefined}
+          canUndo={editorViewMode === 'fidelity' ? fidelityUndoStackRef.current.length > 0 : undefined}
+          canRedo={editorViewMode === 'fidelity' ? fidelityRedoStackRef.current.length > 0 : undefined}
+        />
 
 
         <ModalBody p={0} display="flex" flexDirection="row" overflow="hidden" data-editor-flex-row>
@@ -2394,6 +3040,93 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             >
               {editorViewMode === 'fidelity' && hasFidelityLayout ? (
                 <VStack align="stretch" spacing={6} p={4}>
+                  {/* ── Fidelity: Select-All toolbar ───────────────────────── */}
+                  <HStack
+                    bg={fidelitySelectAll ? 'purple.50' : 'gray.50'}
+                    border="1px solid"
+                    borderColor={fidelitySelectAll ? 'purple.300' : 'gray.200'}
+                    borderRadius="md"
+                    px={4} py={2}
+                    justify="space-between"
+                    flexWrap="wrap"
+                    gap={2}
+                  >
+                    <HStack spacing={2}>
+                      <Button
+                        size="sm"
+                        colorScheme={fidelitySelectAll ? 'purple' : 'gray'}
+                        variant={fidelitySelectAll ? 'solid' : 'outline'}
+                        onClick={() => {
+                          setFidelitySelectAll((v) => !v);
+                          if (fidelitySelectAll) setSelectedFidelityBlock(null);
+                        }}
+                        leftIcon={
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="0.5" y="0.5" width="5" height="5" rx="0.5" stroke="currentColor"/>
+                            <rect x="8.5" y="0.5" width="5" height="5" rx="0.5" stroke="currentColor"/>
+                            <rect x="0.5" y="8.5" width="5" height="5" rx="0.5" stroke="currentColor"/>
+                            <rect x="8.5" y="8.5" width="5" height="5" rx="0.5" stroke="currentColor"/>
+                          </svg>
+                        }
+                      >
+                        {fidelitySelectAll ? 'Deselect All' : 'Select All Boxes'}
+                      </Button>
+                      {fidelitySelectAll && (
+                        <Text fontSize="xs" color="purple.600">
+                          All text boxes highlighted — click any to focus &amp; drag
+                        </Text>
+                      )}
+                    </HStack>
+                    <Text fontSize="xs" color="gray.500">
+                      {fidelityPagesToRender.reduce((n, p) => n + (Array.isArray(p?.blocks) ? p.blocks.filter((b) => !isImageLikeBlock(b) && !isSeparatorText(b?.text || '')).length : 0), 0)} editable blocks
+                    </Text>
+                  </HStack>
+
+                  {/* ── Fidelity: Apply edits directly to PDF ──────────────── */}
+                  {Object.keys(fidelityEdits || {}).length > 0 && (
+                    <HStack
+                      bg="purple.50"
+                      border="1px solid"
+                      borderColor="purple.200"
+                      borderRadius="md"
+                      px={4} py={2}
+                      justify="space-between"
+                    >
+                      <Text fontSize="sm" color="purple.700" fontWeight="500">
+                        {Object.keys(fidelityEdits).length} block(s) edited — apply changes directly into the PDF
+                      </Text>
+                      <Button
+                        size="sm"
+                        colorScheme="purple"
+                        leftIcon={<FiSave />}
+                        isLoading={isFidelityApplying}
+                        loadingText="Applying…"
+                        onClick={async () => {
+                          setIsFidelityApplying(true);
+                          try {
+                            const newPdfUrl = await fileService.applyFidelityEditsToPdf(
+                              selectedFile?._id,
+                              fidelityEdits,
+                              fidelityOffsets,
+                            );
+                            setAppliedFidelityPdfUrl(newPdfUrl);
+                            toast({
+                              title: 'PDF updated',
+                              description: 'Edits baked into the PDF. Use "Download as PDF" to save.',
+                              status: 'success',
+                              duration: 4000,
+                            });
+                          } catch (err) {
+                            toast({ title: 'Apply failed', description: err.message, status: 'error', duration: 4000 });
+                          } finally {
+                            setIsFidelityApplying(false);
+                          }
+                        }}
+                      >
+                        Apply to PDF
+                      </Button>
+                    </HStack>
+                  )}
                   {fidelityPagesToRender.map((page) => {
                     const pageNumber = Number(page?.pageNumber || 1);
                     const pageWidth = Number(page?.width || 794);
@@ -2404,7 +3137,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                         <Text fontSize="xs" color="gray.500" mb={2}>Page {pageNumber}</Text>
                         <Box position="relative" w={`${pageWidth}px`} maxW="none" h={`${pageHeight}px`} overflow="hidden" bg="gray.50">
                           <PdfPageCanvas
-                            pdfUrl={pdfCanvasUrl}
+                            pdfUrl={appliedFidelityPdfUrl || pdfCanvasUrl}
                             pageNumber={pageNumber}
                             targetWidthPx={pageWidth}
                             fileId={selectedFile?._id || session?.fileId}
@@ -2412,32 +3145,102 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                           {blocks.map((block, bIdx) => {
                             const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
                             const [x1, y1, x2, y2] = bbox;
+                            const originalText = String(block?.text || '');
+                            const isSep = isSeparatorText(originalText);
+                            const isImageLike = isImageLikeBlock(block);
+                            if (isImageLike || isSep) return null;
+                            const width = Math.max(30, x2 - x1);
+                            const height = Math.max(18, y2 - y1);
+                            const fontSizePxMask = Math.max(9, Number(block?.style?.fontSize || 11));
+                            const maskBuffer = Math.max(6, Math.round(fontSizePxMask * 0.6));
+                            const maskKey = getFidelityBlockKey(pageNumber, bIdx, block);
+                            const offsetMask = fidelityOffsets?.[maskKey] || { x: 0, y: 0 };
+                            const nudgeMask = fidelityCollisionNudges[maskKey] || 0;
+                            return (
+                              <Box
+                                key={`mask-${pageNumber}-${bIdx}`}
+                                position="absolute"
+                                left={`${Math.max(0, x1 + Number(offsetMask.x || 0) - 1)}px`}
+                                top={`${Math.max(0, y1 + Number(offsetMask.y || 0) + nudgeMask - 1)}px`}
+                                w={`${width + 4}px`}
+                                minH={`${height + maskBuffer}px`}
+                                bg="white"
+                                opacity={0.98}
+                                pointerEvents="none"
+                                zIndex={1}
+                              />
+                            );
+                          })}
+                          {blocks.map((block, bIdx) => {
+                            const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
+                            const [x1, y1, x2, y2] = bbox;
                             const blockKey = getFidelityBlockKey(pageNumber, bIdx, block);
                             const originalText = String(block?.text || '');
                             const hasManualEdit = Object.prototype.hasOwnProperty.call(fidelityEdits, blockKey);
-                            const text = hasManualEdit ? getFidelityText(pageNumber, bIdx, originalText, block) : '';
+                            const text = getFidelityText(pageNumber, bIdx, originalText, block);
+                            const offset = fidelityOffsets?.[blockKey] || { x: 0, y: 0 };
+                            const collisionNudge = fidelityCollisionNudges[blockKey] || 0;
                             const width = Math.max(30, x2 - x1);
                             const height = Math.max(18, y2 - y1);
                             const isSep = isSeparatorText(originalText);
+                            const isImageLike = isImageLikeBlock(block);
+                            const fontSizePx = Math.max(9, Number(block?.style?.fontSize || 11));
+                            const runs = Array.isArray(block?.runs) ? block.runs : [];
+                            const hasBoldRun = runs.some((run) => {
+                              const s = run?.style || {};
+                              return Number(s?.fontWeight || 0) >= 600 || !!s?.bold;
+                            });
+                            const resolvedFontWeight = (Number(block?.style?.fontWeight || 0) >= 600 || block?.style?.bold || hasBoldRun) ? 700 : 400;
+                            const styleLineHeight = Number(block?.style?.lineHeight || 0);
+                            const resolvedLineHeightPx = Math.max(Math.round(fontSizePx * 1.25), Number.isFinite(styleLineHeight) ? styleLineHeight : 0);
+                            const isLineLikeBlock = /line|word/i.test(String(block?.type || ''));
                             return (
                               <Box
                                 key={blockKey}
                                 position="absolute"
-                                left={`${x1}px`}
-                                top={`${y1}px`}
+                                left={`${x1 + Number(offset.x || 0)}px`}
+                                top={`${y1 + Number(offset.y || 0) + collisionNudge}px`}
                                 w={`${width}px`}
-                                minH={`${height}px`}
+                                minH={`${Math.max(height, resolvedLineHeightPx + 2)}px`}
+                                h="auto"
                                 px={1}
                                 py={0.5}
                                 border="1px dashed"
-                                borderColor={selectedFidelityBlock?.id === blockKey ? 'purple.500' : 'transparent'}
-                                bg={selectedFidelityBlock?.id === blockKey ? 'purple.50' : 'transparent'}
-                                fontSize={`${Math.max(9, Number(block?.style?.fontSize || 11))}px`}
+                                borderColor={
+                                  selectedFidelityBlock?.id === blockKey
+                                    ? 'purple.600'
+                                    : fidelitySelectAll && !isImageLike
+                                      ? 'blue.400'
+                                      : 'transparent'
+                                }
+                                boxShadow={
+                                  selectedFidelityBlock?.id === blockKey
+                                    ? '0 0 0 1px var(--chakra-colors-purple-500)'
+                                    : fidelitySelectAll && !isImageLike
+                                      ? '0 0 0 1px var(--chakra-colors-blue-300)'
+                                      : 'none'
+                                }
+                                bg={
+                                  isImageLike
+                                    ? 'transparent'
+                                    : selectedFidelityBlock?.id === blockKey
+                                      ? 'purple.50'
+                                      : fidelitySelectAll
+                                        ? 'blue.50'
+                                        : 'whiteAlpha.950'
+                                }
+                                fontSize={`${fontSizePx}px`}
                                 fontFamily={block?.style?.fontFamily || undefined}
-                                lineHeight={block?.style?.lineHeight ? `${Math.max(10, Number(block.style.lineHeight))}px` : undefined}
-                                fontWeight={Number(block?.style?.fontWeight || 0) >= 600 || block?.style?.bold ? 700 : 400}
+                                lineHeight={`${resolvedLineHeightPx}px`}
+                                fontWeight={resolvedFontWeight}
                                 textAlign={block?.style?.align || 'left'}
                                 whiteSpace="pre-wrap"
+                                cursor="text"
+                                _hover={
+                                  fidelitySelectAll
+                                    ? { borderColor: 'purple.400', bg: isImageLike ? 'transparent' : 'purple.50' }
+                                    : undefined
+                                }
                                 onClick={() => setSelectedFidelityBlock({
                                   id: blockKey,
                                   page: pageNumber,
@@ -2446,6 +3249,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                   confidence: block?.confidence ?? null,
                                   type: block?.type || 'line',
                                 })}
+                                zIndex={2}
                               >
                                 {isSep ? (
                                   <Box
@@ -2459,24 +3263,91 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                     opacity={0.9}
                                   />
                                 ) : (
-                                  <Textarea
-                                    variant="unstyled"
-                                    resize="none"
-                                    overflow="hidden"
-                                    value={text}
-                                    placeholder={hasManualEdit ? '' : ''}
-                                    minH={`${height}px`}
-                                    onFocus={() => {
-                                      if (!hasManualEdit) {
-                                        setFidelityEdits((prev) => ({ ...prev, [blockKey]: originalText }));
-                                      }
-                                    }}
-                                    onChange={(e) => {
-                                      const next = e.target.value;
-                                      setFidelityEdits((prev) => ({ ...prev, [blockKey]: next }));
-                                      setHasUnsavedChanges(true);
-                                    }}
-                                  />
+                                  <>
+                                    {selectedFidelityBlock?.id === blockKey && (
+                                      <Box
+                                        position="absolute"
+                                        right="2px"
+                                        top="1px"
+                                        zIndex={3}
+                                        fontSize="9px"
+                                        lineHeight="1"
+                                        px={1}
+                                        py={0.5}
+                                        bg="blackAlpha.600"
+                                        color="white"
+                                        borderRadius="3px"
+                                        cursor="grab"
+                                        title="Drag to align this text block"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          const base = fidelityOffsets?.[blockKey] || { x: 0, y: 0 };
+                                          fidelityDragRef.current = {
+                                            key: blockKey,
+                                            startX: e.clientX,
+                                            startY: e.clientY,
+                                            baseX: Number(base.x || 0),
+                                            baseY: Number(base.y || 0),
+                                          };
+                                          document.body.style.userSelect = 'none';
+                                          document.body.style.cursor = 'grabbing';
+                                        }}
+                                      >
+                                        Drag
+                                      </Box>
+                                    )}
+                                    <Textarea
+                                      variant="unstyled"
+                                      resize="none"
+                                      wrap={isLineLikeBlock ? 'off' : 'soft'}
+                                      value={text}
+                                      placeholder={hasManualEdit ? '' : ''}
+                                      minH={`${Math.max(height, resolvedLineHeightPx + 2)}px`}
+                                      // Auto-resize: fit height to content so text never overflows
+                                      ref={(el) => {
+                                        if (!el) return;
+                                        el.style.height = 'auto';
+                                        el.style.height = `${el.scrollHeight}px`;
+                                      }}
+                                      onInput={(e) => {
+                                        const el = e.currentTarget;
+                                        el.style.height = 'auto';
+                                        el.style.height = `${el.scrollHeight}px`;
+                                      }}
+                                      onFocus={(e) => {
+                                        if (!hasManualEdit) {
+                                          setFidelityEdits((prev) => ({ ...prev, [blockKey]: originalText }));
+                                        }
+                                        // Re-fit on focus in case content changed
+                                        const el = e.currentTarget;
+                                        el.style.height = 'auto';
+                                        el.style.height = `${el.scrollHeight}px`;
+                                      }}
+                                      onChange={(e) => {
+                                        const next = e.target.value;
+                                        pushFidelityUndoSnapshot(fidelityEdits);
+                                        setFidelityEdits((prev) => ({ ...prev, [blockKey]: next }));
+                                        setHasUnsavedChanges(true);
+                                      }}
+                                      sx={{
+                                        width: '100%',
+                                        fontFamily: 'inherit',
+                                        fontSize: 'inherit',
+                                        fontWeight: 'inherit',
+                                        lineHeight: 'inherit',
+                                        color: 'inherit',
+                                        textAlign: 'inherit',
+                                        whiteSpace: isLineLikeBlock ? 'pre' : 'pre-wrap',
+                                        p: 0,
+                                        m: 0,
+                                        border: 'none',
+                                        bg: 'transparent',
+                                        overflow: 'hidden',
+                                        _focusVisible: { boxShadow: 'none' },
+                                      }}
+                                    />
+                                  </>
                                 )}
                               </Box>
                             );

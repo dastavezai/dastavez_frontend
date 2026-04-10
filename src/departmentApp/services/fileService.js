@@ -251,6 +251,25 @@ const fileService = {
     }
   },
 
+  /**
+   * Apply fidelity text edits directly into the PDF via pdf-lib on the backend.
+   * Returns a Blob (application/pdf) of the modified PDF ready for display.
+   */
+  applyFidelityEditsToPdf: async (fileId, fidelityEdits, fidelityOffsets = {}) => {
+    try {
+      const response = await api.post(
+        `${API_URL}/edit/fidelity-apply`,
+        { fileId, fidelityEdits, fidelityOffsets },
+        { responseType: 'arraybuffer', timeout: 60000 }
+      );
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Fidelity PDF apply error:', error);
+      throw error;
+    }
+  },
+
   
   aiChatAboutDocument: async (message, selectedText = '', chatHistory = [], language = 'en') => {
     try {
