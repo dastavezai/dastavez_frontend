@@ -246,6 +246,110 @@ const bboxOverlapRatio = (a, b) => {
   return area / areaA;
 };
 
+const inferAlignFromLine = (x1, x2, pageWidth) => {
+  if (!pageWidth) return 'left';
+  const leftRatio = x1 / pageWidth;
+  const rightRatio = x2 / pageWidth;
+  const mid = (leftRatio + rightRatio) / 2;
+  if (mid > 0.42 && mid < 0.58 && rightRatio < 0.85) return 'center';
+  if (leftRatio > 0.62) return 'right';
+  return 'left';
+};
+
+const buildPdfTextLineBlocks = (items, pageNumber, pageWidth, tableCells = []) => {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const valid = items.filter((it) => String(it?.text || '').trim().length > 0);
+  if (valid.length === 0) return [];
+
+  // Group items into lines by y proximity.
+  const sorted = valid.slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const lines = [];
+  const lineThreshold = (it) => Math.max(2, Number(it.height || 0) * 0.6);
+
+  for (const item of sorted) {
+    const threshold = lineThreshold(item);
+    let line = lines.find((l) => Math.abs(l.y - item.y) <= threshold);
+    if (!line) {
+      line = { items: [], y: item.y };
+      lines.push(line);
+    }
+    line.items.push(item);
+    line.y = (line.y * (line.items.length - 1) + item.y) / line.items.length;
+  }
+
+  const tableBboxes = tableCells.map((c) => c.bbox).filter(Boolean);
+
+  const blocks = lines.map((line, idx) => {
+    const parts = line.items.slice().sort((a, b) => a.x - b.x);
+    const xs = parts.map((p) => p.x);
+    const ys = parts.map((p) => p.y);
+    const rights = parts.map((p) => p.right);
+    const bottoms = parts.map((p) => p.bottom);
+    const x1 = Math.min(...xs);
+    const y1 = Math.min(...ys);
+    const x2 = Math.max(...rights);
+    const y2 = Math.max(...bottoms);
+
+    // Skip if line falls inside a table cell.
+    for (const tb of tableBboxes) {
+      if (bboxOverlapRatio([x1, y1, x2, y2], tb) > 0.3) return null;
+    }
+
+    let text = '';
+    let lastRight = null;
+    const fontFamilies = new Map();
+    const fontWeights = new Map();
+    const fontStyles = new Map();
+    let avgHeight = 0;
+
+    for (const p of parts) {
+      const gap = lastRight !== null ? (p.x - lastRight) : 0;
+      const fontSizeGuess = Math.max(8, Number(p.height || 10) * 0.9);
+      const spaceThreshold = Math.max(2, fontSizeGuess * 0.35);
+      if (lastRight !== null && gap > spaceThreshold && !/^[\.,:;)\]]/.test(p.text || '')) {
+        text += ' ';
+      }
+      text += String(p.text || '');
+      lastRight = p.right;
+      avgHeight += Number(p.height || 0);
+      const ff = String(p.fontFamily || p.fontName || '').trim();
+      if (ff) fontFamilies.set(ff, (fontFamilies.get(ff) || 0) + 1);
+      const fw = String(p.fontWeight || '').trim();
+      if (fw) fontWeights.set(fw, (fontWeights.get(fw) || 0) + 1);
+      const fs = String(p.fontStyle || '').trim();
+      if (fs) fontStyles.set(fs, (fontStyles.get(fs) || 0) + 1);
+    }
+
+    const best = (m) => [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+    const fontFamily = best(fontFamilies);
+    const fontWeightRaw = best(fontWeights);
+    const fontStyleRaw = best(fontStyles);
+    const fontWeight = /bold/i.test(fontFamily) || /bold/i.test(fontWeightRaw) ? 700 : 400;
+    const fontStyle = /italic|oblique/i.test(fontFamily) || /italic|oblique/i.test(fontStyleRaw) ? 'italic' : 'normal';
+    const fontSize = Math.max(9, Math.min(18, Math.round((avgHeight / parts.length) || 11)));
+    const lineHeight = Math.max(10, Math.round(fontSize * 1.25));
+
+    return {
+      id: `pdfline_${pageNumber}_${idx}_${Math.round(x1)}_${Math.round(y1)}`,
+      type: 'line',
+      role: 'body',
+      text,
+      bbox: [x1, y1, x2, y2],
+      style: {
+        align: inferAlignFromLine(x1, x2, pageWidth),
+        fontSize,
+        bold: fontWeight >= 600,
+        fontFamily: normalizeFontFamily(fontFamily),
+        fontWeight,
+        lineHeight,
+        fontStyle,
+      },
+    };
+  }).filter(Boolean);
+
+  return blocks;
+};
+
 const isSeparatorText = (text = '') => /^[-=_]{5,}$/.test(String(text || '').trim());
 
 const documentGraphToLayoutModel = (documentGraph) => {
@@ -1460,6 +1564,7 @@ const FullPageEditor = ({
               bottom: Math.max(0, top + h),
               width: w,
               height: h,
+              fontName: item.fontName || null,
               fontFamily: font?.fontFamily || null,
               fontWeight: font?.fontWeight || null,
               fontStyle: font?.fontStyle || null,
@@ -1605,11 +1710,21 @@ const FullPageEditor = ({
       const textLayer = pdfTextLayersByPage?.[pageNumber] || null;
       const textItems = Array.isArray(textLayer?.items) ? textLayer.items : [];
       const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+      const pageWidth = Number(page?.width || 794);
 
-      const overlayBlocks = blocks.map((block, bIdx) => {
+      const tableCells = blocks.filter((b) => b?.type === 'tableCell');
+      const textLineBlocks = textItems.length >= 5
+        ? buildPdfTextLineBlocks(textItems, pageNumber, pageWidth, tableCells)
+        : null;
+
+      const overlaySource = Array.isArray(textLineBlocks) && textLineBlocks.length > 0
+        ? [...textLineBlocks, ...tableCells]
+        : blocks;
+
+      const overlayBlocks = overlaySource.map((block, bIdx) => {
         const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
         const [bx1, by1, bx2, by2] = bbox;
-        const blockKey = getFidelityBlockKey(pageNumber, bIdx, block);
+        const blockKey = block?.id ? String(block.id) : getFidelityBlockKey(pageNumber, bIdx, block);
         const offset = fidelityOffsets?.[blockKey] || { x: 0, y: 0 };
         const text = getFidelityText(pageNumber, bIdx, String(block?.text || ''), block);
         const width = Math.max(30, bx2 - bx1);
@@ -1675,6 +1790,7 @@ const FullPageEditor = ({
             fontStyle,
             fontSize: fontSizePx,
             lineHeight: lineHeightPx,
+            align: block?.style?.align || inferAlignFromLine(bx1, bx2, pageWidth),
           },
         };
       });
