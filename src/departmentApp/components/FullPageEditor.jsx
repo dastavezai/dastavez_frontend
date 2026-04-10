@@ -34,6 +34,7 @@ import {
   Spinner,
   Flex,
   Icon,
+  Select,
 } from '@chakra-ui/react';
 import {
   FiSave,
@@ -80,6 +81,8 @@ import PageBreakExtension, { useAutoPageBreak } from './editor/PageBreakExtensio
 import FontSize from './editor/FontSizeExtension.jsx';
 import LegalParagraphStyle from './editor/LegalParagraphStyleExtension.jsx';
 import DocumentConverter from './editor/DocumentConverter.jsx';
+import { buildDocFlow } from './editor/DocFlowEngine.js';
+import { extractPageObjects } from './editor/ObjectLayer.js';
 import { useAppTheme } from '../context/ThemeContext';
 import DemoLauncher from './DemoMode/DemoLauncher';
 import './FullPageEditor.css';
@@ -133,9 +136,20 @@ const FONT_FAMILY_MAP = [
   { test: /georgia/gi, css: "Georgia, 'Times New Roman', Times, serif" },
 ];
 
+const EXTRACTED_FONT_FAMILIES = new Set();
+const registerExtractedFontFamilies = (families = []) => {
+  for (const f of families) {
+    const name = String(f || '').trim();
+    if (name) EXTRACTED_FONT_FAMILIES.add(name);
+  }
+};
+
 const normalizeFontFamily = (raw = '') => {
   const name = String(raw || '').trim();
   if (!name) return "'Times New Roman', Times, serif";
+  if (EXTRACTED_FONT_FAMILIES.has(name)) {
+    return `'${name}', 'Times New Roman', 'Noto Serif', Times, serif`;
+  }
   for (const m of FONT_FAMILY_MAP) {
     if (m.test.test(name)) return m.css;
   }
@@ -256,96 +270,137 @@ const inferAlignFromLine = (x1, x2, pageWidth) => {
   return 'left';
 };
 
+const scaleBBox = (bbox, scale = 1) => {
+  if (!Array.isArray(bbox) || bbox.length < 4) return bbox;
+  if (!Number.isFinite(scale) || scale === 1) return bbox;
+  return [bbox[0] * scale, bbox[1] * scale, bbox[2] * scale, bbox[3] * scale];
+};
+
 const buildPdfTextLineBlocks = (items, pageNumber, pageWidth, tableCells = []) => {
   if (!Array.isArray(items) || items.length === 0) return [];
   const valid = items.filter((it) => String(it?.text || '').trim().length > 0);
   if (valid.length === 0) return [];
 
-  // Group items into lines by y proximity.
-  const sorted = valid.slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  // Group items into lines by baseline proximity.
+  const sorted = valid.slice().sort((a, b) => (a.baseline - b.baseline) || (a.x - b.x));
   const lines = [];
-  const lineThreshold = (it) => Math.max(2, Number(it.height || 0) * 0.6);
+  const lineThreshold = (it) => Math.max(2, Number(it.height || 0) * 0.8);
 
   for (const item of sorted) {
     const threshold = lineThreshold(item);
-    let line = lines.find((l) => Math.abs(l.y - item.y) <= threshold);
+    let line = lines.find((l) => Math.abs(l.baseline - item.baseline) <= threshold);
     if (!line) {
-      line = { items: [], y: item.y };
+      line = { items: [], baseline: item.baseline };
       lines.push(line);
     }
     line.items.push(item);
-    line.y = (line.y * (line.items.length - 1) + item.y) / line.items.length;
+    line.baseline = (line.baseline * (line.items.length - 1) + item.baseline) / line.items.length;
   }
 
-  const tableBboxes = tableCells.map((c) => c.bbox).filter(Boolean);
+  const tableBboxes = tableCells.map((c) => c.bbox).filter(Boolean).map((b) => {
+    // expand bbox slightly to ensure lines inside tables are filtered
+    const pad = 2;
+    return [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad];
+  });
 
-  const blocks = lines.map((line, idx) => {
+  const blocks = [];
+  lines.forEach((line, idx) => {
     const parts = line.items.slice().sort((a, b) => a.x - b.x);
     const xs = parts.map((p) => p.x);
     const ys = parts.map((p) => p.y);
     const rights = parts.map((p) => p.right);
     const bottoms = parts.map((p) => p.bottom);
-    const x1 = Math.min(...xs);
-    const y1 = Math.min(...ys);
-    const x2 = Math.max(...rights);
-    const y2 = Math.max(...bottoms);
+    const lineX1 = Math.min(...xs);
+    const lineY1 = Math.min(...ys);
+    const lineX2 = Math.max(...rights);
+    const lineY2 = Math.max(...bottoms);
 
     // Skip if line falls inside a table cell.
     for (const tb of tableBboxes) {
-      if (bboxOverlapRatio([x1, y1, x2, y2], tb) > 0.3) return null;
+      if (bboxOverlapRatio([lineX1, lineY1, lineX2, lineY2], tb) > 0.25) return;
     }
 
-    let text = '';
+    // Split line into segments when the gap is large (keeps right‑aligned pieces separate)
+    const segments = [];
+    let seg = [];
     let lastRight = null;
-    const fontFamilies = new Map();
-    const fontWeights = new Map();
-    const fontStyles = new Map();
-    let avgHeight = 0;
-
     for (const p of parts) {
       const gap = lastRight !== null ? (p.x - lastRight) : 0;
       const fontSizeGuess = Math.max(8, Number(p.height || 10) * 0.9);
-      const spaceThreshold = Math.max(2, fontSizeGuess * 0.35);
-      if (lastRight !== null && gap > spaceThreshold && !/^[\.,:;)\]]/.test(p.text || '')) {
-        text += ' ';
+      const bigGap = Math.max(6, fontSizeGuess * 1.6);
+      if (lastRight !== null && gap > bigGap && seg.length > 0) {
+        segments.push(seg);
+        seg = [];
       }
-      text += String(p.text || '');
+      seg.push(p);
       lastRight = p.right;
-      avgHeight += Number(p.height || 0);
-      const ff = String(p.fontFamily || p.fontName || '').trim();
-      if (ff) fontFamilies.set(ff, (fontFamilies.get(ff) || 0) + 1);
-      const fw = String(p.fontWeight || '').trim();
-      if (fw) fontWeights.set(fw, (fontWeights.get(fw) || 0) + 1);
-      const fs = String(p.fontStyle || '').trim();
-      if (fs) fontStyles.set(fs, (fontStyles.get(fs) || 0) + 1);
     }
+    if (seg.length > 0) segments.push(seg);
 
-    const best = (m) => [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-    const fontFamily = best(fontFamilies);
-    const fontWeightRaw = best(fontWeights);
-    const fontStyleRaw = best(fontStyles);
-    const fontWeight = /bold/i.test(fontFamily) || /bold/i.test(fontWeightRaw) ? 700 : 400;
-    const fontStyle = /italic|oblique/i.test(fontFamily) || /italic|oblique/i.test(fontStyleRaw) ? 'italic' : 'normal';
-    const fontSize = Math.max(9, Math.min(18, Math.round((avgHeight / parts.length) || 11)));
-    const lineHeight = Math.max(10, Math.round(fontSize * 1.25));
+    segments.forEach((segItems, sIdx) => {
+      const sXs = segItems.map((p) => p.x);
+      const sYs = segItems.map((p) => p.y);
+      const sRights = segItems.map((p) => p.right);
+      const sBottoms = segItems.map((p) => p.bottom);
+      const x1 = Math.min(...sXs);
+      const y1 = Math.min(...sYs);
+      const x2 = Math.max(...sRights);
+      const y2 = Math.max(...sBottoms);
 
-    return {
-      id: `pdfline_${pageNumber}_${idx}_${Math.round(x1)}_${Math.round(y1)}`,
-      type: 'line',
-      role: 'body',
-      text,
-      bbox: [x1, y1, x2, y2],
-      style: {
-        align: inferAlignFromLine(x1, x2, pageWidth),
-        fontSize,
-        bold: fontWeight >= 600,
-        fontFamily: normalizeFontFamily(fontFamily),
-        fontWeight,
-        lineHeight,
-        fontStyle,
-      },
-    };
-  }).filter(Boolean);
+      let text = '';
+      let segLastRight = null;
+      const fontFamilies = new Map();
+      const fontWeights = new Map();
+      const fontStyles = new Map();
+      let avgHeight = 0;
+
+      for (const p of segItems) {
+        const gap = segLastRight !== null ? (p.x - segLastRight) : 0;
+        const fontSizeGuess = Math.max(8, Number(p.height || 10) * 0.9);
+        const spaceThreshold = Math.max(2, fontSizeGuess * 0.35);
+        if (segLastRight !== null && gap > spaceThreshold && !/^[\.,:;)\]]/.test(p.text || '')) {
+          text += ' ';
+        }
+        text += String(p.text || '');
+        segLastRight = p.right;
+        avgHeight += Number(p.height || 0);
+        const ff = String(p.fontFamily || p.fontName || '').trim();
+        if (ff) fontFamilies.set(ff, (fontFamilies.get(ff) || 0) + 1);
+        const fw = String(p.fontWeight || '').trim();
+        if (fw) fontWeights.set(fw, (fontWeights.get(fw) || 0) + 1);
+        const fs = String(p.fontStyle || '').trim();
+        if (fs) fontStyles.set(fs, (fontStyles.get(fs) || 0) + 1);
+      }
+
+      const best = (m) => [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+      const fontFamily = best(fontFamilies);
+      const fontWeightRaw = best(fontWeights);
+      const fontStyleRaw = best(fontStyles);
+      const fontWeight = /bold/i.test(fontFamily) || /bold/i.test(fontWeightRaw) ? 700 : 400;
+      const fontStyle = /italic|oblique/i.test(fontFamily) || /italic|oblique/i.test(fontStyleRaw) ? 'italic' : 'normal';
+      const fontSize = Math.max(9, Math.min(18, Math.round((avgHeight / segItems.length) || 11)));
+      const lineHeight = Math.max(Math.round(fontSize * 1.1), Math.round((y2 - y1) || fontSize));
+
+      blocks.push({
+        id: `pdfline_${pageNumber}_${idx}_${sIdx}_${Math.round(x1)}_${Math.round(y1)}`,
+        type: 'line',
+        role: 'body',
+        text,
+        bbox: [x1, y1, x2, y2],
+        source: 'pdfText',
+        style: {
+          align: inferAlignFromLine(x1, x2, pageWidth),
+          fontSize,
+          bold: fontWeight >= 600,
+          fontFamily: normalizeFontFamily(fontFamily),
+          fontFamilyRaw: fontFamily,
+          fontWeight,
+          lineHeight,
+          fontStyle,
+        },
+      });
+    });
+  });
 
   return blocks;
 };
@@ -377,13 +432,27 @@ const documentGraphToLayoutModel = (documentGraph) => {
 };
 
 const escHtml = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const pxToPt = (px) => {
+  const n = Number(px);
+  if (!Number.isFinite(n)) return null;
+  // 1pt = 1.333px => px * 0.75 = pt
+  return n * 0.75;
+};
+const clampPt = (pt, min = 8, max = 24) => Math.max(min, Math.min(max, pt));
 const runStyleToCss = (style = {}) => {
   const css = [];
   if (style?.fontFamily) css.push(`font-family:${String(style.fontFamily).replace(/"/g, '')}`);
-  if (style?.fontSize) css.push(`font-size:${Math.max(8, Math.min(24, Number(style.fontSize)))}pt`);
+  if (style?.fontSize) {
+    const pt = pxToPt(style.fontSize);
+    css.push(`font-size:${clampPt(Number.isFinite(pt) ? pt : Number(style.fontSize))}pt`);
+  }
   if (style?.lineHeight) {
     const lh = Number(style.lineHeight);
-    if (Number.isFinite(lh) && lh > 0) css.push(`line-height:${Math.max(1, Math.min(2.5, lh / Math.max(10, Number(style.fontSize || 12))))}`);
+    const fsPx = Number(style.fontSize || 12);
+    if (Number.isFinite(lh) && lh > 0) {
+      const ratio = fsPx > 0 ? (lh / Math.max(8, fsPx)) : lh;
+      css.push(`line-height:${Math.max(1, Math.min(2.5, ratio))}`);
+    }
   }
   if (style?.color) css.push(`color:${String(style.color)}`);
   return css.join(';');
@@ -397,7 +466,7 @@ const renderStyledRun = (run = {}, fallbackStyle = {}) => {
   const fontStyle = String(style?.fontStyle || fallbackStyle?.fontStyle || '').toLowerCase();
   const isItalic = fontStyle.includes('italic') || !!style?.italic || !!fallbackStyle?.italic;
   const isUnderline = !!style?.underline || !!fallbackStyle?.underline;
-  const css = runStyleToCss(style);
+  const css = runStyleToCss({ ...fallbackStyle, ...style });
   let out = css ? `<span style="${css}">${text}</span>` : text;
   if (isUnderline) out = `<u>${out}</u>`;
   if (isItalic) out = `<em>${out}</em>`;
@@ -579,6 +648,8 @@ const buildTableHtml = (chunk) => {
   const grid = new Map();
   let maxRow = 0;
   let maxCol = 0;
+  const fontSizes = [];
+  const colWidths = new Map();
   for (const cell of chunk) {
     const r = Number(cell?.table?.rowIndex ?? cell?.table?.row ?? 0);
     const c = Number(cell?.table?.columnIndex ?? cell?.table?.col ?? 0);
@@ -587,8 +658,28 @@ const buildTableHtml = (chunk) => {
     maxCol = Math.max(maxCol, c);
     if (!grid.has(r)) grid.set(r, new Map());
     if (!grid.get(r).has(c)) grid.get(r).set(c, cell);
+    const fs = Number(cell?.style?.fontSize || 0);
+    if (Number.isFinite(fs) && fs > 0) fontSizes.push(fs);
+    const w = Number(cell?.right || 0) - Number(cell?.x || 0);
+    if (Number.isFinite(w) && w > 0) {
+      colWidths.set(c, Math.max(colWidths.get(c) || 0, w));
+    }
   }
-  const tParts = ['<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:11pt;">'];
+  const sortedSizes = fontSizes.slice().sort((a, b) => a - b);
+  const medianPx = sortedSizes.length ? sortedSizes[Math.floor(sortedSizes.length / 2)] : 14;
+  const tableFontPt = clampPt(pxToPt(medianPx) || 10, 8, 14);
+
+  const totalWidth = Array.from(colWidths.values()).reduce((a, b) => a + b, 0);
+  const colGroup = totalWidth > 0
+    ? `<colgroup>${Array.from({ length: maxCol + 1 }).map((_, idx) => {
+      const w = colWidths.get(idx) || (totalWidth / (maxCol + 1));
+      const pct = Math.max(4, Math.min(96, (w / totalWidth) * 100));
+      return `<col style="width:${pct.toFixed(1)}%;">`;
+    }).join('')}</colgroup>`
+    : '';
+
+  const tParts = [`<table style="border-collapse:collapse;width:100%;margin:6px 0;font-size:${tableFontPt}pt;table-layout:fixed;">`];
+  if (colGroup) tParts.push(colGroup);
   for (let r = 0; r <= maxRow; r += 1) {
     tParts.push('<tr>');
     for (let c = 0; c <= maxCol; c += 1) {
@@ -804,8 +895,8 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
     // ── Layout properties ──
     const rawAlign = row.style?.align || inferAlign(row.x, row.right, width);
     // fontSize: prefer style.fontSize, fall back to page median
-    const rawFontSize = Number(row.style?.fontSize || fontStats.median || 12);
-    const fontSize = Math.max(9, Math.min(24, Math.round(rawFontSize)));
+    const rawFontSizePx = Number(row.style?.fontSize || fontStats.median || 12);
+    const fontSize = clampPt(pxToPt(rawFontSizePx) || rawFontSizePx, 9, 24);
     const fontWeight = isBold ? 700 : 400;
     const fontFamily = row.style?.fontFamily
       ? `font-family:'${String(row.style.fontFamily).replace(/['"]/g, '')}';`
@@ -813,15 +904,15 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
     const rawLH = Number(row.style?.lineHeight || 0);
     const lineHeight = rawLH > 1 && rawLH < 4
       ? rawLH
-      : (rawLH >= 8 ? Math.max(1.1, Math.min(2.0, rawLH / Math.max(8, fontSize))) : 1.4);
+      : (rawLH >= 8 ? Math.max(1.1, Math.min(2.0, rawLH / Math.max(8, rawFontSizePx))) : 1.4);
 
     // ── Indent: map pixel X to em (1 em ≈ fontSize px) ──
     const indentEm = Math.max(0, Math.min(6, Math.round((row.x / width) * 8 * 10) / 10));
 
     // ── Vertical spacing from Y-gap ──
     const yGap = prevY == null ? 0 : Math.max(0, Number(row.y || 0) - Number(prevY || 0));
-    const paraBreak = yGap > fontSize * 1.8;
-    const sectionBreak = yGap > fontSize * 4;
+    const paraBreak = yGap > rawFontSizePx * 1.8;
+    const sectionBreak = yGap > rawFontSizePx * 4;
     prevY = Number(row.y || 0);
 
     // ── Heading detection ──
@@ -1070,7 +1161,7 @@ const FullPageEditor = ({
       (caseData.summary ? `Summary: ${caseData.summary}` : '');
     aiHelperRef.current?.addContext?.(ctx);
     setLeftTabIndex(1);
-  }, []);
+  }, [fidelitySnapEnabled, fidelityGridSnapEnabled, fidelityGridSize, fidelityZoom]);
 
 
   const [suggestions, setSuggestions] = useState(initialSuggestions || []);
@@ -1112,8 +1203,17 @@ const FullPageEditor = ({
   const [fidelityEdits, setFidelityEdits] = useState({});
   const [fidelityOffsets, setFidelityOffsets] = useState({});
   const [pdfTextLayersByPage, setPdfTextLayersByPage] = useState({});
+  const [fidelityFontsMeta, setFidelityFontsMeta] = useState([]);
+  const [fidelityObjectsByPage, setFidelityObjectsByPage] = useState({});
+  const [fidelityObjectEdits, setFidelityObjectEdits] = useState({});
+  const [selectedFidelityObject, setSelectedFidelityObject] = useState(null);
+  const [fidelityObjectsVisible, setFidelityObjectsVisible] = useState(true);
   const [fidelitySnapEnabled, setFidelitySnapEnabled] = useState(true);
+  const [fidelityGridSnapEnabled, setFidelityGridSnapEnabled] = useState(false);
+  const [fidelityGridSize, setFidelityGridSize] = useState(5);
   const [fidelityDebug, setFidelityDebug] = useState(false);
+  const [fidelityZoom, setFidelityZoom] = useState(1);
+  const [pdfPageCount, setPdfPageCount] = useState(0);
   const [fidelitySnapGuides, setFidelitySnapGuides] = useState({ x: null, y: null, page: null });
   const [isFidelityApplying, setIsFidelityApplying] = useState(false);
   const [appliedFidelityPdfUrl, setAppliedFidelityPdfUrl] = useState(null);
@@ -1127,6 +1227,8 @@ const FullPageEditor = ({
   const [, setFidelityHistoryTick] = useState(0);
   const fidelityDragRef = useRef(null);
   const pdfTextLayersByPageRef = useRef({});
+  const loadedFontIdsRef = useRef(new Set());
+  const fidelityObjectDragRef = useRef(null);
 
   const toast = useToast();
   const { colorMode, toggleColorMode } = useColorMode();
@@ -1438,6 +1540,7 @@ const FullPageEditor = ({
           mode: 'fidelity',
           fidelityEdits,
           fidelityOffsets,
+          fidelityObjectEdits,
         });
       } else {
         await fileService.saveHtmlContent(html, plainText, selectedFile?._id, { mode: 'editable' });
@@ -1480,7 +1583,7 @@ const FullPageEditor = ({
       || 0
     );
     const layoutTotal = pages.length > 0 ? Math.max(...pages.map((p) => Number(p?.pageNumber || 0))) : 0;
-    const totalPages = Math.max(diagTotal, layoutTotal);
+    const totalPages = Math.max(diagTotal, layoutTotal, Number(pdfPageCount || 0));
     if (totalPages <= 0) return pages;
     const baseWidth = Number(pages[0]?.width || 794);
     const baseHeight = Number(pages[0]?.height || 1123);
@@ -1499,7 +1602,7 @@ const FullPageEditor = ({
       }
     }
     return out;
-  }, [fidelityLayout, scanData?.scanResults?.layoutDiagnostics?.pages, scanResults?.layoutDiagnostics?.pages, session?.scanResults?.layoutDiagnostics?.pages]);
+  }, [fidelityLayout, scanData?.scanResults?.layoutDiagnostics?.pages, scanResults?.layoutDiagnostics?.pages, session?.scanResults?.layoutDiagnostics?.pages, pdfPageCount]);
 
   const hasFidelityLayout = fidelityPagesToRender.length > 0;
 
@@ -1507,6 +1610,75 @@ const FullPageEditor = ({
   const pdfCanvasUrl = useMemo(() => (
     resolvePdfUrl(selectedFile?.fileUrl || selectedFile?.url || session?.fileUrl || '')
   ), [selectedFile?.fileUrl, selectedFile?.url, session?.fileUrl]);
+
+  useEffect(() => {
+    if (editorViewMode !== 'fidelity') return;
+    const fileId = selectedFile?._id || session?.fileId || null;
+    if (!fileId) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fileService.getFidelityFonts(fileId);
+        if (cancelled) return;
+        const fonts = Array.isArray(res?.fonts) ? res.fonts : [];
+        setFidelityFontsMeta(fonts);
+        registerExtractedFontFamilies(fonts.map((f) => f.family));
+        for (const font of fonts) {
+          if (loadedFontIdsRef.current.has(font.id)) continue;
+          try {
+            const blob = await fileService.downloadFidelityFont(fileId, font.id);
+            if (!blob) continue;
+            const url = URL.createObjectURL(blob);
+            if (typeof FontFace !== 'undefined') {
+              const ff = new FontFace(font.family, `url(${url})`, {
+                weight: String(font.weight || 400),
+                style: font.style || 'normal',
+              });
+              await ff.load();
+              document.fonts.add(ff);
+            } else {
+              const style = document.createElement('style');
+              style.textContent = `@font-face{font-family:'${font.family}';src:url('${url}');font-weight:${font.weight || 400};font-style:${font.style || 'normal'};}`;
+              document.head.appendChild(style);
+            }
+            loadedFontIdsRef.current.add(font.id);
+          } catch (e) {
+            console.warn('[Fidelity-Fonts] load failed:', font?.family, e?.message || e);
+          }
+        }
+      } catch (err) {
+        console.warn('[Fidelity-Fonts] fetch failed:', err?.message || err);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [editorViewMode, selectedFile?._id, session?.fileId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!pdfCanvasUrl) return;
+      const fileId = selectedFile?._id || session?.fileId || null;
+      try {
+        let pdf = null;
+        try {
+          const task = pdfjsLib.getDocument({ url: pdfCanvasUrl });
+          pdf = await task.promise;
+        } catch (urlErr) {
+          if (!fileId) throw urlErr;
+          const blob = await fileService.downloadFile(fileId, 'pdf');
+          const arr = await blob.arrayBuffer();
+          const task = pdfjsLib.getDocument({ data: new Uint8Array(arr) });
+          pdf = await task.promise;
+        }
+        if (!cancelled) setPdfPageCount(Number(pdf?.numPages || 0));
+      } catch (err) {
+        if (!cancelled) setPdfPageCount(0);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [pdfCanvasUrl, selectedFile?._id, session?.fileId]);
 
   const pdfTextLayerUrl = appliedFidelityPdfUrl || pdfCanvasUrl;
 
@@ -1551,10 +1723,10 @@ const FullPageEditor = ({
           const mapped = items.map((item) => {
             const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
             const x = tx[4];
-            const y = tx[5];
+            const baseline = tx[5];
             const w = Number(item.width || 0) * scale;
             const h = Math.abs(Number(item.height || 0) * scale) || Math.abs(tx[3]) || 0;
-            const top = y - h;
+            const top = baseline - h;
             const font = styles?.[item.fontName] || {};
             return {
               text: item.str,
@@ -1564,6 +1736,7 @@ const FullPageEditor = ({
               bottom: Math.max(0, top + h),
               width: w,
               height: h,
+              baseline,
               fontName: item.fontName || null,
               fontFamily: font?.fontFamily || null,
               fontWeight: font?.fontWeight || null,
@@ -1598,6 +1771,47 @@ const FullPageEditor = ({
     run();
     return () => { cancelled = true; };
   }, [pdfTextLayerUrl, fidelityPagesToRender, selectedFile?._id, session?.fileId]);
+
+  useEffect(() => {
+    if (editorViewMode !== 'fidelity') return;
+    let cancelled = false;
+    const run = async () => {
+      if (!pdfTextLayerUrl) return;
+      const fileId = selectedFile?._id || session?.fileId || null;
+      try {
+        let pdf = null;
+        try {
+          const loadingTask = pdfjsLib.getDocument({ url: pdfTextLayerUrl });
+          pdf = await loadingTask.promise;
+        } catch (urlErr) {
+          if (!fileId) throw urlErr;
+          const blob = await fileService.downloadFile(fileId, 'pdf');
+          const arr = await blob.arrayBuffer();
+          const dataTask = pdfjsLib.getDocument({ data: new Uint8Array(arr) });
+          pdf = await dataTask.promise;
+        }
+        const totalPages = Number(pdf?.numPages || pdfPageCount || Object.keys(pdfTextLayersByPage || {}).length || 0);
+        if (!totalPages) return;
+        const results = {};
+        for (let p = 1; p <= totalPages; p += 1) {
+          const page = await pdf.getPage(p);
+          const viewport1 = page.getViewport({ scale: 1 });
+          const targetWidth = Number(pdfTextLayersByPage?.[p]?.width || viewport1.width);
+          const scale = targetWidth && viewport1?.width ? (targetWidth / viewport1.width) : 1;
+          const viewport = page.getViewport({ scale });
+          const extracted = await extractPageObjects(page, viewport, p);
+          results[p] = extracted.objects || [];
+        }
+        if (!cancelled) setFidelityObjectsByPage(results);
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[PDF-OBJECT-LAYER] extract failed:', err?.message || err);
+        }
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [editorViewMode, pdfTextLayerUrl, pdfPageCount, pdfTextLayersByPage, selectedFile?._id, session?.fileId]);
 
   try {
     const layoutPages = Array.isArray(fidelityLayout?.pages)
@@ -1683,12 +1897,12 @@ const FullPageEditor = ({
 
   const buildFidelityEditPayload = useCallback((block, text) => {
     if (!block) return { text: String(text || '') };
-    const pageNumber = Number(block?.pageNumber || block?.page || 1);
+    const pageNumber = Number(block?.renderPageNumber || block?.pageNumber || block?.page || 1);
     const scale = pdfTextLayersByPage?.[pageNumber]?.scale || 1;
     return {
       text: String(text || ''),
       pageNumber,
-      bbox: block?.bbox || null,
+      bbox: block?.renderBBox || block?.bbox || null,
       style: block?.style || null,
       type: block?.type || null,
       table: block?.table || null,
@@ -1710,7 +1924,10 @@ const FullPageEditor = ({
       const textLayer = pdfTextLayersByPage?.[pageNumber] || null;
       const textItems = Array.isArray(textLayer?.items) ? textLayer.items : [];
       const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
-      const pageWidth = Number(page?.width || 794);
+      const layoutWidth = Number(page?.width || 794);
+      const textLayerWidth = Number(textLayer?.width || 0);
+      const pageWidth = textLayerWidth || layoutWidth;
+      const scaleRatio = textLayerWidth && layoutWidth ? (textLayerWidth / layoutWidth) : 1;
 
       const tableCells = blocks.filter((b) => b?.type === 'tableCell');
       const textLineBlocks = textItems.length >= 5
@@ -1722,10 +1939,10 @@ const FullPageEditor = ({
         : blocks;
 
       const overlayBlocks = overlaySource.map((block, bIdx) => {
-        const bbox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
+        const rawBBox = Array.isArray(block?.bbox) ? block.bbox : [0, 0, 0, 0];
+        const bbox = block?.source === 'pdfText' ? rawBBox : scaleBBox(rawBBox, scaleRatio);
         const [bx1, by1, bx2, by2] = bbox;
         const blockKey = block?.id ? String(block.id) : getFidelityBlockKey(pageNumber, bIdx, block);
-        const offset = fidelityOffsets?.[blockKey] || { x: 0, y: 0 };
         const text = getFidelityText(pageNumber, bIdx, String(block?.text || ''), block);
         const width = Math.max(30, bx2 - bx1);
         const height = Math.max(18, by2 - by1);
@@ -1755,7 +1972,11 @@ const FullPageEditor = ({
 
         const fontSizePx = Math.max(9, Number(block?.style?.fontSize || 11));
         const lineHeightPx = Number(block?.style?.lineHeight || Math.round(fontSizePx * 1.35));
-        const fontFamily = normalizeFontFamily(matchedFontFamily || "'Times New Roman', Times, serif");
+        const fontFamilyRaw = String(matchedFontFamily || 'Times New Roman')
+          .split(',')[0]
+          .replace(/['"]/g, '')
+          .trim();
+        const fontFamily = normalizeFontFamily(fontFamilyRaw);
         const fontWeight = Number(matchedFontWeight || (block?.style?.bold ? 700 : 400) || 400);
         const fontStyle = matchedFontStyle || (block?.style?.italic ? 'italic' : 'normal');
 
@@ -1776,8 +1997,8 @@ const FullPageEditor = ({
           pageNumber,
           text,
           bbox,
-          baseX: bx1 + Number(offset.x || 0),
-          baseY: by1 + Number(offset.y || 0),
+          baseX: bx1,
+          baseY: by1,
           width,
           height,
           computedHeight,
@@ -1786,6 +2007,7 @@ const FullPageEditor = ({
           style: {
             ...(block?.style || {}),
             fontFamily,
+            fontFamilyRaw,
             fontWeight,
             fontStyle,
             fontSize: fontSizePx,
@@ -1801,52 +2023,77 @@ const FullPageEditor = ({
         textLayer,
       };
     });
-  }, [fidelityPagesToRender, pdfTextLayersByPage, fidelityOffsets, getFidelityBlockKey, getFidelityText]);
+  }, [fidelityPagesToRender, pdfTextLayersByPage, getFidelityBlockKey, getFidelityText]);
 
-  // ── Text flow + cascading nudge ──────────────────────────────────────────
-  const fidelityReflowOffsets = useMemo(() => {
-    const offsets = {};
-    for (const page of fidelityOverlayPages) {
-      const items = (page?.overlayBlocks || [])
-        .filter((b) => !isImageLikeBlock(b) && !isSeparatorText(b?.text || '') && b?.type !== 'tableCell')
-        .map((b) => ({
-          blockKey: b.blockKey,
-          x1: b.baseX,
-          y1: b.baseY,
-          x2: b.baseX + b.width,
-          height: b.computedHeight || b.height || 18,
-          fontSizePx: Math.max(9, Number(b?.style?.fontSize || 11)),
-        }));
+  const { flowMap, tableFlow, pageHeights: flowPageHeights } = useMemo(
+    () => buildDocFlow(fidelityOverlayPages),
+    [fidelityOverlayPages],
+  );
 
-      items.sort((a, b) => (a.y1 - b.y1) || (a.x1 - b.x1));
-
-      for (let i = 0; i < items.length - 1; i += 1) {
-        const curr = items[i];
-        for (let j = i + 1; j < items.length; j += 1) {
-          const next = items[j];
-          if (next.y1 > curr.y1 + curr.height + curr.fontSizePx * 2) break;
-          const xOverlap = curr.x1 < next.x2 - 4 && curr.x2 > next.x1 + 4;
-          if (!xOverlap) continue;
-          const currBottom = curr.y1 + curr.height;
-          const minGap = curr.fontSizePx * 0.2;
-          if (next.y1 < currBottom + minGap) {
-            const shift = (currBottom + minGap) - next.y1;
-            const cappedShift = Math.min(shift, curr.fontSizePx * 3);
-            if (cappedShift > 0) {
-              offsets[next.blockKey] = (offsets[next.blockKey] || 0) + cappedShift;
-              next.y1 += cappedShift;
-            }
-          }
-        }
+  const fidelityFlowPages = useMemo(() => {
+    const byPage = new Map();
+    const basePages = fidelityOverlayPages || [];
+    for (const p of basePages) {
+      byPage.set(Number(p.pageNumber || 1), {
+        ...p,
+        overlayBlocks: [],
+      });
+    }
+    // Add extra pages if flow spilled over
+    const maxPage = Math.max(
+      ...Array.from({ length: flowPageHeights.length }, (_, i) => i + 1),
+      ...Array.from(byPage.keys()),
+      1,
+    );
+    for (let i = 1; i <= maxPage; i += 1) {
+      if (!byPage.has(i)) {
+        const height = Number(flowPageHeights[i - 1] || basePages[0]?.height || 1123);
+        const width = Number(basePages[0]?.width || 794);
+        byPage.set(i, { pageNumber: i, width, height, overlayBlocks: [] });
       }
     }
-    return offsets;
-  }, [fidelityOverlayPages, isImageLikeBlock]);
+
+    for (const page of basePages) {
+      for (const block of page.overlayBlocks || []) {
+        const blockKey = block.blockKey;
+        const offset = fidelityOffsets?.[blockKey] || { x: 0, y: 0 };
+        let renderPage = block.pageNumber;
+        let renderY = Number(block.baseY || 0);
+
+        if (block.type === 'tableCell' && block.table?.tableId) {
+          const tId = `${block.pageNumber}:${block.table.tableId}`;
+          const flow = tableFlow.get(tId);
+          if (flow?.pageNumber) renderPage = flow.pageNumber;
+          if (flow?.yShift) renderY = renderY + flow.yShift;
+        } else {
+          const flow = flowMap.get(blockKey);
+          if (flow?.pageNumber) renderPage = flow.pageNumber;
+          if (Number.isFinite(flow?.y)) renderY = flow.y;
+        }
+
+        const renderX = Number(block.baseX || 0) + Number(offset.x || 0);
+        const renderYFinal = Number(renderY) + Number(offset.y || 0);
+        const renderH = Number(block.computedHeight || block.height || 18);
+        const renderBBox = [renderX, renderYFinal, renderX + Number(block.width || 0), renderYFinal + renderH];
+
+        const targetPage = byPage.get(renderPage) || byPage.get(block.pageNumber);
+        if (!targetPage) continue;
+        targetPage.overlayBlocks.push({
+          ...block,
+          renderPageNumber: renderPage,
+          renderX,
+          renderY: renderYFinal,
+          renderBBox,
+        });
+      }
+    }
+    return Array.from(byPage.values()).sort((a, b) => Number(a.pageNumber || 0) - Number(b.pageNumber || 0));
+  }, [fidelityOverlayPages, fidelityOffsets, flowMap, tableFlow, flowPageHeights]);
 
   // ── Table grouping for fidelity overlay ───────────────────────────────────
   const fidelityTableGroups = useMemo(() => {
     const byPage = new Map();
-    for (const page of fidelityOverlayPages) {
+    for (const page of fidelityFlowPages) {
       const tableMap = new Map();
       for (const block of page.overlayBlocks || []) {
         const tableId = block?.table?.tableId;
@@ -1856,10 +2103,10 @@ const FullPageEditor = ({
       }
       const tables = [];
       for (const [tableId, cells] of tableMap.entries()) {
-        const xs = cells.map((c) => c.baseX);
-        const ys = cells.map((c) => c.baseY);
-        const rights = cells.map((c) => c.baseX + c.width);
-        const bottoms = cells.map((c) => c.baseY + c.height);
+        const xs = cells.map((c) => c.renderX ?? c.baseX ?? 0);
+        const ys = cells.map((c) => c.renderY ?? c.baseY ?? 0);
+        const rights = cells.map((c) => (c.renderX ?? c.baseX ?? 0) + (c.width || 0));
+        const bottoms = cells.map((c) => (c.renderY ?? c.baseY ?? 0) + (c.height || 0));
         tables.push({
           tableId,
           cells,
@@ -1874,29 +2121,29 @@ const FullPageEditor = ({
       byPage.set(page.pageNumber, tables);
     }
     return byPage;
-  }, [fidelityOverlayPages]);
+  }, [fidelityFlowPages]);
 
   const fidelityOverlayIndex = useMemo(() => {
     const map = new Map();
-    for (const page of fidelityOverlayPages) {
+    for (const page of fidelityFlowPages) {
       for (const block of page?.overlayBlocks || []) {
         if (block?.blockKey) map.set(block.blockKey, block);
       }
     }
     return map;
-  }, [fidelityOverlayPages]);
+  }, [fidelityFlowPages]);
 
   useEffect(() => {
     ensureWebFontSheet();
     const families = new Set();
-    for (const page of fidelityOverlayPages) {
+    for (const page of fidelityFlowPages) {
       for (const block of page?.overlayBlocks || []) {
         const fam = String(block?.style?.fontFamily || '').trim();
         if (fam) families.add(fam);
       }
     }
     families.forEach((fam) => loadFontFamily(fam));
-  }, [fidelityOverlayPages]);
+  }, [fidelityFlowPages]);
 
   const selectedFidelityBlockIdSet = useMemo(
     () => new Set(selectedFidelityBlockIds),
@@ -1967,8 +2214,8 @@ const FullPageEditor = ({
 
     const primary = fidelityOverlayIndex.get(selectedFidelityBlock?.id) || blocks[0];
     const primaryBox = {
-      x: Number(primary.baseX || 0),
-      y: Number(primary.baseY || 0) + (fidelityReflowOffsets[primary.blockKey] || 0),
+      x: Number(primary.renderX ?? primary.baseX ?? 0),
+      y: Number(primary.renderY ?? primary.baseY ?? 0),
       w: Number(primary.width || 0),
       h: Number(primary.computedHeight || primary.height || 0),
     };
@@ -1984,8 +2231,8 @@ const FullPageEditor = ({
     setFidelityOffsets((prev) => {
       const next = { ...prev };
       for (const b of blocks) {
-        const curX = Number(b.baseX || 0);
-        const curY = Number(b.baseY || 0) + (fidelityReflowOffsets[b.blockKey] || 0);
+        const curX = Number(b.renderX ?? b.baseX ?? 0);
+        const curY = Number(b.renderY ?? b.baseY ?? 0);
         const w = Number(b.width || 0);
         const h = Number(b.computedHeight || b.height || 0);
         let dx = 0;
@@ -2002,7 +2249,7 @@ const FullPageEditor = ({
       return next;
     });
     setHasUnsavedChanges(true);
-  }, [getSelectedOverlayBlocks, selectedFidelityBlock, fidelityOverlayIndex, fidelityReflowOffsets, fidelityEdits, pushFidelityUndoSnapshot]);
+  }, [getSelectedOverlayBlocks, selectedFidelityBlock, fidelityOverlayIndex, fidelityEdits, pushFidelityUndoSnapshot]);
 
   const distributeBlocks = useCallback((axis = 'x') => {
     const blocks = getSelectedOverlayBlocks();
@@ -2010,8 +2257,8 @@ const FullPageEditor = ({
     pushFidelityUndoSnapshot(fidelityEdits);
     const boxes = blocks.map((b) => ({
       id: b.blockKey,
-      x: Number(b.baseX || 0),
-      y: Number(b.baseY || 0) + (fidelityReflowOffsets[b.blockKey] || 0),
+      x: Number(b.renderX ?? b.baseX ?? 0),
+      y: Number(b.renderY ?? b.baseY ?? 0),
       w: Number(b.width || 0),
       h: Number(b.computedHeight || b.height || 0),
     }));
@@ -2034,7 +2281,7 @@ const FullPageEditor = ({
       return next;
     });
     setHasUnsavedChanges(true);
-  }, [getSelectedOverlayBlocks, fidelityReflowOffsets, fidelityEdits, pushFidelityUndoSnapshot]);
+  }, [getSelectedOverlayBlocks, fidelityEdits, pushFidelityUndoSnapshot]);
 
   const applySuggestionToFidelity = useCallback((suggestion) => {
     const suggested = String(suggestion?.suggestedText || '').trim();
@@ -2045,8 +2292,8 @@ const FullPageEditor = ({
     let targetKey = targetId || null;
 
     if (!targetKey) {
-      const firstPage = Array.isArray(fidelityOverlayPages)
-        ? fidelityOverlayPages.find((p) => Array.isArray(p?.overlayBlocks) && p.overlayBlocks.length > 0)
+      const firstPage = Array.isArray(fidelityFlowPages)
+        ? fidelityFlowPages.find((p) => Array.isArray(p?.overlayBlocks) && p.overlayBlocks.length > 0)
         : null;
       if (firstPage) {
         targetKey = firstPage.overlayBlocks[0]?.blockKey || null;
@@ -2068,7 +2315,7 @@ const FullPageEditor = ({
     setSelectedFidelityBlock((prev) => prev?.id === targetKey ? prev : (prev || { id: targetKey }));
     setHasUnsavedChanges(true);
     return true;
-  }, [selectedFidelityBlock, fidelityOverlayPages, fidelityOverlayIndex, fidelityEdits, pushFidelityUndoSnapshot, buildFidelityEditPayload]);
+  }, [selectedFidelityBlock, fidelityFlowPages, fidelityOverlayIndex, fidelityEdits, pushFidelityUndoSnapshot, buildFidelityEditPayload]);
 
   useEffect(() => {
     if (session?.fidelityEdits && typeof session.fidelityEdits === 'object') {
@@ -2088,8 +2335,53 @@ const FullPageEditor = ({
   }, [session?.fidelityOffsets]);
 
   useEffect(() => {
+    if (session?.fidelityObjectEdits && typeof session.fidelityObjectEdits === 'object') {
+      setFidelityObjectEdits(session.fidelityObjectEdits);
+    } else if (!session?.fidelityObjectEdits) {
+      setFidelityObjectEdits({});
+    }
+  }, [session?.fidelityObjectEdits]);
+
+  useEffect(() => {
     const onKeyDown = (e) => {
       if (editorViewMode !== 'fidelity') return;
+      const tag = String(e?.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      const keyRaw = String(e.key || '');
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(keyRaw)) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dx = keyRaw === 'ArrowLeft' ? -step : (keyRaw === 'ArrowRight' ? step : 0);
+        const dy = keyRaw === 'ArrowUp' ? -step : (keyRaw === 'ArrowDown' ? step : 0);
+        if (selectedFidelityObject?.id) {
+          setFidelityObjectEdits((prev) => {
+            const next = { ...prev };
+            const existing = prev?.[selectedFidelityObject.id] || { dx: 0, dy: 0, scaleX: 1, scaleY: 1, object: selectedFidelityObject };
+            next[selectedFidelityObject.id] = {
+              ...existing,
+              dx: Math.round(Number(existing.dx || 0) + dx),
+              dy: Math.round(Number(existing.dy || 0) + dy),
+              object: existing.object || selectedFidelityObject,
+            };
+            return next;
+          });
+        }
+        const targetIds = selectedFidelityBlockIds.length > 0
+          ? selectedFidelityBlockIds
+          : (selectedFidelityBlock?.id ? [selectedFidelityBlock.id] : []);
+        if (targetIds.length > 0) {
+          setFidelityOffsets((prev) => {
+            const next = { ...prev };
+            for (const id of targetIds) {
+              const base = prev?.[id] || { x: 0, y: 0 };
+              next[id] = { x: Math.round(Number(base.x || 0) + dx), y: Math.round(Number(base.y || 0) + dy) };
+            }
+            return next;
+          });
+        }
+        setHasUnsavedChanges(true);
+        return;
+      }
       const isMod = e.ctrlKey || e.metaKey;
       if (!isMod) return;
       const key = String(e.key || '').toLowerCase();
@@ -2128,6 +2420,7 @@ const FullPageEditor = ({
         setSelectedFidelityBlock(null);
         setSelectedFidelityBlockIds([]);
         setFidelitySelectAll(false);
+        setSelectedFidelityObject(null);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -2136,10 +2429,45 @@ const FullPageEditor = ({
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [editorViewMode, handleFidelityRedo, handleFidelityUndo]);
+  }, [editorViewMode, handleFidelityRedo, handleFidelityUndo, selectedFidelityObject, selectedFidelityBlockIds, selectedFidelityBlock]);
 
   useEffect(() => {
     const onMove = (e) => {
+      if (fidelityObjectDragRef.current) {
+        const { id, mode, startX, startY, baseDx, baseDy, baseW, baseH } = fidelityObjectDragRef.current;
+        const scale = fidelityZoom || 1;
+        const dx = (e.clientX - startX) / scale;
+        const dy = (e.clientY - startY) / scale;
+        setFidelityObjectEdits((prev) => {
+          const next = { ...prev };
+          const existing = prev?.[id] || { dx: 0, dy: 0, scaleX: 1, scaleY: 1 };
+          if (mode === 'resize') {
+            const newW = Math.max(10, baseW + dx);
+            const newH = Math.max(10, baseH + dy);
+            next[id] = {
+              ...existing,
+              scaleX: baseW > 0 ? newW / baseW : 1,
+              scaleY: baseH > 0 ? newH / baseH : 1,
+            };
+          } else {
+            let nextDx = baseDx + dx;
+            let nextDy = baseDy + dy;
+            if (fidelityGridSnapEnabled) {
+              const grid = Math.max(2, Number(fidelityGridSize || 5));
+              nextDx = Math.round(nextDx / grid) * grid;
+              nextDy = Math.round(nextDy / grid) * grid;
+            }
+            next[id] = {
+              ...existing,
+              dx: Math.round(nextDx),
+              dy: Math.round(nextDy),
+            };
+          }
+          return next;
+        });
+        setHasUnsavedChanges(true);
+        return;
+      }
       if (!fidelityDragRef.current) return;
       const {
         keys = [],
@@ -2151,8 +2479,9 @@ const FullPageEditor = ({
         primaryAbsX,
         primaryAbsY,
       } = fidelityDragRef.current;
-      let dx = e.clientX - startX;
-      let dy = e.clientY - startY;
+      const scale = fidelityZoom || 1;
+      let dx = (e.clientX - startX) / scale;
+      let dy = (e.clientY - startY) / scale;
       const SNAP_DIST = 4;
 
       let guideX = null;
@@ -2180,9 +2509,16 @@ const FullPageEditor = ({
         const next = { ...prev };
         for (const k of keys) {
           const base = baseOffsets?.[k] || { x: 0, y: 0 };
+          let nx = Number(base.x || 0) + dx;
+          let ny = Number(base.y || 0) + dy;
+          if (fidelityGridSnapEnabled) {
+            const grid = Math.max(2, Number(fidelityGridSize || 5));
+            nx = Math.round(nx / grid) * grid;
+            ny = Math.round(ny / grid) * grid;
+          }
           next[k] = {
-            x: Math.round(Number(base.x || 0) + dx),
-            y: Math.round(Number(base.y || 0) + dy),
+            x: Math.round(nx),
+            y: Math.round(ny),
           };
         }
         return next;
@@ -2190,6 +2526,12 @@ const FullPageEditor = ({
       setHasUnsavedChanges(true);
     };
     const onUp = () => {
+      if (fidelityObjectDragRef.current) {
+        fidelityObjectDragRef.current = null;
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        return;
+      }
       if (!fidelityDragRef.current) return;
       fidelityDragRef.current = null;
       document.body.style.userSelect = '';
@@ -2213,6 +2555,7 @@ const FullPageEditor = ({
           mode: 'fidelity',
           fidelityEdits,
           fidelityOffsets,
+          fidelityObjectEdits,
         });
         setLastSaved(new Date());
       } catch (err) {
@@ -2222,7 +2565,7 @@ const FullPageEditor = ({
     return () => {
       if (fidelityAutosaveTimerRef.current) clearTimeout(fidelityAutosaveTimerRef.current);
     };
-  }, [editorViewMode, fidelityEdits, fidelityOffsets, selectedFile?._id]);
+  }, [editorViewMode, fidelityEdits, fidelityOffsets, fidelityObjectEdits, selectedFile?._id]);
 
 
   const handleAIEdit = async () => {
@@ -3707,9 +4050,12 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       )}
                     </HStack>
                     <Text fontSize="xs" color="gray.500">
-                      {fidelityOverlayPages.reduce((n, p) => n + (Array.isArray(p?.overlayBlocks)
+                      {fidelityFlowPages.reduce((n, p) => n + (Array.isArray(p?.overlayBlocks)
                         ? p.overlayBlocks.filter((b) => !isImageLikeBlock(b) && !isSeparatorText(b?.text || '')).length
                         : 0), 0)} editable blocks
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      {fidelityFontsMeta.length} fonts loaded
                     </Text>
                   </HStack>
                   <HStack
@@ -3734,8 +4080,27 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       <Button size="xs" onClick={() => distributeBlocks('y')} isDisabled={selectedFidelityBlockIds.length < 3}>Distribute V</Button>
                     </HStack>
                     <HStack spacing={2}>
+                      <Select
+                        size="xs"
+                        w="90px"
+                        value={String(fidelityZoom)}
+                        onChange={(e) => setFidelityZoom(Number(e.target.value || 1))}
+                      >
+                        <option value="0.5">50%</option>
+                        <option value="0.75">75%</option>
+                        <option value="1">100%</option>
+                        <option value="1.25">125%</option>
+                        <option value="1.5">150%</option>
+                        <option value="2">200%</option>
+                      </Select>
                       <Button size="xs" variant={fidelitySnapEnabled ? 'solid' : 'outline'} colorScheme="blue" onClick={() => setFidelitySnapEnabled((v) => !v)}>
                         Snap {fidelitySnapEnabled ? 'On' : 'Off'}
+                      </Button>
+                      <Button size="xs" variant={fidelityGridSnapEnabled ? 'solid' : 'outline'} colorScheme="teal" onClick={() => setFidelityGridSnapEnabled((v) => !v)}>
+                        Grid {fidelityGridSnapEnabled ? `${fidelityGridSize}px` : 'Off'}
+                      </Button>
+                      <Button size="xs" variant={fidelityObjectsVisible ? 'solid' : 'outline'} colorScheme="orange" onClick={() => setFidelityObjectsVisible((v) => !v)}>
+                        Objects {fidelityObjectsVisible ? 'On' : 'Off'}
                       </Button>
                       <Button size="xs" variant={fidelityDebug ? 'solid' : 'outline'} colorScheme="orange" onClick={() => setFidelityDebug((v) => !v)}>
                         Debug Layer
@@ -3769,6 +4134,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                               selectedFile?._id,
                               fidelityEdits,
                               fidelityOffsets,
+                              fidelityObjectEdits,
                             );
                             setAppliedFidelityPdfUrl(newPdfUrl);
                             toast({
@@ -3788,23 +4154,45 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </Button>
                     </HStack>
                   )}
-                  {fidelityOverlayPages.map((page) => {
+                  {fidelityFlowPages.map((page) => {
                     const pageNumber = Number(page?.pageNumber || 1);
-                    const pageWidth = Number(page?.width || 794);
-                    const pageHeight = Number(page?.height || 1123);
                     const blocks = Array.isArray(page?.overlayBlocks) ? page.overlayBlocks : [];
                     const tables = fidelityTableGroups.get(pageNumber) || [];
                     const textLayer = page?.textLayer || null;
+                    const pageWidth = Number(textLayer?.width || page?.width || 794);
+                    const pageHeight = Number(textLayer?.height || page?.height || 1123);
                     return (
-                      <Box key={`fpage-${pageNumber}`} border="1px solid" borderColor={borderColor} borderRadius="md" bg="white" p={3}>
+                    <Box
+                      key={`fpage-${pageNumber}`}
+                      border="1px solid"
+                      borderColor={borderColor}
+                      borderRadius="md"
+                      bg="white"
+                      p={3}
+                      onClick={() => setSelectedFidelityObject(null)}
+                    >
                         <Text fontSize="xs" color="gray.500" mb={2}>Page {pageNumber}</Text>
-                        <Box position="relative" w={`${pageWidth}px`} maxW="none" h={`${pageHeight}px`} overflow="hidden" bg="gray.50">
-                          <PdfPageCanvas
-                            pdfUrl={appliedFidelityPdfUrl || pdfCanvasUrl}
-                            pageNumber={pageNumber}
-                            targetWidthPx={pageWidth}
-                            fileId={selectedFile?._id || session?.fileId}
-                          />
+                        <Box w={`${pageWidth * fidelityZoom}px`} h={`${pageHeight * fidelityZoom}px`} overflow="hidden">
+                          <Box
+                            position="relative"
+                            w={`${pageWidth}px`}
+                            maxW="none"
+                            h={`${pageHeight}px`}
+                            overflow="hidden"
+                            bg="gray.50"
+                            transform={`scale(${fidelityZoom})`}
+                            transformOrigin="top left"
+                          >
+                            {(!pdfPageCount || pageNumber <= pdfPageCount) ? (
+                              <PdfPageCanvas
+                                pdfUrl={appliedFidelityPdfUrl || pdfCanvasUrl}
+                                pageNumber={pageNumber}
+                                targetWidthPx={pageWidth}
+                                fileId={selectedFile?._id || session?.fileId}
+                              />
+                            ) : (
+                              <Box position="absolute" inset="0" bg="white" />
+                            )}
                           {fidelitySnapGuides?.page === pageNumber && Number.isFinite(fidelitySnapGuides.x) && (
                             <Box position="absolute" left={`${fidelitySnapGuides.x}px`} top="0" h={`${pageHeight}px`} w="1px" bg="blue.400" opacity={0.6} zIndex={1} />
                           )}
@@ -3821,9 +4209,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                             const fontSizePxMask = Math.max(9, Number(block?.style?.fontSize || 11));
                             const maskBuffer = Math.max(6, Math.round(fontSizePxMask * 0.6));
                             const maskKey = block?.blockKey;
-                            const nudgeMask = fidelityReflowOffsets[maskKey] || 0;
-                            const left = Math.max(0, Number(block?.baseX || 0) - 1);
-                            const top = Math.max(0, Number(block?.baseY || 0) + nudgeMask - 1);
+                            const left = Math.max(0, Number(block?.renderX ?? block?.baseX ?? 0) - 1);
+                            const top = Math.max(0, Number(block?.renderY ?? block?.baseY ?? 0) - 1);
                             return (
                               <Box
                                 key={`mask-${maskKey}`}
@@ -3833,10 +4220,103 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                 w={`${width + 4}px`}
                                 minH={`${height + maskBuffer}px`}
                                 bg="white"
-                                opacity={0.98}
+                                opacity={1}
                                 pointerEvents="none"
                                 zIndex={1}
                               />
+                            );
+                          })}
+                          {fidelityObjectsVisible && (fidelityObjectsByPage?.[pageNumber] || []).map((obj) => {
+                            const bbox = Array.isArray(obj?.bbox) ? obj.bbox : [0, 0, 0, 0];
+                            const [ox1, oy1, ox2, oy2] = bbox;
+                            const baseW = Math.max(4, ox2 - ox1);
+                            const baseH = Math.max(4, oy2 - oy1);
+                            const edit = fidelityObjectEdits?.[obj.id] || {};
+                            const dx = Number(edit.dx || 0);
+                            const dy = Number(edit.dy || 0);
+                            const scaleX = Number(edit.scaleX || 1);
+                            const scaleY = Number(edit.scaleY || 1);
+                            const x = ox1 + dx;
+                            const y = oy1 + dy;
+                            const w = Math.max(4, baseW * scaleX);
+                            const h = Math.max(4, baseH * scaleY);
+                            const isSelected = selectedFidelityObject?.id === obj.id;
+                            return (
+                              <Box
+                                key={`obj-${obj.id}`}
+                                position="absolute"
+                                left={`${x}px`}
+                                top={`${y}px`}
+                                w={`${w}px`}
+                                h={`${h}px`}
+                                border="1px solid"
+                                borderColor={isSelected ? 'orange.500' : 'orange.200'}
+                                bg={isSelected ? 'orange.50' : 'transparent'}
+                                zIndex={1}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setSelectedFidelityObject(obj);
+                                  setSelectedFidelityBlock(null);
+                                  setSelectedFidelityBlockIds([]);
+                                  setFidelitySelectAll(false);
+                                  const existing = fidelityObjectEdits?.[obj.id] || { dx: 0, dy: 0, scaleX: 1, scaleY: 1, object: obj };
+                                  setFidelityObjectEdits((prev) => ({
+                                    ...prev,
+                                    [obj.id]: { ...existing, object: obj },
+                                  }));
+                                  fidelityObjectDragRef.current = {
+                                    id: obj.id,
+                                    mode: 'move',
+                                    startX: e.clientX,
+                                    startY: e.clientY,
+                                    baseDx: Number(existing.dx || 0),
+                                    baseDy: Number(existing.dy || 0),
+                                    baseW,
+                                    baseH,
+                                  };
+                                  document.body.style.userSelect = 'none';
+                                  document.body.style.cursor = 'grabbing';
+                                }}
+                              >
+                                {isSelected && (
+                                  <Box
+                                    position="absolute"
+                                    right="-4px"
+                                    bottom="-4px"
+                                    w="8px"
+                                    h="8px"
+                                    bg="orange.400"
+                                    borderRadius="2px"
+                                    cursor="nwse-resize"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const existing = fidelityObjectEdits?.[obj.id] || { dx: 0, dy: 0, scaleX: 1, scaleY: 1, object: obj };
+                                      setSelectedFidelityObject(obj);
+                                      setSelectedFidelityBlock(null);
+                                      setSelectedFidelityBlockIds([]);
+                                      setFidelitySelectAll(false);
+                                      setFidelityObjectEdits((prev) => ({
+                                        ...prev,
+                                        [obj.id]: { ...existing, object: obj },
+                                      }));
+                                      fidelityObjectDragRef.current = {
+                                        id: obj.id,
+                                        mode: 'resize',
+                                        startX: e.clientX,
+                                        startY: e.clientY,
+                                        baseDx: Number(existing.dx || 0),
+                                        baseDy: Number(existing.dy || 0),
+                                        baseW,
+                                        baseH,
+                                      };
+                                      document.body.style.userSelect = 'none';
+                                      document.body.style.cursor = 'nwse-resize';
+                                    }}
+                                  />
+                                )}
+                              </Box>
                             );
                           })}
                           {tables.flatMap((table) => (
@@ -3847,8 +4327,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                               const isPrimary = selectedFidelityBlock?.id === blockKey;
                               const width = Math.max(20, Number(cell?.width || 0));
                               const height = Math.max(16, Number(cell?.height || 0));
-                              const x1 = Number(cell?.baseX || 0);
-                              const y1 = Number(cell?.baseY || 0);
+                              const x1 = Number(cell?.renderX ?? cell?.baseX ?? 0);
+                              const y1 = Number(cell?.renderY ?? cell?.baseY ?? 0);
                               const fontSizePx = Math.max(9, Number(cell?.style?.fontSize || 10));
                               const lineHeightPx = Math.max(Math.round(fontSizePx * 1.2), Number(cell?.style?.lineHeight || 0));
                               const border = cell?.border;
@@ -3876,6 +4356,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setFidelitySelectAll(false);
+                                    setSelectedFidelityObject(null);
                                     if (e.shiftKey) {
                                       setSelectedFidelityBlockIds((prev) => {
                                         const exists = prev.includes(blockKey);
@@ -3957,11 +4438,10 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                             const isTableCell = block?.type === 'tableCell';
                             if (isImageLike || isSep || isTableCell) return null;
 
-                            const collisionNudge = fidelityReflowOffsets[blockKey] || 0;
                             const width = Math.max(30, Number(block?.width || 0));
                             const height = Math.max(18, Number(block?.computedHeight || block?.height || 0));
-                            const x1 = Number(block?.baseX || 0);
-                            const y1 = Number(block?.baseY || 0) + collisionNudge;
+                            const x1 = Number(block?.renderX ?? block?.baseX ?? 0);
+                            const y1 = Number(block?.renderY ?? block?.baseY ?? 0);
                             const fontSizePx = Math.max(9, Number(block?.style?.fontSize || 11));
                             const runs = Array.isArray(block?.runs) ? block.runs : [];
                             const hasBoldRun = runs.some((run) => {
@@ -4026,6 +4506,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setFidelitySelectAll(false);
+                                  setSelectedFidelityObject(null);
                                   if (e.shiftKey) {
                                     setSelectedFidelityBlockIds((prev) => {
                                       const exists = prev.includes(blockKey);
@@ -4085,15 +4566,15 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                             const base = fidelityOffsets?.[k] || { x: 0, y: 0 };
                                             baseOffsets[k] = { x: Number(base.x || 0), y: Number(base.y || 0) };
                                           }
-                                          const pageOverlay = fidelityOverlayPages.find((p) => Number(p?.pageNumber || 1) === pageNumber);
+                                          const pageOverlay = fidelityFlowPages.find((p) => Number(p?.pageNumber || 1) === pageNumber);
                                           const snapX = [];
                                           const snapY = [];
                                           if (pageOverlay) {
                                             const pageBlocks = Array.isArray(pageOverlay?.overlayBlocks) ? pageOverlay.overlayBlocks : [];
                                             for (const b of pageBlocks) {
                                               if (!b?.blockKey || selectedKeys.includes(b.blockKey)) continue;
-                                              const bx = Number(b.baseX || 0);
-                                              const by = Number(b.baseY || 0) + (fidelityReflowOffsets[b.blockKey] || 0);
+                                              const bx = Number(b.renderX ?? b.baseX ?? 0);
+                                              const by = Number(b.renderY ?? b.baseY ?? 0);
                                               const bw = Number(b.width || 0);
                                               const bh = Number(b.computedHeight || b.height || 0);
                                               snapX.push(bx, bx + bw, bx + bw / 2);
@@ -4113,8 +4594,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                             page: pageNumber,
                                             snapX,
                                             snapY,
-                                            primaryAbsX: Number(block?.baseX || 0),
-                                            primaryAbsY: Number(block?.baseY || 0) + (fidelityReflowOffsets[blockKey] || 0),
+                                            primaryAbsX: Number(block?.renderX ?? block?.baseX ?? 0),
+                                            primaryAbsY: Number(block?.renderY ?? block?.baseY ?? 0),
                                           };
                                           document.body.style.userSelect = 'none';
                                           document.body.style.cursor = 'grabbing';
@@ -4184,6 +4665,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                               Page rendered from source PDF; block extraction missing for this page
                             </Text>
                           ) : null}
+                          </Box>
                         </Box>
                       </Box>
                     );

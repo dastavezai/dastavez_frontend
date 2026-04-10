@@ -243,6 +243,8 @@ const fileService = {
       if (fileId) body.fileId = fileId;
       if (options.mode) body.mode = options.mode;
       if (options.fidelityEdits) body.fidelityEdits = options.fidelityEdits;
+      if (options.fidelityOffsets) body.fidelityOffsets = options.fidelityOffsets;
+      if (options.fidelityObjectEdits) body.fidelityObjectEdits = options.fidelityObjectEdits;
       const response = await api.post(`${API_URL}/edit/save-html`, body);
       return response.data;
     } catch (error) {
@@ -255,17 +257,40 @@ const fileService = {
    * Apply fidelity text edits directly into the PDF via pdf-lib on the backend.
    * Returns a Blob (application/pdf) of the modified PDF ready for display.
    */
-  applyFidelityEditsToPdf: async (fileId, fidelityEdits, fidelityOffsets = {}) => {
+  applyFidelityEditsToPdf: async (fileId, fidelityEdits, fidelityOffsets = {}, fidelityObjectEdits = {}) => {
     try {
       const response = await api.post(
         `${API_URL}/edit/fidelity-apply`,
-        { fileId, fidelityEdits, fidelityOffsets },
+        { fileId, fidelityEdits, fidelityOffsets, fidelityObjectEdits },
         { responseType: 'arraybuffer', timeout: 60000 }
       );
       const blob = new Blob([response.data], { type: 'application/pdf' });
       return URL.createObjectURL(blob);
     } catch (error) {
       console.error('Fidelity PDF apply error:', error);
+      throw error;
+    }
+  },
+
+  getFidelityFonts: async (fileId) => {
+    try {
+      const response = await api.get(`${API_URL}/edit/fonts/${fileId}`, { timeout: 60000 });
+      return response.data;
+    } catch (error) {
+      console.error('Fidelity font list error:', error);
+      throw error;
+    }
+  },
+
+  downloadFidelityFont: async (fileId, fontId) => {
+    try {
+      const response = await api.get(`${API_URL}/edit/fonts/${fileId}/${fontId}`, {
+        responseType: 'arraybuffer',
+        timeout: 60000,
+      });
+      return new Blob([response.data]);
+    } catch (error) {
+      console.error('Fidelity font download error:', error);
       throw error;
     }
   },
