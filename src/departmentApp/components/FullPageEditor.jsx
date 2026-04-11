@@ -667,7 +667,10 @@ const buildTableHtml = (chunk) => {
   }
   const sortedSizes = fontSizes.slice().sort((a, b) => a - b);
   const medianPx = sortedSizes.length ? sortedSizes[Math.floor(sortedSizes.length / 2)] : 14;
-  const tableFontPt = clampPt(pxToPt(medianPx) || 10, 8, 14);
+  // Azure layout frequently reports fontSize in PDF points (~11-12) when page
+  // widths are in PDF points (≈612). If median is already "pt-like", do not
+  // shrink it by converting px→pt again.
+  const tableFontPt = clampPt(medianPx <= 24 ? medianPx : (pxToPt(medianPx) || 10), 8, 16);
 
   const totalWidth = Array.from(colWidths.values()).reduce((a, b) => a + b, 0);
   const colGroup = totalWidth > 0
@@ -778,10 +781,15 @@ const groupLinesIntoParagraphs = (lines, width) => {
 
 const blocksToEditableHtml = (rawBlocks, pageWidth) => {
   const width = Number(pageWidth || 600);
+  const widthLooksLikePdfPoints = width > 0 && width < 700;
   // 1) Normalize and sort
   const normalized = rawBlocks
     .map((b, idx) => {
       const bbox = Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0];
+      const x = Number(bbox[0] || 0);
+      const y = Number(bbox[1] || 0);
+      const right = Number(bbox[2] || 0);
+      const bottom = Number(bbox[3] || 0);
       const rawStyle = b?.style || {};
       // Merge top-level font props into style for blocks (Azure paragraph path)
       const style = {
@@ -799,31 +807,91 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
         type: String(b?.type || 'line'),
         role: String(b?.role || 'body'),
         text: String(b?.text || '').trim(),
-        x: Number(bbox[0] || 0),
-        y: Number(bbox[1] || 0),
-        right: Number(bbox[2] || 0),
+        x,
+        y,
+        right,
+        bottom,
+        bbox: [x, y, right, bottom],
         style,
         runs: Array.isArray(b?.runs) ? b.runs : [],
         table: b?.table || null,
+        tableKey: b?.type === 'tableCell'
+          ? String(b?.table?.tableId || b?.table?.id || b?.table?.tableIndex || 'table')
+          : null,
       };
     })
     .filter((b) => b.text && b.role !== 'pageHeader' && b.role !== 'pageFooter')
     .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
+
+  // 1.5) Remove duplicates (Azure sometimes provides both paragraph + line blocks)
+  const hasParagraphBlocks = normalized.some((b) => b.type === 'paragraph');
+
+  // Group table cells into table bounding boxes so we can drop duplicate text blocks inside tables.
+  const tableBoxes = (() => {
+    const map = new Map(); // tableKey -> bbox
+    for (const b of normalized) {
+      if (b.type !== 'tableCell') continue;
+      const key = b.tableKey || 'table';
+      const prev = map.get(key);
+      const bb = b.bbox || [b.x, b.y, b.right, b.bottom];
+      if (!prev) {
+        map.set(key, bb.slice());
+      } else {
+        prev[0] = Math.min(prev[0], bb[0]);
+        prev[1] = Math.min(prev[1], bb[1]);
+        prev[2] = Math.max(prev[2], bb[2]);
+        prev[3] = Math.max(prev[3], bb[3]);
+      }
+    }
+    return Array.from(map.values());
+  })();
+
+  const isInsideAnyTable = (b) => {
+    if (!tableBoxes.length) return false;
+    const bb = b.bbox || [b.x, b.y, b.right, b.bottom];
+    const safe = [
+      bb[0],
+      bb[1],
+      bb[2],
+      Math.max(bb[3] || 0, bb[1] + Math.max(10, Number(b?.style?.fontSize || 12))),
+    ];
+    return tableBoxes.some((tb) => bboxOverlapRatio(safe, tb) > 0.25);
+  };
+
+  const filtered = normalized
+    .filter((b) => {
+      if (b.type === 'tableCell') return true;
+      // If paragraph blocks exist, prefer them and drop raw line blocks to avoid duplication.
+      if (hasParagraphBlocks && b.type !== 'paragraph') return false;
+      // Drop any text blocks that are inside table bounds (table content is rendered via cells).
+      if (isInsideAnyTable(b)) return false;
+      return true;
+    })
+    .filter((b) => b.text && b.text.trim().length > 0);
+
+  const deduped = [];
+  const seen = new Set();
+  for (const b of filtered) {
+    const bb = b.bbox || [b.x, b.y, b.right, b.bottom];
+    const key = `${b.type}|${b.role}|${Math.round(bb[0])}|${Math.round(bb[1])}|${Math.round(bb[2])}|${Math.round(bb[3])}|${b.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(b);
+  }
+  deduped.sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
 
   // 2) Decide processing path:
   //    - If blocks already come as 'paragraph' type (Azure DI path), they are
   //      pre-grouped — just fix same-line fragments within table cells.
   //    - If blocks are raw 'line' type (documentGraph / prebuilt-read lines),
   //      group them into logical paragraphs first.
-  const hasParagraphBlocks = normalized.some((b) => b.type === 'paragraph');
-
   let grouped;
   if (hasParagraphBlocks) {
     // Azure paragraph path: blocks already logically grouped — no additional merging needed
-    grouped = normalized;
+    grouped = deduped;
   } else {
     // Line path: merge same-line OCR fragments, then group into paragraphs
-    const sameLine = mergeSameLineFragments(normalized);
+    const sameLine = mergeSameLineFragments(deduped);
     grouped = groupLinesIntoParagraphs(sameLine, width);
   }
 
@@ -832,6 +900,25 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
 
   // 4) Compute page-level font stats for relative heading detection
   const fontStats = computePageFontStats(rows);
+
+  // 4.5) Estimate the left margin (so we don't double-indent: the editor canvas
+  // already applies page padding for margins).
+  const marginX = (() => {
+    const xs = rows
+      .filter((r) => r.type !== 'tableCell' && !isSeparatorText(r.text))
+      .filter((r) => {
+        const role = String(r.role || '').toLowerCase();
+        if (role === 'title' || role.includes('heading')) return false;
+        const listMarker = parseListMarker(r.text) || (/list/i.test(String(r.type || '')) ? { kind: 'ul' } : null);
+        if (listMarker) return false;
+        const x = Number(r.x || 0);
+        return Number.isFinite(x) && x > 0 && x < width;
+      })
+      .map((r) => Number(r.x || 0))
+      .sort((a, b) => a - b);
+    if (!xs.length) return 0;
+    return xs[Math.floor(xs.length * 0.1)];
+  })();
 
   const parts = [];
   // olCounter tracks the running ordered-list item number so that if a list is
@@ -856,9 +943,13 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
     // ── Table ──
     if (row.type === 'tableCell') {
       parts.push(closeListTag(listState));
+      const tKey = row.tableKey || 'table';
       const chunk = [];
       let j = i;
-      while (j < rows.length && rows[j].type === 'tableCell') { chunk.push(rows[j]); j += 1; }
+      while (j < rows.length && rows[j].type === 'tableCell' && (rows[j].tableKey || 'table') === tKey) {
+        chunk.push(rows[j]);
+        j += 1;
+      }
       parts.push(buildTableHtml(chunk));
       prevY = Number(rows[j - 1]?.y || row.y || 0);
       i = j;
@@ -895,8 +986,9 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
     // ── Layout properties ──
     const rawAlign = row.style?.align || inferAlign(row.x, row.right, width);
     // fontSize: prefer style.fontSize, fall back to page median
-    const rawFontSizePx = Number(row.style?.fontSize || fontStats.median || 12);
-    const fontSize = clampPt(pxToPt(rawFontSizePx) || rawFontSizePx, 9, 24);
+    const rawFontSize = Number(row.style?.fontSize || fontStats.median || 12);
+    const fontSizePtRaw = widthLooksLikePdfPoints ? rawFontSize : (pxToPt(rawFontSize) || rawFontSize);
+    const fontSize = clampPt(fontSizePtRaw, 8, 36);
     const fontWeight = isBold ? 700 : 400;
     const fontFamily = row.style?.fontFamily
       ? `font-family:'${String(row.style.fontFamily).replace(/['"]/g, '')}';`
@@ -904,15 +996,16 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
     const rawLH = Number(row.style?.lineHeight || 0);
     const lineHeight = rawLH > 1 && rawLH < 4
       ? rawLH
-      : (rawLH >= 8 ? Math.max(1.1, Math.min(2.0, rawLH / Math.max(8, rawFontSizePx))) : 1.4);
+      : (rawLH >= 8 ? Math.max(1.1, Math.min(2.0, rawLH / Math.max(8, rawFontSize))) : 1.4);
 
-    // ── Indent: map pixel X to em (1 em ≈ fontSize px) ──
-    const indentEm = Math.max(0, Math.min(6, Math.round((row.x / width) * 8 * 10) / 10));
+    // ── Indent: map X to em (relative to estimated margin) ──
+    const indentUnits = Math.max(0, Number(row.x || 0) - marginX);
+    const indentEm = Math.max(0, Math.min(8, Math.round((indentUnits / Math.max(8, rawFontSize)) * 10) / 10));
 
     // ── Vertical spacing from Y-gap ──
     const yGap = prevY == null ? 0 : Math.max(0, Number(row.y || 0) - Number(prevY || 0));
-    const paraBreak = yGap > rawFontSizePx * 1.8;
-    const sectionBreak = yGap > rawFontSizePx * 4;
+    const paraBreak = yGap > rawFontSize * 1.8;
+    const sectionBreak = yGap > rawFontSize * 4;
     prevY = Number(row.y || 0);
 
     // ── Heading detection ──
@@ -1003,13 +1096,16 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
 const documentGraphToEditableHtml = (documentGraph) => {
   if (!documentGraph || !Array.isArray(documentGraph.pages) || documentGraph.pages.length === 0) return '';
   const allParts = [];
-  for (const page of documentGraph.pages) {
+  for (let pIdx = 0; pIdx < documentGraph.pages.length; pIdx += 1) {
+    const page = documentGraph.pages[pIdx];
     const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
     const pageWidth = Number(page?.width || 600);
     const pageHtml = blocksToEditableHtml(blocks, pageWidth);
     if (pageHtml.trim()) {
       allParts.push(pageHtml);
-      allParts.push('<p style="margin:0;font-size:1px;line-height:0;">&nbsp;</p>');
+      if (pIdx < documentGraph.pages.length - 1) {
+        allParts.push('<div data-type="page-break"></div>');
+      }
     }
   }
   return allParts.join('\n');
@@ -1018,13 +1114,16 @@ const documentGraphToEditableHtml = (documentGraph) => {
 const layoutModelToEditableHtml = (layoutModel) => {
   if (!layoutModel || !Array.isArray(layoutModel.pages) || layoutModel.pages.length === 0) return '';
   const allParts = [];
-  for (const page of layoutModel.pages) {
+  for (let pIdx = 0; pIdx < layoutModel.pages.length; pIdx += 1) {
+    const page = layoutModel.pages[pIdx];
     const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
     const pageWidth = Number(page?.width || 600);
     const pageHtml = blocksToEditableHtml(blocks, pageWidth);
     if (pageHtml.trim()) {
       allParts.push(pageHtml);
-      allParts.push('<p style="margin:0;font-size:1px;line-height:0;">&nbsp;</p>');
+      if (pIdx < layoutModel.pages.length - 1) {
+        allParts.push('<div data-type="page-break"></div>');
+      }
     }
   }
   return allParts.join('\n');
@@ -1302,25 +1401,29 @@ const FullPageEditor = ({
       .join('');
   }, []);
 
+  const estimateHtmlUniqueness = useCallback((html = '') => {
+    const raw = String(html || '');
+    if (!raw.trim()) return 1;
+    const text = raw
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<[^>]+>/g, '\n')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\r/g, '\n')
+      .split('\n')
+      .map((l) => l.replace(/\s+/g, ' ').trim())
+      .filter((l) => l.length >= 20);
+    if (text.length < 6) return 1;
+    const unique = new Set(text).size;
+    return unique / text.length;
+  }, []);
+
 
   const getInitialContent = useCallback(() => {
-    // ── Priority 0: Gemini layout-aware HTML (best quality) ───────────────────
-    // Gemini sees both the PDF visually and the Azure markdown text, producing
-    // HTML that matches the original layout at ~80-85%.  Only use if it contains
-    // real structural elements (headings / bold / lists / tables).
-    const gHtml = scanData?.geminiHtml || session?.geminiHtml || '';
-    const geminiHasStructure = gHtml.length > 200 &&
-      /<h[1-6][\s>]|<strong[\s>]|<b[\s>]|<ul[\s>]|<ol[\s>]|<table[\s>]|font-weight\s*:\s*bold/i.test(gHtml);
-    if (geminiHasStructure) return gHtml;
-
-    // ── Priority 1: Azure DI Markdown→HTML ───────────────────────────────────
-    // Azure DI with 2024+ API returns structured Markdown.  Only use if it
-    // contains real structural elements (not just plain <p>-wrapped text).
-    const mdHtml = scanData?.markdownHtml || session?.markdownHtml || '';
-    const mdHasStructure = mdHtml.length > 100 && /<h[1-6][\s>]|<strong[\s>]|<em[\s>]|<ul[\s>]|<ol[\s>]|<table[\s>]/i.test(mdHtml);
-    if (mdHasStructure) return mdHtml;
-
-    // ── Priority 2: Layout-model reconstruction (paragraph path) ─────────────
+    // ── Priority 0: Layout-model reconstruction (best editable alignment) ────
+    // For the editable window we prioritize a clean reconstruction from the
+    // layout model (with page breaks + table de-duplication) so it visually
+    // mimics the PDF instead of looking like plain text.
     const graph = session?.documentGraph || scanData?.documentGraph || null;
     const layoutFromGraph = documentGraphToLayoutModel(graph);
     const sessionLayout = session?.layoutModel || null;
@@ -1331,7 +1434,22 @@ const FullPageEditor = ({
     const layoutHtml = layoutModelToEditableHtml(layout);
     if (layoutHtml && layoutHtml.trim()) return layoutHtml;
 
-    // ── Priority 3: Document graph reconstruction ─────────────────────────────
+    // ── Priority 1: Gemini layout-aware HTML ─────────────────────────────────
+    // Use only if it has structure AND doesn't look duplicated.
+    const gHtml = scanData?.geminiHtml || session?.geminiHtml || '';
+    const geminiHasStructure = gHtml.length > 200 &&
+      /<h[1-6][\s>]|<strong[\s>]|<b[\s>]|<ul[\s>]|<ol[\s>]|<table[\s>]|font-weight\s*:\s*bold/i.test(gHtml);
+    const geminiUnique = estimateHtmlUniqueness(gHtml) >= 0.7;
+    if (geminiHasStructure && geminiUnique) return gHtml;
+
+    // ── Priority 2: Azure DI Markdown→HTML ───────────────────────────────────
+    // Use only if it has structure AND doesn't look duplicated.
+    const mdHtml = scanData?.markdownHtml || session?.markdownHtml || '';
+    const mdHasStructure = mdHtml.length > 100 && /<h[1-6][\s>]|<strong[\s>]|<em[\s>]|<ul[\s>]|<ol[\s>]|<table[\s>]/i.test(mdHtml);
+    const mdUnique = estimateHtmlUniqueness(mdHtml) >= 0.75;
+    if (mdHasStructure && mdUnique) return mdHtml;
+
+    // ── Priority 3: Document graph reconstruction ────────────────────────────
     const graphHtml = documentGraphToEditableHtml(graph);
     if (graphHtml && graphHtml.trim()) return graphHtml;
 
@@ -1343,7 +1461,7 @@ const FullPageEditor = ({
     const text = session?.currentText || session?.originalText || '';
     if (!text) return '<p></p>';
     return textToHtml(text);
-  }, [initialHtml, session, scanData?.layoutModel, scanData?.documentGraph, scanData?.markdownHtml, scanData?.geminiHtml, textToHtml]);
+  }, [initialHtml, session, scanData?.layoutModel, scanData?.documentGraph, scanData?.markdownHtml, scanData?.geminiHtml, textToHtml, estimateHtmlUniqueness]);
 
   useEffect(() => {
     pdfTextLayersByPageRef.current = pdfTextLayersByPage;
@@ -1418,13 +1536,17 @@ const FullPageEditor = ({
 
 
   useEffect(() => {
-    if (editor && session && !editor.isFocused) {
-      const content = getInitialContent();
-      if (content && editor.getHTML() !== content) {
-        editor.commands.setContent(content);
-      }
+    if (!editor || !session) return;
+    // Never clobber user edits.
+    if (hasUnsavedChanges) return;
+    if (editor.isFocused) return;
+    const content = getInitialContent();
+    if (!content) return;
+    const normalize = (h) => String(h || '').replace(/\s+/g, ' ').trim();
+    if (normalize(editor.getHTML()) !== normalize(content)) {
+      editor.commands.setContent(content);
     }
-  }, [session]);
+  }, [editor, session, getInitialContent, hasUnsavedChanges]);
 
 
   // Re-sync localScanArrays ONLY when a genuinely new scan completes.
@@ -3641,6 +3763,29 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 >
                   Editable
                 </Button>
+                <Tooltip
+                  label={hasUnsavedChanges ? 'Save first to rebuild' : 'Reconstruct editable from extracted layout'}
+                  fontSize="xs"
+                >
+                  <span>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      isDisabled={!editor || hasUnsavedChanges}
+                      onClick={() => {
+                        try {
+                          const content = getInitialContent();
+                          if (content) editor.commands.setContent(content);
+                          toast({ title: 'Editable rebuilt', status: 'success', duration: 1500 });
+                        } catch (e) {
+                          toast({ title: 'Rebuild failed', description: e?.message || String(e), status: 'error', duration: 2500 });
+                        }
+                      }}
+                    >
+                      Rebuild
+                    </Button>
+                  </span>
+                </Tooltip>
               </HStack>
 
               <Tooltip label="Search" fontSize="xs">
