@@ -295,6 +295,36 @@ const fileService = {
     }
   },
 
+  convertPdfToDocx: async (fileId) => {
+    try {
+      const response = await api.post(`${API_URL}/${fileId}/convert-docx`, {}, { timeout: 120000 });
+      return response.data;
+    } catch (error) {
+      console.error('DOCX convert error:', error);
+      throw error;
+    }
+  },
+
+  getDocxStatus: async (fileId) => {
+    try {
+      const response = await api.get(`${API_URL}/${fileId}/docx/status`, { timeout: 60000 });
+      return response.data;
+    } catch (error) {
+      console.error('DOCX status error:', error);
+      throw error;
+    }
+  },
+
+  downloadDocx: async (fileId) => {
+    try {
+      const response = await api.get(`${API_URL}/${fileId}/docx/download`, { responseType: 'arraybuffer', timeout: 120000 });
+      return new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    } catch (error) {
+      console.error('DOCX download error:', error);
+      throw error;
+    }
+  },
+
   
   aiChatAboutDocument: async (message, selectedText = '', chatHistory = [], language = 'en') => {
     try {

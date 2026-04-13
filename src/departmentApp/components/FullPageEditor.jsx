@@ -644,6 +644,24 @@ const mergeFragmentGroup = (group) => {
   };
 };
 
+const normalizeForMatch = (s = '') => String(s || '')
+  .toLowerCase()
+  .replace(/\s+/g, ' ')
+  .replace(/[^\p{L}\p{N}\s]/gu, '')
+  .trim();
+
+const scoreTextMatch = (haystack = '', needle = '') => {
+  const h = normalizeForMatch(haystack);
+  const n = normalizeForMatch(needle);
+  if (!h || !n) return 0;
+  if (h.includes(n)) return Math.min(1, 0.6 + n.length / Math.max(60, h.length));
+  const nTokens = n.split(' ').filter((t) => t.length >= 3);
+  if (nTokens.length === 0) return 0;
+  let hits = 0;
+  for (const t of nTokens) if (h.includes(t)) hits += 1;
+  return hits / nTokens.length;
+};
+
 const buildTableHtml = (chunk) => {
   const grid = new Map();
   let maxRow = 0;
@@ -1299,6 +1317,8 @@ const FullPageEditor = ({
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
+  const [docxStatus, setDocxStatus] = useState(scanData?.docxStatus || session?.docxStatus || 'none');
+  const [docxError, setDocxError] = useState('');
   const [fidelityEdits, setFidelityEdits] = useState({});
   const [fidelityOffsets, setFidelityOffsets] = useState({});
   const [pdfTextLayersByPage, setPdfTextLayersByPage] = useState({});
@@ -1420,6 +1440,10 @@ const FullPageEditor = ({
 
 
   const getInitialContent = useCallback(() => {
+    // ── Priority 0: DOCX→HTML (best editable fidelity) ───────────────────────
+    const dHtml = scanData?.docxHtml || session?.docxHtml || '';
+    if (dHtml && dHtml.trim().length > 100) return dHtml;
+
     // ── Priority 0: Layout-model reconstruction (best editable alignment) ────
     // For the editable window we prioritize a clean reconstruction from the
     // layout model (with page breaks + table de-duplication) so it visually
@@ -1461,7 +1485,7 @@ const FullPageEditor = ({
     const text = session?.currentText || session?.originalText || '';
     if (!text) return '<p></p>';
     return textToHtml(text);
-  }, [initialHtml, session, scanData?.layoutModel, scanData?.documentGraph, scanData?.markdownHtml, scanData?.geminiHtml, textToHtml, estimateHtmlUniqueness]);
+  }, [initialHtml, session, scanData?.layoutModel, scanData?.documentGraph, scanData?.markdownHtml, scanData?.geminiHtml, scanData?.docxHtml, session?.docxHtml, textToHtml, estimateHtmlUniqueness]);
 
   useEffect(() => {
     pdfTextLayersByPageRef.current = pdfTextLayersByPage;
@@ -1472,6 +1496,39 @@ const FullPageEditor = ({
       setEditorViewMode('editable');
     }
   }, [editorViewMode, FIDELITY_LOCKED]);
+
+  useEffect(() => {
+    setDocxStatus(scanData?.docxStatus || session?.docxStatus || 'none');
+    setDocxError(scanData?.docxError || session?.docxError || '');
+  }, [scanData?.docxStatus, session?.docxStatus, scanData?.docxError, session?.docxError]);
+
+  useEffect(() => {
+    if (!selectedFile?._id && !session?.fileId) return;
+    console.log('[DOCX-Pipeline][UI] state', {
+      fileId: selectedFile?._id || session?.fileId,
+      docxStatus,
+      hasDocxHtml: !!(scanData?.docxHtml || session?.docxHtml),
+      docxFileUrl: scanData?.docxFileUrl || session?.docxFileUrl || '',
+    });
+  }, [docxStatus, selectedFile?._id, session?.fileId, scanData?.docxHtml, session?.docxHtml, scanData?.docxFileUrl, session?.docxFileUrl]);
+
+  useEffect(() => {
+    if (editorViewMode !== 'editable') return;
+    const fileId = selectedFile?._id || session?.fileId || null;
+    if (!fileId) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const st = await fileService.getDocxStatus(fileId);
+        if (cancelled) return;
+        if (st?.docxStatus) setDocxStatus(st.docxStatus);
+        if (st?.docxError != null) setDocxError(st.docxError || '');
+        // If DOCX is ready and editor is still using a non-docx source, allow rebuild
+      } catch (_) {}
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [editorViewMode, selectedFile?._id, session?.fileId]);
 
 
   const editor = useEditor({
@@ -1727,6 +1784,11 @@ const FullPageEditor = ({
   }, [fidelityLayout, scanData?.scanResults?.layoutDiagnostics?.pages, scanResults?.layoutDiagnostics?.pages, session?.scanResults?.layoutDiagnostics?.pages, pdfPageCount]);
 
   const hasFidelityLayout = fidelityPagesToRender.length > 0;
+
+  const editablePagesToRender = useMemo(() => {
+    const totalPages = Math.max(1, Number(pdfPageCount || 0));
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }, [pdfPageCount]);
 
 
   const pdfCanvasUrl = useMemo(() => (
@@ -2413,6 +2475,33 @@ const FullPageEditor = ({
     let targetId = selectedFidelityBlock?.id || null;
     let targetKey = targetId || null;
 
+    // If no manual selection, auto-find best target block by matching the
+    // suggestion's originalText / clauseRef against overlay block text.
+    if (!targetKey) {
+      const original = String(suggestion?.originalText || '').trim();
+      const clauseRef = String(suggestion?.clauseRef || '').trim();
+      const hints = [original, clauseRef].filter(Boolean);
+      if (hints.length > 0) {
+        let best = { key: null, score: 0 };
+        for (const page of fidelityFlowPages || []) {
+          for (const b of page?.overlayBlocks || []) {
+            if (!b?.blockKey) continue;
+            const text = String(b?.text || '').trim();
+            if (!text) continue;
+            // Skip image/table cells for suggestion placement
+            if (b?.type === 'tableCell' || isImageLikeBlock(b) || isSeparatorText(text)) continue;
+            const s1 = scoreTextMatch(text, hints[0] || '');
+            const s2 = hints[1] ? scoreTextMatch(text, hints[1]) : 0;
+            const score = Math.max(s1, s2);
+            if (score > best.score) best = { key: b.blockKey, score };
+          }
+        }
+        if (best.key && best.score >= 0.25) {
+          targetKey = best.key;
+        }
+      }
+    }
+
     if (!targetKey) {
       const firstPage = Array.isArray(fidelityFlowPages)
         ? fidelityFlowPages.find((p) => Array.isArray(p?.overlayBlocks) && p.overlayBlocks.length > 0)
@@ -2437,7 +2526,7 @@ const FullPageEditor = ({
     setSelectedFidelityBlock((prev) => prev?.id === targetKey ? prev : (prev || { id: targetKey }));
     setHasUnsavedChanges(true);
     return true;
-  }, [selectedFidelityBlock, fidelityFlowPages, fidelityOverlayIndex, fidelityEdits, pushFidelityUndoSnapshot, buildFidelityEditPayload]);
+  }, [selectedFidelityBlock, fidelityFlowPages, fidelityOverlayIndex, fidelityEdits, pushFidelityUndoSnapshot, buildFidelityEditPayload, isImageLikeBlock]);
 
   useEffect(() => {
     if (session?.fidelityEdits && typeof session.fidelityEdits === 'object') {
@@ -4031,6 +4120,48 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             overflow="auto"
             px={0}
           >
+            {editorViewMode === 'editable' && (docxStatus === 'pending' || docxStatus === 'failed') && (
+              <Box px={4} py={2} bg={docxStatus === 'failed' ? 'red.50' : 'blue.50'} borderBottom="1px solid" borderColor="gray.200">
+                <HStack justify="space-between" flexWrap="wrap" gap={2}>
+                  <VStack align="start" spacing={0}>
+                    <Text fontSize="xs" fontWeight="700" color={docxStatus === 'failed' ? 'red.700' : 'blue.700'}>
+                      {docxStatus === 'failed' ? 'DOCX conversion failed' : 'Converting PDF to DOCX for better editable alignment...'}
+                    </Text>
+                    {docxStatus === 'failed' && (
+                      <Text fontSize="xs" color="red.700" noOfLines={2}>
+                        {docxError || 'Unknown error'}
+                      </Text>
+                    )}
+                  </VStack>
+                  <HStack spacing={2}>
+                    <Button
+                      size="xs"
+                      colorScheme={docxStatus === 'failed' ? 'red' : 'blue'}
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const fileId = selectedFile?._id || session?.fileId;
+                          if (!fileId) return;
+                          setDocxStatus('pending');
+                          setDocxError('');
+                          await fileService.convertPdfToDocx(fileId);
+                          const st = await fileService.getDocxStatus(fileId);
+                          if (st?.docxStatus) setDocxStatus(st.docxStatus);
+                          if (st?.docxError != null) setDocxError(st.docxError || '');
+                          toast({ title: 'DOCX conversion complete', status: 'success', duration: 2000 });
+                        } catch (e) {
+                          setDocxStatus('failed');
+                          setDocxError(e?.response?.data?.error || e?.message || String(e));
+                          toast({ title: 'DOCX conversion failed', status: 'error', duration: 2500 });
+                        }
+                      }}
+                    >
+                      {docxStatus === 'failed' ? 'Retry DOCX' : 'Convert now'}
+                    </Button>
+                  </HStack>
+                </HStack>
+              </Box>
+            )}
             {dualViewMode && (
               <Box
                 px={4} py={1.5} bg="purple.600" display="flex" alignItems="center"
@@ -4817,7 +4948,29 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   })}
                 </VStack>
               ) : (
-                <EditorContent editor={editor} />
+                <>
+                  {editorViewMode === 'editable' && pdfPageCount > 0 && (
+                    <Box mb={3} border="1px solid" borderColor="gray.200" borderRadius="md" bg="white" p={2}>
+                      <Text fontSize="xs" color="gray.600" fontWeight="600" mb={2}>PDF preview (all pages)</Text>
+                      <VStack align="stretch" spacing={3}>
+                        {editablePagesToRender.map((pNum) => (
+                          <Box key={`eprev-${pNum}`} border="1px solid" borderColor="gray.200" borderRadius="md" bg="white" p={2}>
+                            <Text fontSize="xs" color="gray.500" mb={1}>Page {pNum}</Text>
+                            <Box position="relative" w="100%" maxW="none" bg="gray.50">
+                              <PdfPageCanvas
+                                pdfUrl={pdfCanvasUrl}
+                                pageNumber={pNum}
+                                targetWidthPx={Number(pageStyle.pageWidth?.replace('px', '') || 793)}
+                                fileId={selectedFile?._id || session?.fileId}
+                              />
+                            </Box>
+                          </Box>
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+                  <EditorContent editor={editor} />
+                </>
               )}
             </Box>
           </Box>
