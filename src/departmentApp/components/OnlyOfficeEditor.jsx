@@ -11,7 +11,10 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
   const [frameHeightPx, setFrameHeightPx] = useState(860);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const holderId = useMemo(() => `onlyoffice-holder-${String(fileId || 'file')}`, [fileId]);
+  const holderId = useMemo(
+    () => `onlyoffice-holder-${String(fileId || 'file')}-${String(refreshKey || 0)}`,
+    [fileId, refreshKey]
+  );
 
   useEffect(() => {
     frameHeightRef.current = frameHeightPx;
@@ -109,9 +112,9 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
             editorRef.current = null;
           }
 
-          // Ensure container is empty before a fresh DocsAPI mount.
-          if (holderRef.current) {
-            holderRef.current.innerHTML = '';
+          // Avoid mounting into a detached/stale node during rapid refreshes.
+          if (!holderRef.current || !document.getElementById(holderId)) {
+            throw new Error('OnlyOffice container is not ready. Please retry.');
           }
 
           editorRef.current = new window.DocsAPI.DocEditor(holderId, config);
@@ -213,6 +216,7 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
         </VStack>
       )}
       <Box
+        key={holderId}
         id={holderId}
         ref={holderRef}
         w="100%"

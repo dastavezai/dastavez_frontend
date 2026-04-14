@@ -4173,18 +4173,22 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         if (fileIdForSync) {
           setIsOnlyOfficeSyncing(true);
           try {
+            const htmlForSync = String(editor.getHTML() || '')
+              .replace(/<mark\b[^>]*>/gi, '')
+              .replace(/<\/mark>/gi, '');
+
             console.info('[SYNC][FRONTEND] start', {
               traceId: applyTraceId,
               fileId: fileIdForSync,
               type: suggestion?.type,
             });
 
-            await fileService.syncOnlyOfficeDocx(fileIdForSync, editor.getHTML(), editor.getText(), {
+            await fileService.syncOnlyOfficeDocx(fileIdForSync, htmlForSync, editor.getText(), {
               traceId: applyTraceId,
               suggestionType: suggestion?.type || '',
               suggestionId: suggestion?.suggestionId || '',
               forceSuggestionSync: true,
-              htmlLength: String(editor.getHTML() || '').length,
+              htmlLength: String(htmlForSync || '').length,
               textLength: String(editor.getText() || '').length,
             });
             setOnlyOfficeRefreshKey(prev => prev + 1);
