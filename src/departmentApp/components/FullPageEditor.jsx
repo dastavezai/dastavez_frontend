@@ -3242,6 +3242,7 @@ const FullPageEditor = ({
       }
 
       let applied = false;
+      let syncSucceeded = true;
       let toastDesc = 'Marked as reviewed';
 
 
@@ -4103,12 +4104,18 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             setOnlyOfficeRefreshKey(prev => prev + 1);
             toastDesc = `${toastDesc}. Synced to OnlyOffice`;
           } catch (syncErr) {
+            syncSucceeded = false;
             console.warn('OnlyOffice sync failed:', syncErr?.message || syncErr);
-            toastDesc = `${toastDesc}. Not yet synced to OnlyOffice`;
+            const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Not yet synced to OnlyOffice';
+            toastDesc = `${toastDesc}. ${syncMsg}`;
           } finally {
             setIsOnlyOfficeSyncing(false);
           }
         }
+      }
+
+      if (applied && !syncSucceeded) {
+        applied = false;
       }
 
 

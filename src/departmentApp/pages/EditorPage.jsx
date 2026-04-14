@@ -13,6 +13,7 @@ const EditorPage = () => {
   
   const [redirecting, setRedirecting] = useState(!state);
   const [hydratedScanData, setHydratedScanData] = useState(state?.scanData || null);
+  const [smartScanRequested, setSmartScanRequested] = useState(false);
 
   useEffect(() => {
     if (!state) {
@@ -38,7 +39,18 @@ const EditorPage = () => {
     const run = async () => {
       if (!state?.fileId) return;
       const hasLayout = Array.isArray(hydratedScanData?.layoutModel?.pages) && hydratedScanData.layoutModel.pages.length > 0;
-      if (hasLayout) return;
+      const hasAnalysis = !!(
+        (hydratedScanData?.scanResults && Object.keys(hydratedScanData.scanResults || {}).length > 0) ||
+        (hydratedScanData?.complianceIssues || []).length ||
+        (hydratedScanData?.clauseFlaws || []).length ||
+        (hydratedScanData?.missingClauses || []).length ||
+        (hydratedScanData?.precedenceAnalysis || []).length ||
+        (hydratedScanData?.internalContradictions || []).length ||
+        (hydratedScanData?.chronologicalIssues || []).length ||
+        (hydratedScanData?.outdatedReferences || []).length
+      );
+
+      if (hasLayout && hasAnalysis) return;
       try {
         const status = await fileService.getScanStatus(state.fileId);
         if (!status) return;
@@ -53,12 +65,36 @@ const EditorPage = () => {
           layoutPages: Array.isArray(status?.layoutModel?.pages) ? status.layoutModel.pages.length : 0,
           hasFileUrl: !!status?.fileUrl,
         });
+
+        const statusHasAnalysis = !!(
+          (status?.scanResults && Object.keys(status.scanResults || {}).length > 0) ||
+          (status?.complianceIssues || []).length ||
+          (status?.clauseFlaws || []).length ||
+          (status?.missingClauses || []).length ||
+          (status?.precedenceAnalysis || []).length ||
+          (status?.internalContradictions || []).length ||
+          (status?.chronologicalIssues || []).length ||
+          (status?.outdatedReferences || []).length
+        );
+
+        if (!statusHasAnalysis && !smartScanRequested) {
+          setSmartScanRequested(true);
+          const scanResult = await fileService.smartScan(state.fileId);
+          if (scanResult) {
+            setHydratedScanData((prev) => ({ ...(prev || {}), ...scanResult }));
+            console.log('[EDITOR-PROPS-FIDELITY]', {
+              event: 'triggered-smart-scan',
+              fileId: state.fileId,
+              hasAnalysis: true,
+            });
+          }
+        }
       } catch (e) {
         console.warn('[EDITOR-PROPS-FIDELITY] failed to hydrate scan status', e?.message || e);
       }
     };
     run();
-  }, [state, hydratedScanData?.layoutModel]);
+  }, [state, hydratedScanData?.layoutModel, smartScanRequested]);
 
   if (redirecting || !state) {
     return (
