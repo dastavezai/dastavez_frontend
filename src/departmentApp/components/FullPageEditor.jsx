@@ -3244,6 +3244,15 @@ const FullPageEditor = ({
       let applied = false;
       let syncSucceeded = true;
       let toastDesc = 'Marked as reviewed';
+      const applyTraceId = `apply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      console.info('[APPLY][FRONTEND] start', {
+        traceId: applyTraceId,
+        type: suggestion?.type || 'unknown',
+        suggestionId: suggestion?.suggestionId || null,
+        editorViewMode,
+        hasEditor: !!editor,
+      });
 
 
       const idKey = suggestion.idempotencyKey ||
@@ -3263,6 +3272,10 @@ const FullPageEditor = ({
       const hasSuggested = !!(suggestion.suggestedText && suggestion.suggestedText.trim());
 
       if (!editor) {
+        console.warn('[APPLY][FRONTEND] editor-missing, using-fidelity-fallback', {
+          traceId: applyTraceId,
+          type: suggestion?.type || 'unknown',
+        });
         const fallbackApplied = applySuggestionToFidelity(suggestion);
         if (fallbackApplied) {
           setHasUnsavedChanges(true);
@@ -3472,7 +3485,7 @@ Respond ONLY JSON:
               .scrollIntoView()
               .toggleHighlight({ color: HIGHLIGHT_ADD })
               .run();
-            return { applied: true, desc: descFound };
+            return { applied: true, desc: descFound, mode: 'replace' };
           }
         }
 
@@ -3480,15 +3493,15 @@ Respond ONLY JSON:
           const anchor = findAnchorRange(anchorHints) || findBestKeywordAnchor(anchorHints, anchorType);
           if (anchor) {
             const done = insertHighlightedParagraph(revisedParagraph, anchor.to + 1);
-            return { applied: !!done, desc: descFound };
+            return { applied: !!done, desc: descFound, mode: 'anchor' };
           }
           if (!allowAppend) {
-            return { applied: false, desc: 'Could not find a safe insertion point automatically. Please review and insert manually.' };
+            return { applied: false, desc: 'Could not find a safe insertion point automatically. Please review and insert manually.', mode: 'no-safe-anchor' };
           }
           const done = insertHighlightedParagraph(revisedParagraph);
-          return { applied: !!done, desc: descAppend || 'AI fix appended — review position and adjust if needed' };
+          return { applied: !!done, desc: descAppend || 'AI fix appended — review position and adjust if needed', mode: 'append' };
         }
-        return { applied: false, desc: 'No text to apply' };
+        return { applied: false, desc: 'No text to apply', mode: 'none' };
       };
 
       if (editor) {
@@ -3860,6 +3873,12 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                     editor.commands.scrollIntoView();
                     applied = true;
                     toastDesc = 'AI placed insertion at the most relevant section (highlighted green)';
+                    console.info('[APPLY][FRONTEND] ai-anchor-placement', {
+                      traceId: applyTraceId,
+                      type: suggestion?.type,
+                      aiAnchorFrom: aiAnchor.from,
+                      aiAnchorTo: aiAnchor.to,
+                    });
                   }
                 }
 
@@ -3879,6 +3898,12 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   !strictPlacementTypes.has(suggestion.type));
                 applied = result.applied;
                 toastDesc = result.desc;
+                console.info('[APPLY][FRONTEND] insertion-result', {
+                  traceId: applyTraceId,
+                  type: suggestion?.type,
+                  mode: result.mode,
+                  applied: result.applied,
+                });
                 }
               }
             }
@@ -4100,12 +4125,32 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               throw new Error('Sync blocked to prevent replacing document with partial content. Please reload and apply again.');
             }
 
-            await fileService.syncOnlyOfficeDocx(fileIdForSync, editor.getHTML(), editor.getText());
+            console.info('[SYNC][FRONTEND] start', {
+              traceId: applyTraceId,
+              fileId: fileIdForSync,
+              type: suggestion?.type,
+            });
+
+            await fileService.syncOnlyOfficeDocx(fileIdForSync, editor.getHTML(), editor.getText(), {
+              traceId: applyTraceId,
+              suggestionType: suggestion?.type || '',
+              suggestionId: suggestion?.suggestionId || '',
+            });
             setOnlyOfficeRefreshKey(prev => prev + 1);
             toastDesc = `${toastDesc}. Synced to OnlyOffice`;
+            console.info('[SYNC][FRONTEND] success', {
+              traceId: applyTraceId,
+              fileId: fileIdForSync,
+            });
           } catch (syncErr) {
             syncSucceeded = false;
-            console.warn('OnlyOffice sync failed:', syncErr?.message || syncErr);
+            console.warn('[SYNC][FRONTEND] failed', {
+              traceId: applyTraceId,
+              fileId: fileIdForSync,
+              message: syncErr?.message || String(syncErr),
+              status: syncErr?.response?.status || null,
+              data: syncErr?.response?.data || null,
+            });
             const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Not yet synced to OnlyOffice';
             toastDesc = `${toastDesc}. ${syncMsg}`;
           } finally {
@@ -4116,6 +4161,10 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
 
       if (applied && !syncSucceeded) {
         applied = false;
+        console.warn('[APPLY][FRONTEND] not-marked-applied-because-sync-failed', {
+          traceId: applyTraceId,
+          type: suggestion?.type,
+        });
       }
 
 
@@ -4153,7 +4202,10 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       }
     } catch (outerErr) {
 
-      console.warn('handleApplySuggestion error:', outerErr.message);
+      console.warn('[APPLY][FRONTEND] exception', {
+        message: outerErr?.message || String(outerErr),
+        stack: outerErr?.stack || null,
+      });
       toast({ title: 'Apply failed', description: 'No change was committed. Please retry.', status: 'error', duration: 3000 });
     }
   };

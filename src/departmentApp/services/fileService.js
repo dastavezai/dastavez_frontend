@@ -340,15 +340,20 @@ const fileService = {
     }
   },
 
-  syncOnlyOfficeDocx: async (fileId, htmlContent, plainText = '') => {
+  syncOnlyOfficeDocx: async (fileId, htmlContent, plainText = '', debugMeta = null) => {
     try {
       const response = await api.post(`${API_URL}/${fileId}/onlyoffice/sync`, {
         htmlContent,
         plainText,
+        debugMeta,
       }, { timeout: 120000 });
       return response.data;
     } catch (error) {
-      console.error('OnlyOffice sync error:', error);
+      console.error('OnlyOffice sync error:', {
+        message: error?.message || String(error),
+        status: error?.response?.status || null,
+        data: error?.response?.data || null,
+      });
       throw error;
     }
   },
