@@ -59,7 +59,7 @@ import {
   MdChevronLeft,
   MdChevronRight,
 } from 'react-icons/md';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import FontFamily from '@tiptap/extension-font-family';
@@ -1359,7 +1359,6 @@ const FullPageEditor = ({
   const docxFileUrl = docxFileUrlState || scanData?.docxFileUrl || session?.docxFileUrl || '';
   const isDevBuild = !!import.meta?.env?.DEV;
   const EDITABLE_ONLY_MODE = true;
-  const USE_ONLYOFFICE_EDITABLE = true;
   const showEditablePdfPreview = false;
   const [fidelityEdits, setFidelityEdits] = useState({});
   const [fidelityOffsets, setFidelityOffsets] = useState({});
@@ -3000,7 +2999,7 @@ const FullPageEditor = ({
 
   const executeDownloadWithDesign = async (format, designConfig) => {
     setIsDesignSuggestionOpen(false);
-    if (editor && !USE_ONLYOFFICE_EDITABLE) await handleAutosave(editor);
+    // OnlyOffice is the active editor surface; skip Tiptap autosave here.
 
     toast({ title: `Generating ${format.toUpperCase()}...`, status: 'info', duration: 2000 });
     try {
@@ -5216,9 +5215,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </VStack>
                     </Box>
                   )}
-                  {USE_ONLYOFFICE_EDITABLE
-                    ? <OnlyOfficeEditor fileId={selectedFile?._id || session?.fileId} />
-                    : <EditorContent editor={editor} />}
+                  <OnlyOfficeEditor fileId={selectedFile?._id || session?.fileId} />
                 </>
               )}
             </Box>
