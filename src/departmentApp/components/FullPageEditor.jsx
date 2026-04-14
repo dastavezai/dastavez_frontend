@@ -3259,6 +3259,27 @@ const FullPageEditor = ({
       const hasOriginal = !!(suggestion.originalText && suggestion.originalText.trim());
       const hasSuggested = !!(suggestion.suggestedText && suggestion.suggestedText.trim());
 
+      if (!editor) {
+        const fallbackApplied = applySuggestionToFidelity(suggestion);
+        if (fallbackApplied) {
+          setHasUnsavedChanges(true);
+          toast({
+            title: 'Suggestion inserted',
+            description: 'Applied using fidelity fallback. Use Rebuild/refresh view if needed.',
+            status: 'success',
+            duration: 3000,
+          });
+          return;
+        }
+        toast({
+          title: 'Editor not ready',
+          description: 'Could not insert suggestion. Please retry once the editor is fully loaded.',
+          status: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
 
 
       const AI_DRIVEN_TYPES = new Set([
@@ -3621,10 +3642,11 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
               }
             } else {
 
+              let parsed = null;
               try {
                 const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
                 if (jsonMatch) {
-                  const parsed = JSON.parse(jsonMatch[0]);
+                  parsed = JSON.parse(jsonMatch[0]);
 
                   if (parsed.insertAfterParagraph !== undefined && parsed.clauseText) {
                     const insertAfter = parsed.insertAfterParagraph || '';
@@ -4307,7 +4329,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             flexDirection="column"
             h="100%"
             bg={editorCanvasBg}
-            overflow="auto"
+            overflow="hidden"
             px={0}
           >
             {editorViewMode === 'editable' && (docxStatus === 'pending' || docxStatus === 'failed') && (
@@ -4355,48 +4377,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 </HStack>
               </Box>
             )}
-            {editorViewMode === 'editable' && docxStatus === 'ready' && !!docxFileUrl && (
-              <Box px={4} py={2} bg="green.50" borderBottom="1px solid" borderColor="gray.200">
-                <HStack justify="space-between" flexWrap="wrap" gap={2}>
-                  <VStack align="start" spacing={0}>
-                    <Text fontSize="xs" fontWeight="700" color="green.700">
-                      DOCX conversion ready
-                    </Text>
-                    <Text fontSize="xs" color="green.700">
-                      Download and open in Word to compare raw conversion vs editor rendering.
-                    </Text>
-                  </VStack>
-                  <HStack spacing={2}>
-                    <Button
-                      size="xs"
-                      colorScheme="green"
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          const fileId = selectedFile?._id || session?.fileId;
-                          if (!fileId) return;
-                          const blob = await fileService.downloadDocx(fileId);
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `converted_${fileId}.docx`;
-                          document.body.appendChild(a);
-                          a.click();
-                          a.remove();
-                          URL.revokeObjectURL(url);
-                          console.log('[DOCX-Pipeline][UI] download-docx', { fileId });
-                        } catch (e) {
-                          console.warn('[DOCX-Pipeline][UI] download-docx-failed', { error: e?.message || String(e) });
-                          toast({ title: 'DOCX download failed', status: 'error', duration: 2500 });
-                        }
-                      }}
-                    >
-                      Download Converted DOCX
-                    </Button>
-                  </HStack>
-                </HStack>
-              </Box>
-            )}
+            {/* Removed DOCX-ready banner per UX request. */}
             {dualViewMode && (
               <Box
                 px={4} py={1.5} bg="purple.600" display="flex" alignItems="center"
@@ -4409,18 +4390,18 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             )}
             <Box
               data-page-container
-              mx="auto"
+              mx={editorViewMode === 'editable' ? 0 : 'auto'}
               my={0}
               mb={0}
               w="100%"
-              maxW={pageStyle.pageWidth || '793px'}
-              minH="calc(100vh - 200px)"
-              pb="120px"
-              bg="#ffffff"
+              maxW={editorViewMode === 'editable' ? '100%' : (pageStyle.pageWidth || '793px')}
+              minH={editorViewMode === 'editable' ? '100%' : 'calc(100vh - 200px)'}
+              pb={editorViewMode === 'editable' ? 0 : '120px'}
+              bg={editorViewMode === 'editable' ? 'transparent' : '#ffffff'}
               boxShadow="none"
               borderRadius="0"
               position="relative"
-              overflow="visible"
+              overflow={editorViewMode === 'editable' ? 'hidden' : 'visible'}
               style={{
                 '--page-canvas-bg': editorCanvasBg,
                 '--pad-left': pageStyle.paddingLeft || '72px',
