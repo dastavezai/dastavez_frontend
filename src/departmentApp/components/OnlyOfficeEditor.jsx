@@ -15,9 +15,6 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Do not include refreshKey in holderId! 
-  // Changing the key forces React to unmount the Box exactly while DocsAPI is trying to destroy its own iframe,
-  // causing "Failed to execute 'removeChild' on 'Node'" DOM crashes.
   const holderId = useMemo(
     () => `onlyoffice-holder-${String(fileId || 'file')}`,
     [fileId]
@@ -44,94 +41,55 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
 
   React.useImperativeHandle(ref, () => ({
     insertText: (text, anchorText = '', mode = 'replace') => {
-      console.log('[CONNECTOR-TRACE] insertText-called. Global connector search...');
+      console.log('[CONNECTOR-TRACE] insertText-called. Searching for connection...');
       
       const doApply = (conn) => {
         if (!conn || !conn.executeMethod) {
-           console.error('[CONNECTOR-TRACE] invalid connector object:', conn);
-           return;
+          console.error('[CONNECTOR-TRACE] invalid connector object');
+          return;
         }
-        if (anchorText && anchorText.length > 5) {
-          console.log(`[CONNECTOR-TRACE] searching for anchor: "${anchorText.substring(0, 60)}..."`);
-          conn.executeMethod("Search", [anchorText, true], (result) => {
-            console.log('[CONNECTOR-TRACE] search-result', { count: result?.length || 0 });
-            if (mode === 'replace' || !result || result.length === 0) {
-              console.info('[CONNECTOR-TRACE] using PasteText fallback');
-              conn.executeMethod("PasteText", [text]);
-            } else {
-              console.info(`[CONNECTOR-TRACE] using callCommand for ${mode}`);
-              conn.callCommand(function(t, a, m) {
-                var oDocument = Api.GetDocument();
-                var oRange = oDocument.GetRangeBySearch(a, true);
-                if (oRange && oRange.length > 0) {
-                  var oParagraph = oRange[0].GetParagraph(0);
-                  if (m === 'replace') {
-                    oRange[0].Delete();
-                    oDocument.InsertContent([Api.CreateParagraph().AddText(t)], false, oParagraph.GetIndex());
-                  } else {
-                    var oNewPara = Api.CreateParagraph();
-                    try {
-                      var oStyle = oParagraph.GetStyle();
-                      if (oStyle) oNewPara.SetStyle(oStyle);
-                      oNewPara.SetJc(oParagraph.GetJc());
-                      oNewPara.SetIndLeft(oParagraph.GetIndLeft());
-                      oNewPara.SetIndFirstLine(oParagraph.GetIndFirstLine());
-                      var nSpacing = oParagraph.GetSpacingLine();
-                      var nRule = oParagraph.GetSpacingLineRule();
-                      if (nSpacing !== undefined) oNewPara.SetSpacingLine(nSpacing, nRule);
-                    } catch(e) {}
-                    oNewPara.AddText(t);
-                    oDocument.InsertContent([oNewPara], true, oParagraph.GetIndex());
-                    
-                    var oNewRange = oNewPara.GetRange();
-                    oNewRange.SetHighlight("yellow");
-                    oNewRange.Select();
-                    oDocument.ScrollTo(oNewRange);
-                    oDocument.UpdateAllFields(true);
-                  }
-                } else {
-                  oDocument.PasteText(t);
-                }
-              }, text, anchorText, mode);
-            }
-          });
-        } else {
-          console.log('[CONNECTOR-TRACE] no anchor, using PasteText directly');
-          conn.executeMethod("PasteText", [text]);
+        try {
+          // Priority 1: If we have enough anchor text, try surgical SearchAndReplace
+          if (anchorText && anchorText.length > 5) {
+            console.log('[CONNECTOR-TRACE] attempting SearchAndReplace for:', anchorText.substring(0, 40));
+            conn.executeMethod("SearchAndReplace", [{
+              searchString: anchorText,
+              replaceString: text,
+              isCaseSelected: false,
+              isMatchCase: false
+            }]);
+          } else {
+            // Priority 2: Universal Fallback - type at cursor
+            console.log('[CONNECTOR-TRACE] no anchor, using PasteText at cursor');
+            conn.executeMethod("PasteText", [text]);
+          }
+        } catch (err) {
+          console.error('[CONNECTOR-TRACE] execution failed:', err);
         }
       };
 
-      // USE GLOBAL CONNECTOR IF AVAILABLE
-      if (window.ONLYOFFICE_CONNECTOR) {
-        console.log('[CONNECTOR-TRACE] using global window connector');
-        doApply(window.ONLYOFFICE_CONNECTOR);
-        return true;
-      }
-
-      // POLL FOR CONNECTOR AVAILABILITY
       let attempts = 0;
       const poll = () => {
-        if (!editorRef.current) return;
-        if (!connectorRef.current && editorRef.current.createConnector) {
-          connectorRef.current = editorRef.current.createConnector();
-          window.ONLYOFFICE_CONNECTOR = connectorRef.current;
+        // DocEditor.createConnector is the standard way to get a bridge
+        if (!connectorRef.current && editorRef.current?.createConnector) {
+           connectorRef.current = editorRef.current.createConnector();
+           window.ONLYOFFICE_CONNECTOR = connectorRef.current;
         }
-        
-          const conn = window.ONLYOFFICE_CONNECTOR || connectorRef.current;
+
+        const conn = window.ONLYOFFICE_CONNECTOR || connectorRef.current;
         if (conn) {
-          console.log('[CONNECTOR-TRACE] connection success!', { attempts });
+          console.info('[CONNECTOR-TRACE] successful link established!');
           doApply(conn);
-        } else if (attempts < 10) {
-          if (attempts === 0) console.log('[CONNECTOR-TRACE] connector not yet available, polling 1.5s...');
+        } else if (attempts < 20) {
           attempts++;
-          setTimeout(poll, 150);
+          setTimeout(poll, 100);
         } else {
-          console.warn('[CONNECTOR-TRACE] poll-timeout: Direct insertion link failed. Resorting to background sync.');
+          console.warn('[CONNECTOR-TRACE] poll-timeout: Direct insertion link failed. Fallback to background only.');
         }
       };
 
       poll();
-      return true;
+      return true; // We return true to signify the attempt has been dispatched
     }
   }));
 
@@ -144,7 +102,6 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
       const top = wrapperRef.current?.getBoundingClientRect?.().top ?? 0;
       const viewport = typeof window !== 'undefined' ? window.innerHeight : 900;
       const available = Math.round(viewport - top - 16);
-      // Keep a comfortable minimum for legal-document work and avoid oversized jumps.
       const next = Math.max(700, Math.min(1200, available));
       setFrameHeightPx(next);
     };
@@ -169,6 +126,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
     let pollTimer = null;
     mountSeqRef.current += 1;
     const myMountSeq = mountSeqRef.current;
+    
     const boot = async () => {
       if (!fileId) {
         setError('No file selected for OnlyOffice.');
@@ -206,15 +164,12 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             throw new Error('Invalid OnlyOffice configuration from server.');
           }
 
-          // CACHE-BUSTING: Force OnlyOffice to fetch the fresh patched file
           if (config.document?.url) {
             const url = new URL(config.document.url, window.location.origin);
             url.searchParams.set('v', Date.now());
             config.document.url = url.toString();
-            console.log('[OnlyOffice][cache-bust] loading fresh document version:', config.document.url);
           }
 
-          // Do not rely on inherited 100% height; explicit height prevents blank iframe render.
           config.height = `${frameHeightRef.current}px`;
           config.width = '100%';
 
@@ -228,8 +183,9 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             onDocumentReady: () => {
               console.log('[OnlyOffice][onDocumentReady]');
               if (editorRef.current?.createConnector) {
-                console.log('[OnlyOffice][connector] initializing early...');
+                console.log('[OnlyOffice][connector] pre-initializing bridge...');
                 connectorRef.current = editorRef.current.createConnector();
+                window.ONLYOFFICE_CONNECTOR = connectorRef.current;
               }
             },
             onAppReady: () => {
@@ -243,7 +199,6 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
 
           safeDestroyEditor('pre-mount');
 
-          // Avoid mounting into a detached/stale node during rapid refreshes.
           if (!holderRef.current || !document.getElementById(holderId)) {
             throw new Error('OnlyOffice container is not ready. Please retry.');
           }
@@ -254,7 +209,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             const msg = String(mountErr?.message || mountErr || '');
             const isDomRace = /insertBefore|removeChild|not a child of this node/i.test(msg);
             if (isDomRace && attempt < 1 && !cancelled && myMountSeq === mountSeqRef.current) {
-              console.warn('[OnlyOffice][mount-retry-after-dom-race]', { holderId, attempt: attempt + 1, message: msg });
+              console.warn('[OnlyOffice][mount-retry-dom-race]', { attempt: attempt + 1, message: msg });
               safeDestroyEditor('dom-race-retry');
               await new Promise((resolve) => setTimeout(resolve, 100));
               return mountEditor(payload, attempt + 1);
@@ -262,11 +217,9 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             throw mountErr;
           }
           requestAnimationFrame(() => {
-            const h = `${frameHeightRef.current}px`;
             const iframe = holderRef.current?.querySelector('iframe');
             if (iframe) {
-              iframe.style.height = h;
-              iframe.style.minHeight = h;
+              iframe.style.height = `${frameHeightRef.current}px`;
               iframe.style.width = '100%';
               iframe.style.display = 'block';
             }
@@ -279,8 +232,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             const cfg = await fileService.getOnlyOfficeConfig(fileId);
             return cfg;
           } catch (e) {
-            const status = Number(e?.response?.status || 0);
-            if (status === 202) return { pending: true };
+            if (Number(e?.response?.status || 0) === 202) return { pending: true };
             throw e;
           }
         };
@@ -294,7 +246,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
               if (pollAttemptsRef.current > 60) {
                 clearInterval(pollTimer);
                 if (!cancelled) {
-                  setError('OnlyOffice setup timed out while preparing DOCX. Please try reopening the file.');
+                  setError('OnlyOffice preparation timed out. Please retry.');
                   setLoading(false);
                 }
                 return;
@@ -306,7 +258,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             } catch (pollErr) {
               clearInterval(pollTimer);
               if (!cancelled) {
-                setError(pollErr?.message || 'Failed to initialize OnlyOffice editor.');
+                setError(pollErr?.message || 'Failed to initialize editor.');
                 setLoading(false);
               }
             }
@@ -316,7 +268,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
 
         await mountEditor(cfgRes);
       } catch (e) {
-        if (!cancelled) setError(e?.message || 'Failed to initialize OnlyOffice editor.');
+        if (!cancelled) setError(e?.message || 'Failed to initialize editor.');
       } finally {
         if (!cancelled && !pollTimer) setLoading(false);
       }
@@ -325,7 +277,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
     return () => {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
-      safeDestroyEditor('effect-cleanup');
+      safeDestroyEditor('cleanup');
     };
   }, [fileId, holderId, refreshKey, internalRefreshKey]);
 

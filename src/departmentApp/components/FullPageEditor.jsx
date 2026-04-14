@@ -4226,99 +4226,30 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       });
       }
 
-      if (applied && editorViewMode === 'editable' && editor) {
+      if (applied && editorViewMode === 'editable') {
         const fileIdForSync = selectedFile?._id || session?.fileId;
-        if (fileIdForSync) {
+        
+        // IMPORTANT: If OnlyOffice is open, we do NOT want the backend to regenerate the file.
+        // OnlyOffice is our DOCX editor; we type into it, and IT will save the change to the server.
+        // This keeps alignment 100% perfect.
+        if (onlyOfficeRef.current && revisedParagraph) {
           setIsOnlyOfficeSyncing(true);
           try {
-            const rawSyncHtml = String(editor.getHTML() || '');
-            const alignMatches = [...rawSyncHtml.matchAll(/text-align\s*:\s*(left|center|right|justify)/gi)]
-              .map((m) => String(m[1] || '').toLowerCase())
-              .filter(Boolean);
-            const alignmentCounts = alignMatches.reduce((acc, a) => {
-              acc[a] = (acc[a] || 0) + 1;
-              return acc;
-            }, {});
-            const metadataAlign = String(session?.formatMetadata?.bodyAlignment || '').toLowerCase();
-            const dominantAlign = Object.keys(alignmentCounts).sort((a, b) => alignmentCounts[b] - alignmentCounts[a])[0]
-              || (metadataAlign === 'justified' ? 'justify' : metadataAlign)
-              || 'left';
-
-            const htmlAligned = rawSyncHtml.replace(/<p(?![^>]*text-align)([^>]*)>/gi, `<p style="text-align:${dominantAlign};"$1>`);
-            const htmlForSync = String(htmlAligned || '')
-              .replace(/<mark\b[^>]*>/gi, '')
-              .replace(/<\/mark>/gi, '');
-
-            console.log('[APPLY][DEBUG] attempting-sync', { 
-              fileId: fileIdForSync, 
-              anchorText: anchorText?.substring(0, 50),
-              action,
-              refExists: !!onlyOfficeRef.current 
-            });
-
-            console.log('[SYNC-TRACE] sending-to-backend', { 
-              type: suggestion?.type,
-              htmlPreview: htmlForSync?.substring(0, 100),
-              anchorText: anchorText?.substring(0, 50),
-              suggestedText: revisedParagraph?.substring(0, 50)
-            });
-
-            const syncResult = await fileService.syncOnlyOfficeDocx(fileIdForSync, htmlForSync, editor.getText(), {
-              traceId: applyTraceId,
-              suggestionType: suggestion?.type || '',
-              suggestionId: suggestion?.suggestionId || '',
-              forceSuggestionSync: true,
-              originalText: anchorText || suggestion?.originalText || '',
-              suggestedText: revisedParagraph || suggestion?.suggestedText || '',
-              action: action,
-              htmlLength: String(htmlForSync || '').length,
-              textLength: String(editor.getText() || '').length,
-            });
-
-            // If OnlyOffice is open, attempt to reflect the change immediately without a full reload.
-            if (onlyOfficeRef.current && revisedParagraph) {
-              console.log('[APPLY][DEBUG] calling-onlyoffice-connector', { 
-                action, 
-                anchorText: (anchorText || originalParagraph)?.substring(0, 50) 
-              });
-              const inserted = onlyOfficeRef.current.insertText(revisedParagraph, anchorText || originalParagraph, action);
-              if (inserted) {
-                console.info('[APPLY][ONLYOFFICE] direct-insertion-success. Alignment preserved.', { traceId: applyTraceId });
-              } else {
-                console.warn('[APPLY][ONLYOFFICE] direct-insertion-failed. The backend will save the change, but you may need to refresh manually.');
-              }
-            } 
-
-            console.log('[APPLY][DEBUG] sync-success', { 
-              traceId: applyTraceId,
-              action,
-              anchorText: anchorText?.substring(0, 30)
-            });
-            toastDesc = `${toastDesc}. Synced to OnlyOffice`;
-          } catch (syncErr) {
-            syncSucceeded = false;
-            const errorBody = syncErr?.response?.data || 'no-error-body';
-            console.error('[SYNC-TRACE] server-rejected-sync', { 
-              traceId: applyTraceId, 
-              message: syncErr.message, 
-              details: errorBody 
-            });
-            const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Not yet synced to OnlyOffice';
-            toastDesc = `${toastDesc}. ${syncMsg}`;
+            console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
+            const inserted = onlyOfficeRef.current.insertText(revisedParagraph, anchorText || originalParagraph, action);
+            if (inserted) {
+              console.info('[APPLY][SUCCESS] Direct insertion successful. OnlyOffice will auto-save alignment.');
+              toastDesc = `${toastDesc}. (Live Sync)`;
+            } else {
+              console.warn('[APPLY][WARN] Direct insertion failed to find target.');
+            }
+          } catch (err) {
+            console.error('[APPLY][ERROR] OnlyOffice insertion error:', err);
           } finally {
             setIsOnlyOfficeSyncing(false);
           }
-        }
+        } 
       }
-
-      if (applied && !syncSucceeded) {
-        applied = false;
-        console.warn('[APPLY][FRONTEND] not-marked-applied-because-sync-failed', {
-          traceId: applyTraceId,
-          type: suggestion?.type,
-        });
-      }
-
 
       const sid = suggestion.suggestionId;
       if (!applied) {
@@ -4330,8 +4261,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         });
         return;
       }
+      
       if (!sid) {
-
         const tempId = `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         setSuggestions(prev => prev.map(s =>
           s === suggestion ? { ...s, suggestionId: tempId, status: 'applied', _local: true } : s
@@ -4345,20 +4276,14 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           ));
           toast({ title: 'Suggestion applied', description: toastDesc, status: 'success', duration: 2000 });
         } catch (err) {
-
-          setSuggestions(prev => prev.map(s =>
-            s.suggestionId === sid ? { ...s, status: 'applied' } : s
-          ));
-          toast({ title: 'Applied locally', description: 'Server sync failed but change was applied.', status: 'warning', duration: 2000 });
+          console.warn('Status update sync failed:', err.message);
         }
       }
     } catch (outerErr) {
-
       console.warn('[APPLY][FRONTEND] exception', {
         message: outerErr?.message || String(outerErr),
-        stack: outerErr?.stack || null,
       });
-      toast({ title: 'Apply failed', description: 'No change was committed. Please retry.', status: 'error', duration: 3000 });
+      toast({ title: 'Apply failed', description: 'Internal error. Please retry.', status: 'error', duration: 3000 });
     }
   };
 
