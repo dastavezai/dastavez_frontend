@@ -49,11 +49,17 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
           return false;
         }
         try {
-          if (mode === 'replace' && anchorText && anchorText.length > 5) {
-            console.log('[CONNECTOR-TRACE] attempting SearchAndReplace for:', anchorText.substring(0, 40));
+          if (anchorText && anchorText.length > 5) {
+            const cleanedAnchor = String(anchorText || '').trim();
+            const cleanedText = String(text || '').trim();
+            const replaceString = mode === 'append'
+              ? `${cleanedAnchor}\n${cleanedText}`
+              : cleanedText;
+
+            console.log('[CONNECTOR-TRACE] attempting SearchAndReplace for:', cleanedAnchor.substring(0, 40), { mode });
             conn.executeMethod('SearchAndReplace', [{
-              searchString: anchorText,
-              replaceString: text,
+              searchString: cleanedAnchor,
+              replaceString,
               isCaseSelected: false,
               isMatchCase: false,
             }]);

@@ -4207,6 +4207,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
 
       if (applied && editorViewMode === 'editable') {
         const fileIdForSync = selectedFile?._id || session?.fileId;
+        let directInserted = false;
 
         // Phase 1 (best effort): direct OnlyOffice bridge insertion for immediate visual feedback.
         // Phase 2 (authoritative): backend sync from editor HTML to guarantee persistence + alignment.
@@ -4219,7 +4220,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               action
             );
             if (inserted) {
+              directInserted = true;
               console.info('[APPLY][SUCCESS] Direct insertion dispatched.');
+              toastDesc = `${toastDesc}. Inserted directly in OnlyOffice`;
             } else {
               console.warn('[APPLY][WARN] Direct insertion bridge not ready; relying on backend sync.');
             }
@@ -4228,23 +4231,19 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           }
         }
 
-        if (fileIdForSync) {
+        // If direct insertion worked, avoid full DOCX regeneration to preserve original layout fidelity.
+        if (fileIdForSync && !directInserted) {
           setIsOnlyOfficeSyncing(true);
           try {
             const rawSyncHtml = String(editor.getHTML() || '');
-            const alignMatches = [...rawSyncHtml.matchAll(/text-align\s*:\s*(left|center|right|justify)/gi)]
-              .map((m) => String(m[1] || '').toLowerCase())
-              .filter(Boolean);
-            const alignmentCounts = alignMatches.reduce((acc, a) => {
-              acc[a] = (acc[a] || 0) + 1;
-              return acc;
-            }, {});
             const metadataAlign = String(session?.formatMetadata?.bodyAlignment || '').toLowerCase();
-            const dominantAlign = Object.keys(alignmentCounts).sort((a, b) => alignmentCounts[b] - alignmentCounts[a])[0]
-              || (metadataAlign === 'justified' ? 'justify' : metadataAlign)
-              || 'left';
+            const normalizedMetadataAlign = metadataAlign === 'justified' ? 'justify' : metadataAlign;
+            const shouldInjectAlign = /^(left|center|right|justify)$/.test(normalizedMetadataAlign);
 
-            const htmlAligned = rawSyncHtml.replace(/<p(?![^>]*text-align)([^>]*)>/gi, `<p style="text-align:${dominantAlign};"$1>`);
+            const htmlAligned = shouldInjectAlign
+              ? rawSyncHtml.replace(/<p(?![^>]*text-align)([^>]*)>/gi, `<p style="text-align:${normalizedMetadataAlign};"$1>`)
+              : rawSyncHtml;
+
             const htmlForSync = String(htmlAligned || '')
               .replace(/<mark\b[^>]*>/gi, '')
               .replace(/<\/mark>/gi, '');
