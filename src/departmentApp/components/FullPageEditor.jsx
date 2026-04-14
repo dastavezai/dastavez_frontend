@@ -4301,12 +4301,11 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             toastDesc = `${toastDesc}. Synced to OnlyOffice`;
           } catch (syncErr) {
             syncSucceeded = false;
-            console.warn('[SYNC][FRONTEND] failed', {
-              traceId: applyTraceId,
-              fileId: fileIdForSync,
-              message: syncErr?.message || String(syncErr),
-              status: syncErr?.response?.status || null,
-              data: syncErr?.response?.data || null,
+            const errorBody = syncErr?.response?.data || 'no-error-body';
+            console.error('[SYNC-TRACE] server-rejected-sync', { 
+              traceId: applyTraceId, 
+              message: syncErr.message, 
+              details: errorBody 
             });
             const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Not yet synced to OnlyOffice';
             toastDesc = `${toastDesc}. ${syncMsg}`;

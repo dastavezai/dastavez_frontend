@@ -43,68 +43,75 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
 
   React.useImperativeHandle(ref, () => ({
     insertText: (text, anchorText = '', mode = 'replace') => {
-      console.log('[CONNECTOR-TRACE] insertText-called', { hasEditor: !!editorRef.current, hasConnector: !!connectorRef.current, mode });
-      if (!editorRef.current) {
-        console.warn('[CONNECTOR-TRACE] aborted: editorRef.current is null');
-        return false;
-      }
-      try {
+      console.log('[CONNECTOR-TRACE] insertText-called. Polling for connector...');
+      
+      const doApply = (conn) => {
+        if (anchorText && anchorText.length > 5) {
+          console.log(`[CONNECTOR-TRACE] searching for anchor: "${anchorText.substring(0, 60)}..."`);
+          conn.executeMethod("Search", [anchorText, true], (result) => {
+            console.log('[CONNECTOR-TRACE] search-result', { count: result?.length || 0 });
+            if (mode === 'replace' || !result || result.length === 0) {
+              console.info('[CONNECTOR-TRACE] using PasteText fallback');
+              conn.executeMethod("PasteText", [text]);
+            } else {
+              console.info(`[CONNECTOR-TRACE] using callCommand for ${mode}`);
+              conn.callCommand(function(t, a, m) {
+                var oDocument = Api.GetDocument();
+                var oRange = oDocument.GetRangeBySearch(a, true);
+                if (oRange && oRange.length > 0) {
+                  var oParagraph = oRange[0].GetParagraph(0);
+                  if (m === 'replace') {
+                    oRange[0].Delete();
+                    oDocument.InsertContent([Api.CreateParagraph().AddText(t)], false, oParagraph.GetIndex());
+                  } else {
+                    var oNewPara = Api.CreateParagraph();
+                    try {
+                      var oStyle = oParagraph.GetStyle();
+                      if (oStyle) oNewPara.SetStyle(oStyle);
+                      oNewPara.SetJc(oParagraph.GetJc());
+                      oNewPara.SetIndLeft(oParagraph.GetIndLeft());
+                      oNewPara.SetIndFirstLine(oParagraph.GetIndFirstLine());
+                      var nSpacing = oParagraph.GetSpacingLine();
+                      var nRule = oParagraph.GetSpacingLineRule();
+                      if (nSpacing !== undefined) oNewPara.SetSpacingLine(nSpacing, nRule);
+                    } catch(e) {}
+                    oNewPara.AddText(t);
+                    oDocument.InsertContent([oNewPara], true, oParagraph.GetIndex());
+                  }
+                } else {
+                  oDocument.PasteText(t);
+                }
+              }, text, anchorText, mode);
+            }
+          });
+        } else {
+          console.log('[CONNECTOR-TRACE] no anchor, using PasteText directly');
+          conn.executeMethod("PasteText", [text]);
+        }
+      };
+
+      // POLL FOR CONNECTOR AVAILABILITY
+      let attempts = 0;
+      const poll = () => {
+        if (!editorRef.current) return;
         if (!connectorRef.current && editorRef.current.createConnector) {
-          console.log('[CONNECTOR-TRACE] attempting to createConnector...');
           connectorRef.current = editorRef.current.createConnector();
         }
         
         if (connectorRef.current) {
-          if (anchorText && anchorText.length > 5) {
-            console.log(`[CONNECTOR-TRACE] searching for anchor: "${anchorText.substring(0, 60)}..."`);
-            connectorRef.current.executeMethod("Search", [anchorText, true], (result) => {
-              console.log('[CONNECTOR-TRACE] search-result', { count: result?.length || 0 });
-              if (mode === 'replace' || !result || result.length === 0) {
-                console.info('[CONNECTOR-TRACE] using PasteText fallback');
-                connectorRef.current.executeMethod("PasteText", [text]);
-              } else {
-                console.info(`[CONNECTOR-TRACE] using callCommand for ${mode}`);
-                connectorRef.current.callCommand(function(t, a, m) {
-                  var oDocument = Api.GetDocument();
-                  var oRange = oDocument.GetRangeBySearch(a, true);
-                  if (oRange && oRange.length > 0) {
-                    var oParagraph = oRange[0].GetParagraph(0);
-                    if (m === 'replace') {
-                      oRange[0].Delete();
-                      oDocument.InsertContent([Api.CreateParagraph().AddText(t)], false, oParagraph.GetIndex());
-                    } else {
-                      var oNewPara = Api.CreateParagraph();
-                      try {
-                        var oStyle = oParagraph.GetStyle();
-                        if (oStyle) oNewPara.SetStyle(oStyle);
-                        oNewPara.SetJc(oParagraph.GetJc());
-                        oNewPara.SetIndLeft(oParagraph.GetIndLeft());
-                        oNewPara.SetIndFirstLine(oParagraph.GetIndFirstLine());
-                        var nSpacing = oParagraph.GetSpacingLine();
-                        var nRule = oParagraph.GetSpacingLineRule();
-                        if (nSpacing !== undefined) oNewPara.SetSpacingLine(nSpacing, nRule);
-                      } catch(e) {}
-                      oNewPara.AddText(t);
-                      oDocument.InsertContent([oNewPara], true, oParagraph.GetIndex());
-                    }
-                  } else {
-                    oDocument.PasteText(t);
-                  }
-                }, text, anchorText, mode);
-              }
-            });
-          } else {
-            console.log('[CONNECTOR-TRACE] no anchor, using PasteText directly');
-            connectorRef.current.executeMethod("PasteText", [text]);
-          }
-          return true;
+          console.log('[CONNECTOR-TRACE] connection success!', { attempts, ready: !!connectorRef.current.executeMethod });
+          doApply(connectorRef.current);
+        } else if (attempts < 30) {
+          if (attempts === 0) console.log('[CONNECTOR-TRACE] connector not yet available, starting polling loop...');
+          attempts++;
+          setTimeout(poll, 150);
+        } else {
+          console.error('[CONNECTOR-TRACE] poll-timeout: could not establish connection after 30 attempts (4.5s)');
         }
-        console.warn('[CONNECTOR-TRACE] failed to initialize connector');
-        return false;
-      } catch (err) {
-        console.warn('[CONNECTOR-TRACE] runtime-error', err);
-        return false;
-      }
+      };
+
+      poll();
+      return true; // We return true to suppress the parent's immediate reload, trusting the polling
     }
   }));
 
