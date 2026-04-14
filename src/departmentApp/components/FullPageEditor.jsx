@@ -3544,7 +3544,7 @@ Respond ONLY JSON:
               target = blocks[Math.min(Math.max(laterIndex, 0), blocks.length - 1)];
             }
           }
-          return target ? { from: target.from, to: target.to } : null;
+          return target ? { from: target.from, to: target.to, text: target.text } : null;
         } catch (_) {
           return null;
         }
@@ -3976,7 +3976,7 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                 if (strictPlacementTypes.has(suggestion.type) && revisedParagraph) {
                   const aiAnchor = await findAiAnchorRange([suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle], suggestion.type);
                   if (aiAnchor) {
-                    anchorText = suggestion.principle || suggestion.description || '';
+                    anchorText = aiAnchor.text || suggestion.principle || suggestion.description || '';
                     action = 'append';
                     const escaped = String(revisedParagraph).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;

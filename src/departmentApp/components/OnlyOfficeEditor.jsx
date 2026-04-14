@@ -51,36 +51,45 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
         
         if (connectorRef.current) {
           if (anchorText && anchorText.length > 5) {
-            console.log('[OnlyOfficeEditor] Searching for anchor:', anchorText.substring(0, 50));
+            console.log(`[OnlyOfficeEditor] Searching for anchor: "${anchorText.substring(0, 60)}..."`);
             connectorRef.current.executeMethod("Search", [anchorText, true], (result) => {
               if (mode === 'replace' || !result || result.length === 0) {
+                console.info('[OnlyOfficeEditor] Anchor not found or mode=replace, using PasteText fallback');
                 connectorRef.current.executeMethod("PasteText", [text]);
               } else {
-                connectorRef.current.callCommand(function(t, a) {
+                console.info(`[OnlyOfficeEditor] Anchor found (${result.length} matches), using callCommand for precise ${mode}`);
+                connectorRef.current.callCommand(function(t, a, m) {
                   var oDocument = Api.GetDocument();
                   var oRange = oDocument.GetRangeBySearch(a, true);
                   if (oRange && oRange.length > 0) {
                     var oParagraph = oRange[0].GetParagraph(0);
-                    var oNewPara = Api.CreateParagraph();
-                    
-                    // CLONE LAYOUT PROPERTIES
-                    try {
-                      if (oParagraph.GetStyle()) oNewPara.SetStyle(oParagraph.GetStyle());
-                      oNewPara.SetJc(oParagraph.GetJc());
-                      oNewPara.SetIndLeft(oParagraph.GetIndLeft());
-                      oNewPara.SetIndFirstLine(oParagraph.GetIndFirstLine());
-                      oNewPara.SetSpacingLine(oParagraph.GetSpacingLine(), oParagraph.GetSpacingLineRule());
-                    } catch(e) {}
-
-                    oNewPara.AddText(t);
-                    oDocument.InsertContent([oNewPara], true, oParagraph.GetIndex());
+                    if (m === 'replace') {
+                      oRange[0].Delete();
+                      oDocument.InsertContent([Api.CreateParagraph().AddText(t)], false, oParagraph.GetIndex());
+                    } else {
+                      var oNewPara = Api.CreateParagraph();
+                      // CLONE LAYOUT PROPERTIES
+                      try {
+                        var oStyle = oParagraph.GetStyle();
+                        if (oStyle) oNewPara.SetStyle(oStyle);
+                        oNewPara.SetJc(oParagraph.GetJc());
+                        oNewPara.SetIndLeft(oParagraph.GetIndLeft());
+                        oNewPara.SetIndFirstLine(oParagraph.GetIndFirstLine());
+                        var nSpacing = oParagraph.GetSpacingLine();
+                        var nRule = oParagraph.GetSpacingLineRule();
+                        if (nSpacing !== undefined) oNewPara.SetSpacingLine(nSpacing, nRule);
+                      } catch(e) {}
+                      oNewPara.AddText(t);
+                      oDocument.InsertContent([oNewPara], true, oParagraph.GetIndex());
+                    }
                   } else {
                     oDocument.PasteText(t);
                   }
-                }, text, anchorText);
+                }, text, anchorText, mode);
               }
             });
           } else {
+            console.info('[OnlyOfficeEditor] No anchor provided, using PasteText');
             connectorRef.current.executeMethod("PasteText", [text]);
           }
           return true;
