@@ -3222,38 +3222,11 @@ const strictPlacementTypes = new Set(['precedence_apply', 'compliance_fix', 'mis
 
 const handleApplySuggestion = async (suggestion) => {
     try {
-      if (editorViewMode === 'fidelity') {
-        const fidelityApplied = applySuggestionToFidelity(suggestion);
-        if (fidelityApplied) {
-          setChangeHistory(prev => [...prev, {
-            type: 'suggestion',
-            instruction: suggestion.title || 'Suggestion Applied',
-            summary: `Inserted in fidelity view: "${(suggestion.suggestedText || '').substring(0, 80)}..."`,
-            originalText: suggestion.originalText || '',
-            suggestedText: suggestion.suggestedText || '',
-            timestamp: new Date().toISOString(),
-            applied: true,
-            reverted: false,
-            mode: 'fidelity',
-          }]);
-          toast({
-            title: 'Suggestion inserted in fidelity view',
-            description: selectedFidelityBlock?.id
-              ? 'Applied to selected block.'
-              : 'No block selected, so applied to the first text block.',
-            status: 'success',
-            duration: 2500,
-          });
-          return;
-        }
-        toast({
-          title: 'No fidelity block available',
-          description: 'Could not find a target block to insert the suggestion.',
-          status: 'warning',
-          duration: 3000,
-        });
-        return;
-      }
+      console.log('[APPLY][DEBUG] handleApplySuggestion start', { 
+        suggestionType: suggestion.type, 
+        currentMode: editorViewMode,
+        hasEditor: !!editor 
+      });
 
       let applied = false;
       let syncSucceeded = true;
@@ -3544,6 +3517,12 @@ Respond ONLY JSON:
               target = blocks[Math.min(Math.max(laterIndex, 0), blocks.length - 1)];
             }
           }
+          console.log('[APPLY][DEBUG] findAiAnchorRange result', { 
+            found: !!target, 
+            text: target?.text?.substring(0, 50),
+            from: target?.from,
+            to: target?.to
+          });
           return target ? { from: target.from, to: target.to, text: target.text } : null;
         } catch (_) {
           return null;
@@ -4248,10 +4227,11 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               .replace(/<mark\b[^>]*>/gi, '')
               .replace(/<\/mark>/gi, '');
 
-            console.info('[SYNC][FRONTEND] start', {
-              traceId: applyTraceId,
-              fileId: fileIdForSync,
-              type: suggestion?.type,
+            console.log('[APPLY][DEBUG] attempting-sync', { 
+              fileId: fileIdForSync, 
+              anchorText: anchorText?.substring(0, 50),
+              action,
+              refExists: !!onlyOfficeRef.current 
             });
 
             await fileService.syncOnlyOfficeDocx(fileIdForSync, htmlForSync, editor.getText(), {
@@ -4267,20 +4247,27 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             });
 
             // If OnlyOffice is open, attempt to reflect the change immediately without a full reload.
-            // Direct insertion preserves layout fidelity and prevents DOM reconciliation crashes.
-            if (onlyOfficeRef.current && isAIDriven && revisedParagraph) {
-              // Pass the anchor info to OnlyOfficeEditor so it can try to place the text correctly
+            if (onlyOfficeRef.current && revisedParagraph) {
+              console.log('[APPLY][DEBUG] calling-onlyoffice-connector', { 
+                action, 
+                anchorText: (anchorText || originalParagraph)?.substring(0, 50) 
+              });
               const inserted = onlyOfficeRef.current.insertText(revisedParagraph, anchorText || originalParagraph, action);
               if (inserted) {
                 console.info('[APPLY][ONLYOFFICE] direct-insertion-success', { traceId: applyTraceId });
+              } else {
+                console.warn('[APPLY][ONLYOFFICE] direct-insertion-failed-ref-init-error');
               }
+            } else {
+              console.warn('[APPLY][DEBUG] skipped-onlyoffice-connector-ref-missing');
             }
 
-            toastDesc = `${toastDesc}. Synced to OnlyOffice`;
-            console.info('[SYNC][FRONTEND] success', {
+            console.log('[APPLY][DEBUG] sync-success', { 
               traceId: applyTraceId,
-              fileId: fileIdForSync,
+              action,
+              anchorText: anchorText?.substring(0, 30)
             });
+            toastDesc = `${toastDesc}. Synced to OnlyOffice`;
           } catch (syncErr) {
             syncSucceeded = false;
             console.warn('[SYNC][FRONTEND] failed', {
