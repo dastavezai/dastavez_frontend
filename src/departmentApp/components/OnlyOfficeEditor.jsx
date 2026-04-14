@@ -6,6 +6,7 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
   const wrapperRef = useRef(null);
   const holderRef = useRef(null);
   const editorRef = useRef(null);
+  const mountSeqRef = useRef(0);
   const frameHeightRef = useRef(860);
   const pollAttemptsRef = useRef(0);
   const [frameHeightPx, setFrameHeightPx] = useState(860);
@@ -48,6 +49,8 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
   useEffect(() => {
     let cancelled = false;
     let pollTimer = null;
+    mountSeqRef.current += 1;
+    const myMountSeq = mountSeqRef.current;
     const boot = async () => {
       if (!fileId) {
         setError('No file selected for OnlyOffice.');
@@ -77,7 +80,8 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
           });
         };
 
-        const mountEditor = async (payload) => {
+        const mountEditor = async (payload, attempt = 0) => {
+          if (cancelled || myMountSeq !== mountSeqRef.current) return;
           const docServerUrl = String(payload?.docServerUrl || '').replace(/\/+$/, '');
           const config = payload?.config ? { ...payload.config } : null;
           if (!docServerUrl || !config) {
@@ -105,7 +109,7 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
 
           const scriptSrc = `${docServerUrl}/web-apps/apps/api/documents/api.js`;
           await loadScript(scriptSrc);
-          if (cancelled) return;
+          if (cancelled || myMountSeq !== mountSeqRef.current) return;
 
           if (editorRef.current?.destroyEditor) {
             try { editorRef.current.destroyEditor(); } catch (_) {}
@@ -117,7 +121,19 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
             throw new Error('OnlyOffice container is not ready. Please retry.');
           }
 
-          editorRef.current = new window.DocsAPI.DocEditor(holderId, config);
+          try {
+            editorRef.current = new window.DocsAPI.DocEditor(holderId, config);
+          } catch (mountErr) {
+            const msg = String(mountErr?.message || mountErr || '');
+            const isDomRace = /insertBefore|not a child of this node/i.test(msg);
+            if (isDomRace && attempt < 1 && !cancelled && myMountSeq === mountSeqRef.current) {
+              console.warn('[OnlyOffice][mount-retry-after-dom-race]', { holderId, attempt: attempt + 1, message: msg });
+              if (holderRef.current) holderRef.current.innerHTML = '';
+              await new Promise((resolve) => setTimeout(resolve, 60));
+              return mountEditor(payload, attempt + 1);
+            }
+            throw mountErr;
+          }
           requestAnimationFrame(() => {
             const h = `${frameHeightRef.current}px`;
             const iframe = holderRef.current?.querySelector('iframe');

@@ -4173,7 +4173,21 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         if (fileIdForSync) {
           setIsOnlyOfficeSyncing(true);
           try {
-            const htmlForSync = String(editor.getHTML() || '')
+            const rawSyncHtml = String(editor.getHTML() || '');
+            const alignMatches = [...rawSyncHtml.matchAll(/text-align\s*:\s*(left|center|right|justify)/gi)]
+              .map((m) => String(m[1] || '').toLowerCase())
+              .filter(Boolean);
+            const alignmentCounts = alignMatches.reduce((acc, a) => {
+              acc[a] = (acc[a] || 0) + 1;
+              return acc;
+            }, {});
+            const metadataAlign = String(session?.formatMetadata?.bodyAlignment || '').toLowerCase();
+            const dominantAlign = Object.keys(alignmentCounts).sort((a, b) => alignmentCounts[b] - alignmentCounts[a])[0]
+              || (metadataAlign === 'justified' ? 'justify' : metadataAlign)
+              || 'left';
+
+            const htmlAligned = rawSyncHtml.replace(/<p(?![^>]*text-align)([^>]*)>/gi, `<p style="text-align:${dominantAlign};"$1>`);
+            const htmlForSync = String(htmlAligned || '')
               .replace(/<mark\b[^>]*>/gi, '')
               .replace(/<\/mark>/gi, '');
 
