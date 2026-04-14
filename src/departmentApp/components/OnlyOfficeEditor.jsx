@@ -43,9 +43,13 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
 
   React.useImperativeHandle(ref, () => ({
     insertText: (text, anchorText = '', mode = 'replace') => {
-      console.log('[CONNECTOR-TRACE] insertText-called. Polling for connector...');
+      console.log('[CONNECTOR-TRACE] insertText-called. Global connector search...');
       
       const doApply = (conn) => {
+        if (!conn || !conn.executeMethod) {
+           console.error('[CONNECTOR-TRACE] invalid connector object:', conn);
+           return;
+        }
         if (anchorText && anchorText.length > 5) {
           console.log(`[CONNECTOR-TRACE] searching for anchor: "${anchorText.substring(0, 60)}..."`);
           conn.executeMethod("Search", [anchorText, true], (result) => {
@@ -78,12 +82,11 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
                     oNewPara.AddText(t);
                     oDocument.InsertContent([oNewPara], true, oParagraph.GetIndex());
                     
-                    // FLASH & SCROLL: Focus the view on the new addition
                     var oNewRange = oNewPara.GetRange();
                     oNewRange.SetHighlight("yellow");
                     oNewRange.Select();
                     oDocument.ScrollTo(oNewRange);
-                    console.log("[CONNECTOR-TRACE] auto-scroll-triggered");
+                    oDocument.UpdateAllFields(true);
                   }
                 } else {
                   oDocument.PasteText(t);
@@ -97,17 +100,26 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
         }
       };
 
+      // USE GLOBAL CONNECTOR IF AVAILABLE
+      if (window.ONLYOFFICE_CONNECTOR) {
+        console.log('[CONNECTOR-TRACE] using global window connector');
+        doApply(window.ONLYOFFICE_CONNECTOR);
+        return true;
+      }
+
       // POLL FOR CONNECTOR AVAILABILITY
       let attempts = 0;
       const poll = () => {
         if (!editorRef.current) return;
         if (!connectorRef.current && editorRef.current.createConnector) {
           connectorRef.current = editorRef.current.createConnector();
+          window.ONLYOFFICE_CONNECTOR = connectorRef.current;
         }
         
-        if (connectorRef.current) {
-          console.log('[CONNECTOR-TRACE] connection success!', { attempts, ready: !!connectorRef.current.executeMethod });
-          doApply(connectorRef.current);
+        const conn = window.ONLYOFFICE_CONNECTOR || connectorRef.current;
+        if (conn) {
+          console.log('[CONNECTOR-TRACE] connection success!', { attempts });
+          doApply(conn);
         } else if (attempts < 30) {
           if (attempts === 0) console.log('[CONNECTOR-TRACE] connector not yet available, starting polling loop...');
           attempts++;
@@ -118,7 +130,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
       };
 
       poll();
-      return true; // We return true to suppress the parent's immediate reload, trusting the polling
+      return true;
     }
   }));
 
