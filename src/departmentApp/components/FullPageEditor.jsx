@@ -4283,15 +4283,11 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               });
               const inserted = onlyOfficeRef.current.insertText(revisedParagraph, anchorText || originalParagraph, action);
               if (inserted) {
-                console.info('[APPLY][ONLYOFFICE] direct-insertion-success', { traceId: applyTraceId });
+                console.info('[APPLY][ONLYOFFICE] direct-insertion-success. Alignment preserved.', { traceId: applyTraceId });
               } else {
-                console.warn('[APPLY][ONLYOFFICE] direct-insertion-failed, forcing session reload...');
-                setOnlyOfficeRefreshKey(prev => prev + 1);
+                console.warn('[APPLY][ONLYOFFICE] direct-insertion-failed. The backend will save the change, but you may need to refresh manually.');
               }
-            } else if (revisedParagraph) {
-              console.warn('[APPLY][DEBUG] onlyOfficeRef missing, forcing background reload...');
-              setOnlyOfficeRefreshKey(prev => prev + 1);
-            }
+            } 
 
             console.log('[APPLY][DEBUG] sync-success', { 
               traceId: applyTraceId,

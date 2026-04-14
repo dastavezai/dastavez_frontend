@@ -126,8 +126,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
           attempts++;
           setTimeout(poll, 150);
         } else {
-          console.error('[CONNECTOR-TRACE] poll-timeout: triggering local component refresh...');
-          setInternalRefreshKey(prev => prev + 1);
+          console.warn('[CONNECTOR-TRACE] poll-timeout: Direct insertion link failed. Resorting to background sync.');
         }
       };
 
