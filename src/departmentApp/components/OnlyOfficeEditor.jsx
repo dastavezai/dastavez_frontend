@@ -11,6 +11,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
   const frameHeightRef = useRef(860);
   const pollAttemptsRef = useRef(0);
   const [frameHeightPx, setFrameHeightPx] = useState(860);
+  const [internalRefreshKey, setInternalRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -125,8 +126,8 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
           attempts++;
           setTimeout(poll, 150);
         } else {
-          console.error('[CONNECTOR-TRACE] poll-timeout: triggering auto-refresh to show local sync...');
-          window.location.reload(); // Hard refresh to ensure we see the new backend file
+          console.error('[CONNECTOR-TRACE] poll-timeout: triggering local component refresh...');
+          setInternalRefreshKey(prev => prev + 1);
         }
       };
 
@@ -327,7 +328,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
       if (pollTimer) clearInterval(pollTimer);
       safeDestroyEditor('effect-cleanup');
     };
-  }, [fileId, holderId, refreshKey]);
+  }, [fileId, holderId, refreshKey, internalRefreshKey]);
 
   if (error) {
     return (
