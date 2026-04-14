@@ -33,9 +33,10 @@ const SmartSuggestionsPanel = ({ suggestions = [], onApply, onDismiss, onUndo, o
 
   const stats = useMemo(() => {
     const pending = suggestions.filter(s => s.status === 'pending').length;
+    const inProgress = suggestions.filter(s => s.status === 'in_progress').length;
     const applied = suggestions.filter(s => s.status === 'applied').length;
     const dismissed = suggestions.filter(s => s.status === 'dismissed').length;
-    return { total: suggestions.length, pending, applied, dismissed };
+    return { total: suggestions.length, pending, inProgress, applied, dismissed };
   }, [suggestions]);
 
   const filteredSuggestions = useMemo(() => {
@@ -55,7 +56,7 @@ const SmartSuggestionsPanel = ({ suggestions = [], onApply, onDismiss, onUndo, o
             <Icon as={MdLightbulb} color="yellow.400" boxSize={5} />
             <Text fontWeight="bold" fontSize="sm">Smart Suggestions</Text>
           </HStack>
-          <Badge colorScheme="blue" fontSize="xs">{stats.pending} pending</Badge>
+          <Badge colorScheme="blue" fontSize="xs">{stats.pending + stats.inProgress} active</Badge>
         </HStack>
         
         <Progress 
@@ -67,7 +68,7 @@ const SmartSuggestionsPanel = ({ suggestions = [], onApply, onDismiss, onUndo, o
         />
         
         <HStack spacing={1} fontSize="xs" color={mutedColor}>
-          {['all', 'pending', 'applied', 'dismissed'].map(f => (
+          {['all', 'pending', 'in_progress', 'applied', 'dismissed'].map(f => (
             <Badge
               key={f}
               cursor="pointer"
@@ -78,6 +79,7 @@ const SmartSuggestionsPanel = ({ suggestions = [], onApply, onDismiss, onUndo, o
             >
               {f === 'all' ? `All (${stats.total})` : 
                f === 'pending' ? `Pending (${stats.pending})` :
+               f === 'in_progress' ? `In Progress (${stats.inProgress})` :
                f === 'applied' ? `Applied (${stats.applied})` :
                `Dismissed (${stats.dismissed})`}
             </Badge>
@@ -99,7 +101,7 @@ const SmartSuggestionsPanel = ({ suggestions = [], onApply, onDismiss, onUndo, o
           {filteredSuggestions.map(suggestion => {
             const severity = SEVERITY_CONFIG[suggestion.severity] || SEVERITY_CONFIG.info;
             const isExpanded = expandedId === suggestion.suggestionId;
-            const isDone = suggestion.status !== 'pending';
+            const isDone = !['pending', 'in_progress'].includes(suggestion.status);
 
             return (
               <Box
@@ -164,6 +166,11 @@ const SmartSuggestionsPanel = ({ suggestions = [], onApply, onDismiss, onUndo, o
 
                     {!isDone && (
                       <HStack spacing={2} mt={2}>
+                        {suggestion.status === 'in_progress' && (
+                          <Badge colorScheme="blue" fontSize="2xs" px={2} py={0.5} borderRadius="full">
+                            In Progress
+                          </Badge>
+                        )}
                         <Tooltip label="Apply suggestion" fontSize="xs">
                           <IconButton
                             icon={<FaCheck />}

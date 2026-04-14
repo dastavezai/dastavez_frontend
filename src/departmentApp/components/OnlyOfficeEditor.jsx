@@ -178,6 +178,21 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
       }
       return false;
     },
+
+    undoLastAction: async () => {
+      const ready = await waitForEditorReady(8000);
+      if (!ready) return false;
+
+      const conn = await ensureConnector(5000);
+      if (!conn?.executeMethod) return false;
+
+      try {
+        conn.executeMethod('Undo', []);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    },
   }));
 
   useEffect(() => {

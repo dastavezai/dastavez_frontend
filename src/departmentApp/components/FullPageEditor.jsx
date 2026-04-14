@@ -1353,6 +1353,9 @@ const FullPageEditor = ({
   const [onlyOfficeCallbackWritable, setOnlyOfficeCallbackWritable] = useState(null);
   const [onlyOfficeEditorReady, setOnlyOfficeEditorReady] = useState(false);
   const [pendingCitationPaste, setPendingCitationPaste] = useState(null);
+  const [showCitationTour, setShowCitationTour] = useState(false);
+  const [citationWizardStep, setCitationWizardStep] = useState(1);
+  const [lastConfirmedCitation, setLastConfirmedCitation] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
   const [onlyOfficeRefreshKey, setOnlyOfficeRefreshKey] = useState(0);
@@ -1400,6 +1403,7 @@ const FullPageEditor = ({
   const autosaveTimerRef = useRef(null);
   const overviewDebounceRef = useRef(null);
   const appliedSuggestionsRef = useRef(new Set());
+  const citationInProgressRef = useRef(new Set());
   const lastScanKeyRef = useRef(null); // tracks last scan identity to avoid re-sync on parent re-renders
 
   // Local mutable copies of scan arrays — updated when fixes are applied or doc is manually edited
@@ -3223,6 +3227,56 @@ const FullPageEditor = ({
 
 const strictPlacementTypes = new Set(['precedence_apply', 'compliance_fix', 'missing_clause', 'insert_clause']);
 
+const deriveSectionLabel = (anchor = '') => {
+  const low = String(anchor || '').toLowerCase();
+  if (/precedent|precedence|authorit|case\s*law|citation|judgment/.test(low)) return 'Precedents';
+  if (/ground|argument|legal\s*basis/.test(low)) return 'Legal Grounds';
+  if (/compliance|obligation|mandatory|required/.test(low)) return 'Compliance';
+  return 'Relevant section';
+};
+
+const shortenAnchorPhrase = (anchor = '') => {
+  const clean = String(anchor || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  const words = clean.split(' ');
+  if (words.length <= 12) return clean;
+  return `${words.slice(0, 12).join(' ')}...`;
+};
+
+const findCitationAnchorCandidates = (text = '', existingAnchor = '') => {
+  const raw = String(text || '');
+  if (!raw) return [];
+  const lines = raw
+    .split(/\n+/)
+    .map((l) => l.replace(/\s+/g, ' ').trim())
+    .filter((l) => l.length >= 14);
+  const scored = [];
+  for (const line of lines) {
+    const low = line.toLowerCase();
+    let score = 0;
+    if (/precedent|precedence|authorit|case\s*law|citation|judgment/.test(low)) score += 4;
+    if (/ground|argument|legal\s*basis/.test(low)) score += 2;
+    if (line.length >= 28 && line.length <= 220) score += 1;
+    if (score > 0) scored.push({ score, line });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  const uniq = [];
+  const seen = new Set();
+  const first = String(existingAnchor || '').replace(/\s+/g, ' ').trim();
+  if (first) {
+    uniq.push(first);
+    seen.add(first.toLowerCase());
+  }
+  for (const item of scored) {
+    const key = item.line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniq.push(item.line);
+    if (uniq.length >= 4) break;
+  }
+  return uniq;
+};
+
 const handleOnlyOfficeConfigLoaded = useCallback((cfg) => {
   if (!cfg || typeof cfg.callbackWriteEnabled !== 'boolean') return;
   setOnlyOfficeCallbackWritable(cfg.callbackWriteEnabled);
@@ -3232,6 +3286,231 @@ const handleOnlyOfficeEditorReady = useCallback((ready) => {
   setOnlyOfficeEditorReady(!!ready);
 }, []);
 
+const openCitationTourIfFirstTime = useCallback(() => {
+  try {
+    const key = 'dastavezai_citation_tour_seen_v1';
+    if (localStorage.getItem(key) === '1') return;
+    setShowCitationTour(true);
+  } catch (_) {
+    // ignore storage access errors
+  }
+}, []);
+
+const closeCitationTour = useCallback((markSeen = true) => {
+  setShowCitationTour(false);
+  if (!markSeen) return;
+  try {
+    localStorage.setItem('dastavezai_citation_tour_seen_v1', '1');
+  } catch (_) {
+    // ignore storage access errors
+  }
+}, []);
+
+const markSuggestionInProgress = useCallback((sid) => {
+  if (!sid) return;
+  setSuggestions((prev) => prev.map((s) => (s.suggestionId === sid ? { ...s, status: 'in_progress' } : s)));
+}, [setSuggestions]);
+
+const handleCitationCopyAgain = useCallback(async () => {
+  const txt = String(pendingCitationPaste?.text || '').trim();
+  if (!txt) return;
+  try {
+    await navigator.clipboard.writeText(txt);
+    setCitationWizardStep((step) => Math.max(step, 1));
+    toast({ title: 'Copied. Now move cursor.', status: 'success', duration: 1200 });
+  } catch {
+    toast({ title: 'Clipboard blocked', status: 'warning', duration: 1500 });
+  }
+}, [pendingCitationPaste, toast]);
+
+const handleCitationGoToTarget = useCallback(async () => {
+  const anchor = String(pendingCitationPaste?.anchor || '').trim();
+  if (!anchor) {
+    toast({ title: 'Target is ready. Scroll to it in document.', status: 'info', duration: 1400 });
+    setCitationWizardStep((step) => Math.max(step, 2));
+    return;
+  }
+  let jumped = false;
+  if (onlyOfficeRef.current?.jumpToAnchor) {
+    try {
+      jumped = !!(await onlyOfficeRef.current.jumpToAnchor(anchor));
+    } catch (_) {
+      jumped = false;
+    }
+  }
+  setCitationWizardStep((step) => Math.max(step, 2));
+  toast({
+    title: jumped ? 'Ready to paste.' : 'Move to target section, then paste.',
+    status: 'success',
+    duration: 1500,
+  });
+}, [pendingCitationPaste, toast]);
+
+const handleTryAnotherPlacement = useCallback(async () => {
+  if (!pendingCitationPaste) return;
+  const candidates = Array.isArray(pendingCitationPaste.anchorCandidates)
+    ? pendingCitationPaste.anchorCandidates
+    : [];
+  if (!candidates.length) {
+    toast({ title: 'No alternate target available', status: 'info', duration: 1500 });
+    return;
+  }
+
+  const current = String(pendingCitationPaste.anchor || '').toLowerCase();
+  let idx = candidates.findIndex((c) => String(c || '').toLowerCase() === current);
+  idx = idx < 0 ? 0 : (idx + 1) % candidates.length;
+  const nextAnchor = String(candidates[idx] || '').trim();
+  const nextSection = deriveSectionLabel(nextAnchor);
+
+  setPendingCitationPaste((prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      anchor: nextAnchor,
+      shortAnchor: shortenAnchorPhrase(nextAnchor),
+      sectionLabel: nextSection,
+    };
+  });
+
+  if (nextAnchor && onlyOfficeRef.current?.jumpToAnchor) {
+    try { await onlyOfficeRef.current.jumpToAnchor(nextAnchor); } catch (_) { }
+  }
+
+  toast({ title: 'Alternate target selected', description: 'Ready to paste.', status: 'success', duration: 1600 });
+}, [pendingCitationPaste, toast]);
+
+const handleCancelCitationPaste = useCallback(() => {
+  if (pendingCitationPaste?.idKey) {
+    citationInProgressRef.current.delete(pendingCitationPaste.idKey);
+  }
+  setPendingCitationPaste(null);
+  setCitationWizardStep(1);
+  toast({ title: 'Paste cancelled', description: 'Suggestion kept pending.', status: 'info', duration: 1600 });
+}, [pendingCitationPaste, toast]);
+
+const handleUndoLastCitation = useCallback(async () => {
+  const last = lastConfirmedCitation;
+  if (!last) {
+    toast({ title: 'No recent citation to undo', status: 'info', duration: 1400 });
+    return;
+  }
+
+  let undone = false;
+  if (onlyOfficeRef.current?.undoLastAction) {
+    try {
+      undone = !!(await onlyOfficeRef.current.undoLastAction());
+    } catch (_) {
+      undone = false;
+    }
+  }
+
+  if (last.idKey) appliedSuggestionsRef.current.delete(last.idKey);
+  if (last.idKey) citationInProgressRef.current.delete(last.idKey);
+  if (last.suggestionId) {
+    setSuggestions((prev) => prev.map((s) => (s.suggestionId === last.suggestionId ? { ...s, status: 'pending' } : s)));
+  }
+  setLastConfirmedCitation(null);
+
+  toast({
+    title: undone ? 'Citation undone' : 'Use Ctrl+Z once in OnlyOffice to undo text',
+    status: 'success',
+    duration: 2200,
+  });
+}, [lastConfirmedCitation, toast]);
+
+const handleConfirmCitationPaste = useCallback(async () => {
+  const pending = pendingCitationPaste;
+  if (!pending) return;
+
+  const sid = pending.suggestionId;
+  const idKey = pending.idKey;
+  if (idKey) {
+    appliedSuggestionsRef.current.add(idKey);
+    citationInProgressRef.current.delete(idKey);
+  }
+
+  if (sid) {
+    try {
+      await fileService.updateSuggestionStatus(sid, 'applied', selectedFile?._id);
+    } catch (_) {
+      // Keep optimistic UI even if network fails.
+    }
+    setSuggestions((prev) => prev.map((s) => (s.suggestionId === sid ? { ...s, status: 'applied' } : s)));
+  }
+
+  const confirmedSuggestion = pending.suggestion || null;
+  if (confirmedSuggestion) {
+    setLocalScanArrays(prev => {
+      const type = confirmedSuggestion.type || '';
+      const desc = (confirmedSuggestion.description || '').toLowerCase().trim();
+      const title = (confirmedSuggestion.title || '').toLowerCase();
+      if (type === 'legal_compliance' || type === 'compliance_fix') {
+        return {
+          ...prev, complianceIssues: prev.complianceIssues.filter(c =>
+            (c.description || '').toLowerCase().trim() !== desc &&
+            !title.startsWith('compliance: ' + (c.rule || '').toLowerCase().trim().substring(0, 20))
+          )
+        };
+      }
+      if (type === 'clause_improvement') {
+        return {
+          ...prev, clauseFlaws: prev.clauseFlaws.filter(f =>
+            (f.issue || '').toLowerCase().trim() !== desc
+          )
+        };
+      }
+      if (type === 'missing_clause' || type === 'insert_clause') {
+        return {
+          ...prev, missingClauses: prev.missingClauses.filter(m =>
+            !title.includes((m.clauseType || '').toLowerCase().trim().substring(0, 20))
+          )
+        };
+      }
+      if (type === 'contradiction_fix') {
+        return {
+          ...prev, internalContradictions: prev.internalContradictions.filter(c =>
+            (c.description || '').toLowerCase().trim() !== desc &&
+            !(c.contradiction || '').toLowerCase().includes(desc.substring(0, 40))
+          )
+        };
+      }
+      if (type === 'outdated_ref') {
+        return {
+          ...prev, outdatedReferences: prev.outdatedReferences.filter(o =>
+            (o.description || o.reference || '').toLowerCase().trim() !== desc
+          )
+        };
+      }
+      if (type === 'chronology_fix') {
+        return {
+          ...prev, chronologicalIssues: prev.chronologicalIssues.filter(ci =>
+            (ci.description || '').toLowerCase().trim() !== desc
+          )
+        };
+      }
+      if (type === 'precedence_apply') {
+        return {
+          ...prev, precedenceAnalysis: prev.precedenceAnalysis.filter(p =>
+            (p.caseName || '').toLowerCase() !== (confirmedSuggestion.caseName || '').toLowerCase()
+          )
+        };
+      }
+      return prev;
+    });
+  }
+
+  setLastConfirmedCitation({
+    idKey,
+    suggestionId: sid,
+    suggestionType: pending?.suggestion?.type || 'precedence_apply',
+    confirmedAt: Date.now(),
+  });
+
+  setPendingCitationPaste(null);
+  setCitationWizardStep(1);
+  toast({ title: 'Confirmed. Suggestion applied.', status: 'success', duration: 1900 });
+}, [pendingCitationPaste, selectedFile?._id, toast]);
+
 useEffect(() => {
   setOnlyOfficeEditorReady(false);
 }, [selectedFile?._id, session?.fileId, onlyOfficeRefreshKey]);
@@ -3239,41 +3518,28 @@ useEffect(() => {
 useEffect(() => {
   if (!pendingCitationPaste) return;
 
-  try {
-    const iframe = document.querySelector('iframe');
-    if (iframe?.contentWindow?.focus) {
-      iframe.contentWindow.focus();
-    } else if (iframe?.focus) {
-      iframe.focus();
-    }
-  } catch (_) {
-    // no-op
-  }
+  openCitationTourIfFirstTime();
 
   const onKeyDown = (e) => {
-    const key = String(e.key || '');
-    const isPasteKey = (e.ctrlKey || e.metaKey) && key.toLowerCase() === 'v';
-
-    if (isPasteKey) {
-      toast({ title: 'Paste mode confirmed', description: 'Paste at cursor in OnlyOffice.', status: 'success', duration: 1800 });
-      setPendingCitationPaste(null);
+    const key = String(e.key || '').toLowerCase();
+    if (key === 'escape') {
+      handleCancelCitationPaste();
       return;
     }
-
-    if (key === 'Enter') {
-      toast({ title: 'Insertion point confirmed', description: 'Now press Ctrl+V to paste citation.', status: 'info', duration: 2000 });
-      return;
-    }
-
-    if (['Control', 'Shift', 'Alt', 'Meta', 'Tab'].includes(key)) return;
-
-    setPendingCitationPaste(null);
-    toast({ title: 'Paste mode cancelled', description: 'Apply Principle again when ready.', status: 'warning', duration: 1800 });
   };
 
-  window.addEventListener('keydown', onKeyDown, true);
-  return () => window.removeEventListener('keydown', onKeyDown, true);
-}, [pendingCitationPaste, toast]);
+  const onPaste = () => {
+    setCitationWizardStep((step) => Math.max(step, 3));
+    toast({ title: 'Ready to paste.', description: 'Now click Confirm Paste.', status: 'success', duration: 1300 });
+  };
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('paste', onPaste);
+  return () => {
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('paste', onPaste);
+  };
+}, [pendingCitationPaste, toast, openCitationTourIfFirstTime, handleCancelCitationPaste]);
 
 const handleApplySuggestion = async (suggestion) => {
     try {
@@ -3351,7 +3617,7 @@ const handleApplySuggestion = async (suggestion) => {
       const idKey = suggestion.idempotencyKey ||
         `${suggestion.type || 'generic'}::${(suggestion.title || '').substring(0, 60)}::${(suggestion.suggestedText || '').substring(0, 60)}`;
 
-      if (appliedSuggestionsRef.current.has(idKey)) {
+      if (appliedSuggestionsRef.current.has(idKey) && !citationInProgressRef.current.has(idKey)) {
         toast({
           title: 'Already applied',
           description: `"${suggestion.title || 'This suggestion'}" has already been applied to this document.`,
@@ -3359,6 +3625,14 @@ const handleApplySuggestion = async (suggestion) => {
           duration: 3000,
         });
         return;
+      }
+
+      if (citationInProgressRef.current.has(idKey)) {
+        toast({ title: 'Continue pending citation', description: 'Open assistant card and confirm after paste.', status: 'info', duration: 1800 });
+        if (pendingCitationPaste?.idKey === idKey) {
+          setCitationWizardStep((step) => Math.max(step, 2));
+          return;
+        }
       }
 
 
@@ -4220,10 +4494,13 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         const fileIdForSync = selectedFile?._id || session?.fileId;
         let directInserted = false;
         let directInsertAttempted = false;
+        const citationManualFirst = suggestion?.type === 'precedence_apply';
 
         // Phase 1 (best effort): direct OnlyOffice bridge insertion for immediate visual feedback.
         // Phase 2 (authoritative): backend sync from editor HTML to guarantee persistence + alignment.
-        if (onlyOfficeRef.current && revisedParagraph) {
+        if (citationManualFirst) {
+          directInsertAttempted = true;
+        } else if (onlyOfficeRef.current && revisedParagraph) {
           directInsertAttempted = true;
           try {
             console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
@@ -4274,24 +4551,38 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             const anchorHint = String(
               suggestion?.insertAfterParagraph || anchorText || originalParagraph || ''
             ).trim();
+            const plainDoc = String(editor.getText() || '');
+            const anchorCandidates = findCitationAnchorCandidates(plainDoc, anchorHint);
+            const bestAnchor = anchorCandidates[0] || anchorHint;
+            const sectionLabel = deriveSectionLabel(bestAnchor);
+            const shortAnchor = shortenAnchorPhrase(bestAnchor);
             let jumped = false;
-            if (anchorHint.length >= 8 && onlyOfficeRef.current?.jumpToAnchor) {
+            if (bestAnchor.length >= 8 && onlyOfficeRef.current?.jumpToAnchor) {
               try {
-                jumped = !!(await onlyOfficeRef.current.jumpToAnchor(anchorHint));
+                jumped = !!(await onlyOfficeRef.current.jumpToAnchor(bestAnchor));
               } catch (_) {
                 jumped = false;
               }
             }
+            citationInProgressRef.current.add(idKey);
+            markSuggestionInProgress(suggestion?.suggestionId);
+            setCitationWizardStep(1);
             setPendingCitationPaste({
               text: citationText,
-              anchor: anchorHint.substring(0, 220),
-              jumpTried: anchorHint.length >= 8,
+              anchor: bestAnchor.substring(0, 220),
+              shortAnchor,
+              sectionLabel,
+              anchorCandidates,
+              jumpTried: bestAnchor.length >= 8,
               jumped,
+              idKey,
+              suggestionId: suggestion?.suggestionId || null,
+              suggestion,
             });
             manualPastePrepared = true;
           }
           toastDesc = copied
-            ? 'Citation copied to clipboard. Place cursor where needed in OnlyOffice and paste (Ctrl+V). Suggestion remains pending until re-applied.'
+            ? 'Copied. Now move cursor.'
             : 'Direct insert failed and clipboard copy was blocked. Copy citation manually and paste at the cursor in OnlyOffice.';
         }
 
@@ -4416,10 +4707,10 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       if (!applied) {
         if (manualPastePrepared) {
           toast({
-            title: 'Citation Ready To Paste',
-            description: 'Instruction: paste citation exactly after the shown target paragraph in OnlyOffice. Press Ctrl+V to paste; any other key cancels paste mode.',
+            title: 'Ready to paste.',
+            description: 'Use the assistant card: go to target, paste, then confirm.',
             status: 'success',
-            duration: 7000,
+            duration: 4000,
             isClosable: true,
           });
           return;
@@ -4692,45 +4983,6 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           </HStack>
         </ModalHeader>
 
-        {pendingCitationPaste && (
-          <Box px={4} py={2} bg="yellow.50" borderBottom="1px solid" borderColor="yellow.200">
-            <HStack justify="space-between" align="start" spacing={3}>
-              <VStack align="start" spacing={0}>
-                <Text fontSize="xs" fontWeight="700" color="yellow.800">Citation Paste Mode</Text>
-                <Text fontSize="xs" color="yellow.900">
-                  {pendingCitationPaste?.jumped
-                    ? 'Instruction: cursor moved near target. Paste citation exactly there with Ctrl+V. Press any other key to cancel.'
-                    : 'Instruction: move cursor to the target paragraph shown below, then press Ctrl+V to paste citation. Press any other key to cancel.'}
-                </Text>
-                {!!pendingCitationPaste?.jumpTried && !pendingCitationPaste?.jumped && (
-                  <Text fontSize="2xs" color="yellow.800">Auto-jump is unavailable in this session. Follow the target paragraph instruction below.</Text>
-                )}
-                {!!pendingCitationPaste.anchor && (
-                  <Text fontSize="2xs" color="yellow.800" noOfLines={1}>Paste after this paragraph: {pendingCitationPaste.anchor}</Text>
-                )}
-              </VStack>
-              <HStack spacing={2}>
-                <Button
-                  size="xs"
-                  colorScheme="yellow"
-                  variant="outline"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(String(pendingCitationPaste.text || ''));
-                      toast({ title: 'Citation copied again', status: 'success', duration: 1200 });
-                    } catch {
-                      toast({ title: 'Clipboard blocked', status: 'warning', duration: 1500 });
-                    }
-                  }}
-                >
-                  Copy Again
-                </Button>
-                <Button size="xs" variant="ghost" onClick={() => setPendingCitationPaste(null)}>Cancel</Button>
-              </HStack>
-            </HStack>
-          </Box>
-        )}
-
         {searchVisible && (
           <Box px={4} py={1.5} bg={headerBg} borderBottom="1px solid" borderColor={borderColor}>
             <HStack>
@@ -4893,11 +5145,77 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             style={dualViewMode ? { flex: 'var(--editor-flex, 1 1 50%)' } : undefined}
             display="flex"
             flexDirection="column"
+            position="relative"
             h="100%"
             bg={editorCanvasBg}
             overflow="hidden"
             px={0}
           >
+            {pendingCitationPaste && (
+              <Box
+                position="absolute"
+                right={4}
+                bottom={4}
+                zIndex={30}
+                w="360px"
+                maxW="calc(100% - 24px)"
+                bg={useColorModeValue('white', 'gray.800')}
+                border="1px solid"
+                borderColor={useColorModeValue('gray.200', 'gray.600')}
+                borderRadius="14px"
+                boxShadow="0 10px 28px rgba(0,0,0,0.18)"
+                p={3}
+              >
+                <VStack align="stretch" spacing={2}>
+                  <HStack justify="space-between" align="start">
+                    <Box>
+                      <Text fontSize="xs" fontWeight="700">Citation Assistant</Text>
+                      <Text fontSize="11px" color="gray.500">Step {citationWizardStep}/3: {citationWizardStep === 1 ? 'Citation copied' : citationWizardStep === 2 ? 'Go to target' : 'Paste and confirm'}</Text>
+                    </Box>
+                    <Button size="xs" variant="ghost" onClick={handleCancelCitationPaste}>Cancel</Button>
+                  </HStack>
+
+                  <HStack spacing={1}>
+                    <Box h="6px" flex="1" borderRadius="999px" bg={citationWizardStep >= 1 ? 'green.400' : 'gray.200'} />
+                    <Box h="6px" flex="1" borderRadius="999px" bg={citationWizardStep >= 2 ? 'green.400' : 'gray.200'} />
+                    <Box h="6px" flex="1" borderRadius="999px" bg={citationWizardStep >= 3 ? 'green.400' : 'gray.200'} />
+                  </HStack>
+
+                  <Box px={2.5} py={2} borderRadius="10px" bg={useColorModeValue('gray.50', 'gray.700')}>
+                    <Text fontSize="11px" fontWeight="600" color={useColorModeValue('gray.700', 'gray.100')}>
+                      Paste under: {pendingCitationPaste?.sectionLabel || 'Relevant section'}
+                    </Text>
+                    <Text fontSize="11px" color={useColorModeValue('gray.600', 'gray.200')} noOfLines={2}>
+                      after paragraph starting with "{pendingCitationPaste?.shortAnchor || 'Target paragraph'}"
+                    </Text>
+                  </Box>
+
+                  <HStack spacing={2} flexWrap="wrap">
+                    <Button size="xs" colorScheme="green" onClick={handleCitationCopyAgain}>Copy Again</Button>
+                    <Button size="xs" variant="outline" onClick={handleCitationGoToTarget}>Go To Target</Button>
+                    <Button size="xs" variant="outline" onClick={handleTryAnotherPlacement}>Try Another Placement</Button>
+                    <Button size="xs" colorScheme="blue" onClick={handleConfirmCitationPaste}>Confirm Paste</Button>
+                  </HStack>
+
+                  <HStack justify="space-between">
+                    <Text fontSize="10px" color="gray.500">Keyboard: Ctrl+V paste, Esc cancel.</Text>
+                    <Button size="xs" variant="ghost" onClick={handleUndoLastCitation}>Undo Last Citation</Button>
+                  </HStack>
+
+                  {showCitationTour && (
+                    <Box border="1px solid" borderColor="blue.200" bg="blue.50" borderRadius="10px" p={2}>
+                      <Text fontSize="11px" color="blue.800" fontWeight="600">Quick tour</Text>
+                      <Text fontSize="10px" color="blue.700">1) Copy again if needed 2) Go to target 3) Paste with Ctrl+V 4) Click Confirm Paste.</Text>
+                      <HStack mt={2}>
+                        <Button size="xs" colorScheme="blue" onClick={() => closeCitationTour(true)}>Got it</Button>
+                        <Button size="xs" variant="ghost" onClick={() => closeCitationTour(false)}>Later</Button>
+                      </HStack>
+                    </Box>
+                  )}
+                </VStack>
+              </Box>
+            )}
+
             {editorViewMode === 'editable' && (docxStatus === 'pending' || docxStatus === 'failed') && (
               <Box px={4} py={2} bg={docxStatus === 'failed' ? 'red.50' : 'blue.50'} borderBottom="1px solid" borderColor="gray.200">
                 <HStack justify="space-between" flexWrap="wrap" gap={2}>
@@ -5916,9 +6234,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             </HStack>
             <HStack spacing={4}>
               <Text>{changeHistory.length} edit{changeHistory.length !== 1 ? 's' : ''}</Text>
-              {suggestions.filter(s => s.status === 'pending').length > 0 && (
+              {suggestions.filter(s => s.status === 'pending' || s.status === 'in_progress').length > 0 && (
                 <Text color="orange.400">
-                  {suggestions.filter(s => s.status === 'pending').length} suggestions pending
+                  {suggestions.filter(s => s.status === 'pending' || s.status === 'in_progress').length} suggestions active
                 </Text>
               )}
               {lastSaved && (
