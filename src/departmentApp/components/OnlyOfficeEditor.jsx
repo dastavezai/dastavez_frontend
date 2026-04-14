@@ -17,6 +17,24 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
     [fileId, refreshKey]
   );
 
+  const isIgnorableDomMutationError = (err) => {
+    const msg = String(err?.message || err || '');
+    return /removeChild|insertBefore|not a child of this node/i.test(msg);
+  };
+
+  const safeDestroyEditor = (reason = 'unknown') => {
+    const inst = editorRef.current;
+    editorRef.current = null;
+    if (!inst?.destroyEditor) return;
+    try {
+      inst.destroyEditor();
+    } catch (err) {
+      if (!isIgnorableDomMutationError(err)) {
+        console.warn('[OnlyOffice][destroy-error]', { reason, message: String(err?.message || err) });
+      }
+    }
+  };
+
   useEffect(() => {
     frameHeightRef.current = frameHeightPx;
   }, [frameHeightPx]);
@@ -111,10 +129,7 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
           await loadScript(scriptSrc);
           if (cancelled || myMountSeq !== mountSeqRef.current) return;
 
-          if (editorRef.current?.destroyEditor) {
-            try { editorRef.current.destroyEditor(); } catch (_) {}
-            editorRef.current = null;
-          }
+          safeDestroyEditor('pre-mount');
 
           // Avoid mounting into a detached/stale node during rapid refreshes.
           if (!holderRef.current || !document.getElementById(holderId)) {
@@ -125,11 +140,11 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
             editorRef.current = new window.DocsAPI.DocEditor(holderId, config);
           } catch (mountErr) {
             const msg = String(mountErr?.message || mountErr || '');
-            const isDomRace = /insertBefore|not a child of this node/i.test(msg);
+            const isDomRace = /insertBefore|removeChild|not a child of this node/i.test(msg);
             if (isDomRace && attempt < 1 && !cancelled && myMountSeq === mountSeqRef.current) {
               console.warn('[OnlyOffice][mount-retry-after-dom-race]', { holderId, attempt: attempt + 1, message: msg });
-              if (holderRef.current) holderRef.current.innerHTML = '';
-              await new Promise((resolve) => setTimeout(resolve, 60));
+              safeDestroyEditor('dom-race-retry');
+              await new Promise((resolve) => setTimeout(resolve, 100));
               return mountEditor(payload, attempt + 1);
             }
             throw mountErr;
@@ -198,10 +213,7 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
     return () => {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
-      if (editorRef.current?.destroyEditor) {
-        try { editorRef.current.destroyEditor(); } catch (_) {}
-      }
-      editorRef.current = null;
+      safeDestroyEditor('effect-cleanup');
     };
   }, [fileId, holderId, refreshKey]);
 
