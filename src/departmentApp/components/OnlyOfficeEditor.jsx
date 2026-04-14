@@ -40,56 +40,50 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
   };
 
   React.useImperativeHandle(ref, () => ({
-    insertText: (text, anchorText = '', mode = 'replace') => {
+    insertText: async (text, anchorText = '', mode = 'replace') => {
       console.log('[CONNECTOR-TRACE] insertText-called. Searching for connection...');
-      
+
       const doApply = (conn) => {
         if (!conn || !conn.executeMethod) {
           console.error('[CONNECTOR-TRACE] invalid connector object');
-          return;
+          return false;
         }
         try {
-          // Priority 1: If we have enough anchor text, try surgical SearchAndReplace
-          if (anchorText && anchorText.length > 5) {
+          if (mode === 'replace' && anchorText && anchorText.length > 5) {
             console.log('[CONNECTOR-TRACE] attempting SearchAndReplace for:', anchorText.substring(0, 40));
-            conn.executeMethod("SearchAndReplace", [{
+            conn.executeMethod('SearchAndReplace', [{
               searchString: anchorText,
               replaceString: text,
               isCaseSelected: false,
-              isMatchCase: false
+              isMatchCase: false,
             }]);
           } else {
-            // Priority 2: Universal Fallback - type at cursor
-            console.log('[CONNECTOR-TRACE] no anchor, using PasteText at cursor');
-            conn.executeMethod("PasteText", [text]);
+            console.log('[CONNECTOR-TRACE] using PasteText at cursor');
+            conn.executeMethod('PasteText', [text]);
           }
+          return true;
         } catch (err) {
           console.error('[CONNECTOR-TRACE] execution failed:', err);
+          return false;
         }
       };
 
-      let attempts = 0;
-      const poll = () => {
-        // DocEditor.createConnector is the standard way to get a bridge
+      for (let attempts = 0; attempts < 25; attempts += 1) {
         if (!connectorRef.current && editorRef.current?.createConnector) {
-           connectorRef.current = editorRef.current.createConnector();
-           window.ONLYOFFICE_CONNECTOR = connectorRef.current;
+          connectorRef.current = editorRef.current.createConnector();
+          window.ONLYOFFICE_CONNECTOR = connectorRef.current;
         }
 
         const conn = window.ONLYOFFICE_CONNECTOR || connectorRef.current;
         if (conn) {
           console.info('[CONNECTOR-TRACE] link established!');
-          doApply(conn);
-        } else if (attempts < 25) {
-          attempts++;
-          setTimeout(poll, 80);
-        } else {
-          // Silent fallback to parent refresh
+          return doApply(conn);
         }
-      };
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
 
-      poll();
-      return true; // We return true to signify the attempt has been dispatched
+      console.warn('[CONNECTOR-TRACE] connector not available; direct insert skipped');
+      return false;
     }
   }));
 

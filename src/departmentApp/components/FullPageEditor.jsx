@@ -3502,27 +3502,6 @@ Respond ONLY JSON:
           let target = blocks.find(b => b.index === idx);
 
           // Guard against low-quality AI placements at the document start.
-          // DEEP TRACE FOR ANCHOR SCORING
-          const tiptapBlocks = editor.getJSON().content || [];
-          console.log('[TIPTAP-TRACE] findAiAnchorRange-scoring-start', { blocksCount: tiptapBlocks.length, keywords: anchorKeywords });
-          
-          let bestCandidate = null;
-          let maxScore = -1;
-
-          tiptapBlocks.forEach((block, idx) => {
-            const blockText = (block.content || []).map(c => c.text || '').join('');
-            if (!blockText.trim()) return;
-            const lowText = blockText.toLowerCase();
-            let score = 0;
-            anchorKeywords.forEach(kw => {
-              if (lowText.includes(kw.toLowerCase())) score += 1;
-            });
-            if (score > maxScore) {
-              maxScore = score;
-              bestCandidate = { idx, text: blockText, score };
-            }
-          });
-          console.log('[TIPTAP-TRACE] anchor-best-match', bestCandidate);
 
           if (target && (anchorType === 'precedence_apply' || anchorType === 'compliance_fix')) {
             const isNearTop = target.index <= 1;
@@ -4228,29 +4207,82 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
 
       if (applied && editorViewMode === 'editable') {
         const fileIdForSync = selectedFile?._id || session?.fileId;
-        
-        // IMPORTANT: If OnlyOffice is open, we do NOT want the backend to regenerate the file.
-        // OnlyOffice is our DOCX editor; we type into it, and IT will save the change to the server.
-        // This keeps alignment 100% perfect.
+
+        // Phase 1 (best effort): direct OnlyOffice bridge insertion for immediate visual feedback.
+        // Phase 2 (authoritative): backend sync from editor HTML to guarantee persistence + alignment.
         if (onlyOfficeRef.current && revisedParagraph) {
-          setIsOnlyOfficeSyncing(true);
           try {
             console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
-            const inserted = onlyOfficeRef.current.insertText(revisedParagraph, anchorText || originalParagraph, action);
+            const inserted = await onlyOfficeRef.current.insertText(
+              revisedParagraph,
+              anchorText || originalParagraph,
+              action
+            );
             if (inserted) {
-              console.info('[APPLY][SUCCESS] Direct insertion successful.');
-              toastDesc = `${toastDesc}. (Live Sync)`;
+              console.info('[APPLY][SUCCESS] Direct insertion dispatched.');
             } else {
-              console.warn('[APPLY][WARN] Direct insertion link failed. Refreshing for layout persistence.');
-              setOnlyOfficeRefreshKey(prev => prev + 1);
+              console.warn('[APPLY][WARN] Direct insertion bridge not ready; relying on backend sync.');
             }
           } catch (err) {
             console.error('[APPLY][ERROR] OnlyOffice insertion error:', err);
+          }
+        }
+
+        if (fileIdForSync) {
+          setIsOnlyOfficeSyncing(true);
+          try {
+            const rawSyncHtml = String(editor.getHTML() || '');
+            const alignMatches = [...rawSyncHtml.matchAll(/text-align\s*:\s*(left|center|right|justify)/gi)]
+              .map((m) => String(m[1] || '').toLowerCase())
+              .filter(Boolean);
+            const alignmentCounts = alignMatches.reduce((acc, a) => {
+              acc[a] = (acc[a] || 0) + 1;
+              return acc;
+            }, {});
+            const metadataAlign = String(session?.formatMetadata?.bodyAlignment || '').toLowerCase();
+            const dominantAlign = Object.keys(alignmentCounts).sort((a, b) => alignmentCounts[b] - alignmentCounts[a])[0]
+              || (metadataAlign === 'justified' ? 'justify' : metadataAlign)
+              || 'left';
+
+            const htmlAligned = rawSyncHtml.replace(/<p(?![^>]*text-align)([^>]*)>/gi, `<p style="text-align:${dominantAlign};"$1>`);
+            const htmlForSync = String(htmlAligned || '')
+              .replace(/<mark\b[^>]*>/gi, '')
+              .replace(/<\/mark>/gi, '');
+
+            await fileService.syncOnlyOfficeDocx(fileIdForSync, htmlForSync, editor.getText(), {
+              traceId: applyTraceId,
+              suggestionType: suggestion?.type || '',
+              suggestionId: suggestion?.suggestionId || '',
+              forceSuggestionSync: true,
+              htmlLength: String(htmlForSync || '').length,
+              textLength: String(editor.getText() || '').length,
+            });
+
             setOnlyOfficeRefreshKey(prev => prev + 1);
+            toastDesc = `${toastDesc}. Synced to OnlyOffice`;
+          } catch (syncErr) {
+            syncSucceeded = false;
+            const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Not yet synced to OnlyOffice';
+            toastDesc = `${toastDesc}. ${syncMsg}`;
+            console.warn('[SYNC][FRONTEND] failed', {
+              traceId: applyTraceId,
+              fileId: fileIdForSync,
+              message: syncErr?.message || String(syncErr),
+              status: syncErr?.response?.status || null,
+              data: syncErr?.response?.data || null,
+            });
           } finally {
             setIsOnlyOfficeSyncing(false);
           }
-        } 
+        }
+      }
+
+      if (applied && !syncSucceeded) {
+        applied = false;
+        console.warn('[APPLY][FRONTEND] not-marked-applied-because-sync-failed', {
+          traceId: applyTraceId,
+          type: suggestion?.type,
+        });
       }
 
       const sid = suggestion.suggestionId;
