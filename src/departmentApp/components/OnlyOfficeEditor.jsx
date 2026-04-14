@@ -2,12 +2,14 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
 import fileService from '../services/fileService';
 
-const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoaded = null }, ref) => {
+const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoaded = null, onEditorReady = null }, ref) => {
   const wrapperRef = useRef(null);
   const holderRef = useRef(null);
   const editorRef = useRef(null);
   const connectorRef = useRef(null);
   const mountSeqRef = useRef(0);
+  const appReadyRef = useRef(false);
+  const documentReadyRef = useRef(false);
   const frameHeightRef = useRef(860);
   const pollAttemptsRef = useRef(0);
   const [frameHeightPx, setFrameHeightPx] = useState(860);
@@ -29,6 +31,8 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
     const inst = editorRef.current;
     editorRef.current = null;
     connectorRef.current = null;
+    appReadyRef.current = false;
+    documentReadyRef.current = false;
     if (!inst?.destroyEditor) return;
     try {
       inst.destroyEditor();
@@ -39,9 +43,63 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
     }
   };
 
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const waitForEditorReady = async (maxWaitMs = 25000) => {
+    const deadline = Date.now() + Math.max(1000, Number(maxWaitMs) || 25000);
+    while (Date.now() < deadline) {
+      if (documentReadyRef.current || appReadyRef.current) return true;
+      await sleep(150);
+    }
+    return false;
+  };
+
+  const focusOnlyOfficeFrame = () => {
+    try {
+      const iframe = holderRef.current?.querySelector('iframe');
+      if (iframe?.contentWindow?.focus) {
+        iframe.contentWindow.focus();
+      } else if (iframe?.focus) {
+        iframe.focus();
+      }
+    } catch (_) {
+      // no-op
+    }
+  };
+
+  const ensureConnector = async (maxWaitMs = 15000) => {
+    const deadline = Date.now() + Math.max(500, Number(maxWaitMs) || 9000);
+    while (Date.now() < deadline) {
+      if (!connectorRef.current && editorRef.current?.createConnector && (appReadyRef.current || documentReadyRef.current)) {
+        try {
+          connectorRef.current = editorRef.current.createConnector();
+          window.ONLYOFFICE_CONNECTOR = connectorRef.current;
+        } catch (_) {
+          // no-op
+        }
+      }
+
+      const conn = window.ONLYOFFICE_CONNECTOR || connectorRef.current;
+      if (conn?.executeMethod) return conn;
+
+      focusOnlyOfficeFrame();
+      await sleep(120);
+    }
+    return null;
+  };
+
   React.useImperativeHandle(ref, () => ({
     insertText: async (text, anchorText = '', mode = 'replace') => {
       console.log('[CONNECTOR-TRACE] insertText-called. Searching for connection...');
+
+      const ready = await waitForEditorReady(25000);
+      if (!ready) {
+        console.warn('[CONNECTOR-TRACE] editor did not become ready in time', {
+          appReady: appReadyRef.current,
+          documentReady: documentReadyRef.current,
+        });
+        return false;
+      }
 
       const doApply = (conn) => {
         if (!conn || !conn.executeMethod) {
@@ -74,21 +132,16 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
         }
       };
 
-      for (let attempts = 0; attempts < 25; attempts += 1) {
-        if (!connectorRef.current && editorRef.current?.createConnector) {
-          connectorRef.current = editorRef.current.createConnector();
-          window.ONLYOFFICE_CONNECTOR = connectorRef.current;
-        }
-
-        const conn = window.ONLYOFFICE_CONNECTOR || connectorRef.current;
-        if (conn) {
-          console.info('[CONNECTOR-TRACE] link established!');
-          return doApply(conn);
-        }
-        await new Promise((resolve) => setTimeout(resolve, 80));
+      const conn = await ensureConnector(15000);
+      if (conn) {
+        console.info('[CONNECTOR-TRACE] link established!');
+        return doApply(conn);
       }
 
-      console.warn('[CONNECTOR-TRACE] connector not available; direct insert skipped');
+      console.warn('[CONNECTOR-TRACE] connector not available; direct insert skipped', {
+        appReady: appReadyRef.current,
+        documentReady: documentReadyRef.current,
+      });
       return false;
     }
   }));
@@ -182,6 +235,11 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
             },
             onDocumentReady: () => {
               console.log('[OnlyOffice][onDocumentReady]');
+              appReadyRef.current = true;
+              documentReadyRef.current = true;
+              if (typeof onEditorReady === 'function') {
+                try { onEditorReady(true); } catch (_) {}
+              }
               if (editorRef.current?.createConnector) {
                 console.log('[OnlyOffice][connector] pre-initializing bridge...');
                 connectorRef.current = editorRef.current.createConnector();
@@ -190,6 +248,15 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
             },
             onAppReady: () => {
               console.log('[OnlyOffice][onAppReady]');
+              appReadyRef.current = true;
+              if (!connectorRef.current && editorRef.current?.createConnector) {
+                try {
+                  connectorRef.current = editorRef.current.createConnector();
+                  window.ONLYOFFICE_CONNECTOR = connectorRef.current;
+                } catch (_) {
+                  // no-op
+                }
+              }
             },
           };
 
@@ -286,7 +353,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
       if (pollTimer) clearInterval(pollTimer);
       safeDestroyEditor('cleanup');
     };
-  }, [fileId, holderId, refreshKey, internalRefreshKey, onConfigLoaded]);
+  }, [fileId, holderId, refreshKey, internalRefreshKey, onConfigLoaded, onEditorReady]);
 
   if (error) {
     return (

@@ -1351,6 +1351,7 @@ const FullPageEditor = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isOnlyOfficeSyncing, setIsOnlyOfficeSyncing] = useState(false);
   const [onlyOfficeCallbackWritable, setOnlyOfficeCallbackWritable] = useState(null);
+  const [onlyOfficeEditorReady, setOnlyOfficeEditorReady] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
   const [onlyOfficeRefreshKey, setOnlyOfficeRefreshKey] = useState(0);
@@ -3226,6 +3227,14 @@ const handleOnlyOfficeConfigLoaded = useCallback((cfg) => {
   setOnlyOfficeCallbackWritable(cfg.callbackWriteEnabled);
 }, []);
 
+const handleOnlyOfficeEditorReady = useCallback((ready) => {
+  setOnlyOfficeEditorReady(!!ready);
+}, []);
+
+useEffect(() => {
+  setOnlyOfficeEditorReady(false);
+}, [selectedFile?._id, session?.fileId, onlyOfficeRefreshKey]);
+
 const handleApplySuggestion = async (suggestion) => {
     try {
       console.log('[APPLY][DEBUG] handleApplySuggestion start', { 
@@ -3274,6 +3283,16 @@ const handleApplySuggestion = async (suggestion) => {
           description: 'Could not insert suggestion. Please retry once the editor is fully loaded.',
           status: 'warning',
           duration: 3000,
+        });
+        return;
+      }
+
+      if (editorViewMode === 'editable' && !onlyOfficeEditorReady) {
+        toast({
+          title: 'OnlyOffice still loading',
+          description: 'Wait for document load to complete, click inside the document once, then apply again.',
+          status: 'info',
+          duration: 3500,
         });
         return;
       }
@@ -4252,16 +4271,19 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         const skipRegenForCitation = suggestion?.type === 'precedence_apply';
         if (skipRegenForCitation && directInsertAttempted && !directInserted) {
           try {
-            // Auto-retry once after a short delay; connector often becomes ready right after document focus settles.
-            await new Promise((resolve) => setTimeout(resolve, 350));
-            const retried = await onlyOfficeRef.current?.insertText(
-              revisedParagraph,
-              anchorText || originalParagraph,
-              action
-            );
-            if (retried) {
-              directInserted = true;
-              toastDesc = `${toastDesc}. Inserted directly in OnlyOffice (retry)`;
+            // Connector readiness can lag for a few seconds after mount/focus.
+            // Retry a few times before declaring a safe fail for citation apply.
+            for (let retry = 0; retry < 3 && !directInserted; retry += 1) {
+              await new Promise((resolve) => setTimeout(resolve, 550 + (retry * 250)));
+              const retried = await onlyOfficeRef.current?.insertText(
+                revisedParagraph,
+                anchorText || originalParagraph,
+                action
+              );
+              if (retried) {
+                directInserted = true;
+                toastDesc = `${toastDesc}. Inserted directly in OnlyOffice (retry)`;
+              }
             }
           } catch (_) {
             // no-op
@@ -4270,7 +4292,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
 
         if (skipRegenForCitation && directInsertAttempted && !directInserted) {
           syncSucceeded = false;
-          toastDesc = 'OnlyOffice insertion bridge was not ready. Auto-retry failed. Click inside the document and apply again (no file regeneration performed).';
+          toastDesc = 'OnlyOffice is still initializing or connector is not ready yet. Click inside the document, wait for full load, and apply again (no file regeneration performed).';
         }
 
         // If direct insertion worked, avoid full DOCX regeneration to preserve original layout fidelity.
@@ -5616,7 +5638,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </VStack>
                     </Box>
                   )}
-                  <OnlyOfficeEditor ref={onlyOfficeRef} fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} onConfigLoaded={handleOnlyOfficeConfigLoaded} />
+                  <OnlyOfficeEditor ref={onlyOfficeRef} fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} onConfigLoaded={handleOnlyOfficeConfigLoaded} onEditorReady={handleOnlyOfficeEditorReady} />
                 </>
               )}
             </Box>
