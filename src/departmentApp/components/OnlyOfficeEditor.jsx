@@ -42,20 +42,49 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
   };
 
   React.useImperativeHandle(ref, () => ({
-    insertText: (text) => {
+    insertText: (text, anchorText = '', mode = 'replace') => {
       if (!editorRef.current) return false;
       try {
-        // Try creating connector if not already exists
         if (!connectorRef.current && editorRef.current.createConnector) {
           connectorRef.current = editorRef.current.createConnector();
         }
         
         if (connectorRef.current) {
-          connectorRef.current.executeMethod("PasteText", [text]);
+          if (anchorText && anchorText.length > 5) {
+            console.log('[OnlyOfficeEditor] Searching for anchor:', anchorText.substring(0, 50));
+            connectorRef.current.executeMethod("Search", [anchorText, true], (result) => {
+              if (mode === 'replace' || !result || result.length === 0) {
+                connectorRef.current.executeMethod("PasteText", [text]);
+              } else {
+                connectorRef.current.callCommand(function(t, a) {
+                  var oDocument = Api.GetDocument();
+                  var oRange = oDocument.GetRangeBySearch(a, true);
+                  if (oRange && oRange.length > 0) {
+                    var oParagraph = oRange[0].GetParagraph(0);
+                    var oNewPara = Api.CreateParagraph();
+                    
+                    // CLONE LAYOUT PROPERTIES
+                    try {
+                      if (oParagraph.GetStyle()) oNewPara.SetStyle(oParagraph.GetStyle());
+                      oNewPara.SetJc(oParagraph.GetJc());
+                      oNewPara.SetIndLeft(oParagraph.GetIndLeft());
+                      oNewPara.SetIndFirstLine(oParagraph.GetIndFirstLine());
+                      oNewPara.SetSpacingLine(oParagraph.GetSpacingLine(), oParagraph.GetSpacingLineRule());
+                    } catch(e) {}
+
+                    oNewPara.AddText(t);
+                    oDocument.InsertContent([oNewPara], true, oParagraph.GetIndex());
+                  } else {
+                    oDocument.PasteText(t);
+                  }
+                }, text, anchorText);
+              }
+            });
+          } else {
+            connectorRef.current.executeMethod("PasteText", [text]);
+          }
           return true;
         }
-        
-        // Fallback for non-connector instances/editions
         return false;
       } catch (err) {
         console.warn('[OnlyOffice][insert-error]', err);

@@ -3251,6 +3251,12 @@ const FullPageEditor = ({
       let syncSucceeded = true;
       let toastDesc = 'Marked as reviewed';
       const applyTraceId = `apply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      
+      let originalParagraph = '';
+      let revisedParagraph = suggestion.suggestedText || suggestion.principle || '';
+      let anchorText = '';
+      let action = 'replace'; // 'replace' or 'append'
+      const isAIDriven = AI_DRIVEN_TYPES.has(suggestion.type);
 
       console.info('[APPLY][FRONTEND] start', {
         traceId: applyTraceId,
@@ -3260,9 +3266,34 @@ const FullPageEditor = ({
         hasEditor: !!editor,
       });
 
+      if (!editor) {
+        console.warn('[APPLY][FRONTEND] editor-missing, using-fidelity-fallback', {
+          traceId: applyTraceId,
+          type: suggestion?.type || 'unknown',
+        });
+        const fallbackApplied = applySuggestionToFidelity(suggestion);
+        if (fallbackApplied) {
+          setHasUnsavedChanges(true);
+          toast({
+            title: 'Suggestion inserted',
+            description: 'Applied using fidelity fallback. Use Rebuild/refresh view if needed.',
+            status: 'success',
+            duration: 3000,
+          });
+          return;
+        }
+        toast({
+          title: 'Editor not ready',
+          description: 'Could not insert suggestion. Please retry once the editor is fully loaded.',
+          status: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
 
       const idKey = suggestion.idempotencyKey ||
         `${suggestion.type || 'generic'}::${(suggestion.title || '').substring(0, 60)}::${(suggestion.suggestedText || '').substring(0, 60)}`;
+
       if (appliedSuggestionsRef.current.has(idKey)) {
         toast({
           title: 'Already applied',
@@ -3550,7 +3581,7 @@ Respond ONLY JSON:
               .scrollIntoView()
               .toggleHighlight({ color: HIGHLIGHT_ADD })
               .run();
-            return { applied: true, desc: descFound, mode: 'replace' };
+            return { applied: true, desc: descFound, mode: 'replace', anchorText: originalParagraph };
           }
         }
 
@@ -3558,7 +3589,8 @@ Respond ONLY JSON:
           const anchor = findAnchorRange(anchorHints) || findBestKeywordAnchor(anchorHints, anchorType);
           if (anchor) {
             const done = insertHighlightedParagraph(revisedParagraph, anchor.to + 1);
-            return { applied: !!done, desc: descFound, mode: 'anchor' };
+            let foundText = (editor.state.doc.nodeAt(anchor.from-1) || editor.state.doc.nodeAt(anchor.from))?.textContent || '';
+            return { applied: !!done, desc: descFound, mode: 'anchor', anchorText: foundText };
           }
           if (!allowAppend) {
             return { applied: false, desc: 'Could not find a safe insertion point automatically. Please review and insert manually.', mode: 'no-safe-anchor' };
@@ -3658,6 +3690,10 @@ Respond ONLY in JSON (no preamble, no markdown fences):
                 'AI fix applied — original text not found exactly, appended for review');
               applied = result.applied;
               toastDesc = result.desc;
+              if (result.applied && result.anchorText) {
+                anchorText = result.anchorText;
+                action = result.mode === 'replace' ? 'replace' : 'append';
+              }
             } catch (aiErr) {
               console.warn('AI fallback failed:', aiErr.message);
               toast({ title: 'Text not found in document', description: 'The original text may have been modified. Suggestion marked as applied.', status: 'warning', duration: 4000 });
@@ -3812,9 +3848,6 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
             );
             const responseText = (aiRes?.response || '').trim();
 
-            let originalParagraph = '';
-            let revisedParagraph = suggestion.suggestedText;
-
             if (suggestion.type === 'missing_clause' || suggestion.type === 'insert_clause') {
 
               try {
@@ -3825,6 +3858,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   const clauseText = parsed.clauseText || responseText || suggestion.suggestedText;
 
                   if (insertAfter) {
+                    anchorText = insertAfter;
+                    action = 'append';
                     const range = fuzzyFindRange(insertAfter);
                     if (range) {
 
@@ -3872,6 +3907,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                     const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                     if (insertAfter) {
+                      anchorText = insertAfter;
+                      action = 'append';
                       const range = fuzzyFindRange(insertAfter);
                       if (range) {
                         editor.chain().focus().insertContentAt(range.to + 1, insertHtml).run();
@@ -3893,6 +3930,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   } else {
                     originalParagraph = parsed.originalParagraph || '';
                     revisedParagraph = parsed.revisedParagraph || suggestion.suggestedText;
+                    anchorText = originalParagraph;
+                    action = 'replace';
                   }
                 }
 
@@ -3903,6 +3942,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                   const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                   if (insertAfter) {
+                    anchorText = insertAfter;
+                    action = 'append';
                     const range = fuzzyFindRange(insertAfter);
                     if (range) {
                       editor.chain().focus().insertContentAt(range.to + 1, insertHtml).run();
@@ -3917,6 +3958,10 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                     editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
                     editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
                     editor.commands.scrollIntoView();
+                    anchorText = insertAfter;
+                    action = 'append';
+                    anchorText = insertAfter;
+                    action = 'append';
                     applied = true;
                     toastDesc = 'Case citation appended (highlighted green)';
                     revisedParagraph = clauseText;
@@ -3931,6 +3976,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                 if (strictPlacementTypes.has(suggestion.type) && revisedParagraph) {
                   const aiAnchor = await findAiAnchorRange([suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle], suggestion.type);
                   if (aiAnchor) {
+                    anchorText = suggestion.principle || suggestion.description || '';
+                    action = 'append';
                     const escaped = String(revisedParagraph).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                     editor.chain().focus().insertContentAt(aiAnchor.to + 1, insertHtml).run();
@@ -3963,6 +4010,10 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   !strictPlacementTypes.has(suggestion.type));
                 applied = result.applied;
                 toastDesc = result.desc;
+                if (result.applied && result.anchorText) {
+                  anchorText = result.anchorText;
+                  action = result.mode === 'replace' ? 'replace' : 'append';
+                }
                 console.info('[APPLY][FRONTEND] insertion-result', {
                   traceId: applyTraceId,
                   type: suggestion?.type,
@@ -4208,8 +4259,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               suggestionType: suggestion?.type || '',
               suggestionId: suggestion?.suggestionId || '',
               forceSuggestionSync: true,
-              originalText: suggestion?.originalText || '',
-              suggestedText: suggestion?.suggestedText || '',
+              originalText: anchorText || suggestion?.originalText || '',
+              suggestedText: revisedParagraph || suggestion?.suggestedText || '',
+              action: action,
               htmlLength: String(htmlForSync || '').length,
               textLength: String(editor.getText() || '').length,
             });
@@ -4217,7 +4269,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             // If OnlyOffice is open, attempt to reflect the change immediately without a full reload.
             // Direct insertion preserves layout fidelity and prevents DOM reconciliation crashes.
             if (onlyOfficeRef.current && isAIDriven && revisedParagraph) {
-              const inserted = onlyOfficeRef.current.insertText(revisedParagraph);
+              // Pass the anchor info to OnlyOfficeEditor so it can try to place the text correctly
+              const inserted = onlyOfficeRef.current.insertText(revisedParagraph, anchorText || originalParagraph, action);
               if (inserted) {
                 console.info('[APPLY][ONLYOFFICE] direct-insertion-success', { traceId: applyTraceId });
               }
