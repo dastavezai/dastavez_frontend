@@ -77,6 +77,13 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
                     } catch(e) {}
                     oNewPara.AddText(t);
                     oDocument.InsertContent([oNewPara], true, oParagraph.GetIndex());
+                    
+                    // FLASH & SCROLL: Focus the view on the new addition
+                    var oNewRange = oNewPara.GetRange();
+                    oNewRange.SetHighlight("yellow");
+                    oNewRange.Select();
+                    oDocument.ScrollTo(oNewRange);
+                    console.log("[CONNECTOR-TRACE] auto-scroll-triggered");
                   }
                 } else {
                   oDocument.PasteText(t);
@@ -186,6 +193,14 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             throw new Error('Invalid OnlyOffice configuration from server.');
           }
 
+          // CACHE-BUSTING: Force OnlyOffice to fetch the fresh patched file
+          if (config.document?.url) {
+            const url = new URL(config.document.url, window.location.origin);
+            url.searchParams.set('v', Date.now());
+            config.document.url = url.toString();
+            console.log('[OnlyOffice][cache-bust] loading fresh document version:', config.document.url);
+          }
+
           // Do not rely on inherited 100% height; explicit height prevents blank iframe render.
           config.height = `${frameHeightRef.current}px`;
           config.width = '100%';
@@ -199,8 +214,8 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             },
             onDocumentReady: () => {
               console.log('[OnlyOffice][onDocumentReady]');
-              // Initialize connector once ready
               if (editorRef.current?.createConnector) {
+                console.log('[OnlyOffice][connector] initializing early...');
                 connectorRef.current = editorRef.current.createConnector();
               }
             },
