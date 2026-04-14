@@ -3334,8 +3334,71 @@ const FullPageEditor = ({
         return null;
       };
 
+      const findAnchorRange = (hints = []) => {
+        const normalizedHints = (Array.isArray(hints) ? hints : [hints])
+          .map(h => String(h || '').replace(/[^a-zA-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim())
+          .filter(h => h.length >= 8)
+          .sort((a, b) => b.length - a.length);
+        for (const hint of normalizedHints) {
+          const direct = findRangeInEditor(hint);
+          if (direct) return direct;
+          const words = hint.split(' ').filter(Boolean);
+          if (words.length >= 3) {
+            const lead = words.slice(0, 5).join(' ');
+            const approx = findRangeInEditor(lead);
+            if (approx) return approx;
+          }
+        }
+        return null;
+      };
 
-      const insertAtLocationOrAppend = (originalParagraph, revisedParagraph, descFound, descAppend) => {
+      const getKeywordTokens = (hints = []) => {
+        const stop = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'into', 'under', 'over', 'your', 'rule', 'issue', 'legal', 'document', 'clause']);
+        return (Array.isArray(hints) ? hints : [hints])
+          .map(h => String(h || '').toLowerCase())
+          .join(' ')
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .split(/\s+/)
+          .filter(w => w && w.length >= 4 && !stop.has(w));
+      };
+
+      const findBestKeywordAnchor = (hints = [], anchorType = '') => {
+        const tokens = getKeywordTokens(hints);
+        if (tokens.length < 2) return null;
+
+        const candidates = [];
+        editor.state.doc.descendants((node, pos) => {
+          const isTextBlock = node?.type?.name === 'paragraph' || node?.type?.name === 'heading';
+          if (!isTextBlock) return true;
+          const text = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!text) return true;
+
+          const low = text.toLowerCase();
+          let score = 0;
+          for (const t of tokens) {
+            if (low.includes(t)) score += 1;
+          }
+
+          if (anchorType === 'precedence_apply') {
+            if (/precedent|precedence|authorit|citation|case law|judgment/.test(low)) score += 3;
+          }
+          if (anchorType === 'compliance_fix') {
+            if (/compliance|mandatory|required|shall|obligation|penalty/.test(low)) score += 2;
+          }
+
+          if (score > 0) {
+            candidates.push({ score, from: pos + 1, to: pos + node.nodeSize - 1 });
+          }
+          return true;
+        });
+
+        if (!candidates.length) return null;
+        candidates.sort((a, b) => b.score - a.score);
+        return { from: candidates[0].from, to: candidates[0].to };
+      };
+
+
+      const insertAtLocationOrAppend = (originalParagraph, revisedParagraph, descFound, descAppend, anchorHints = [], anchorType = '') => {
         const focusAt = (pos) => {
           const p = Math.max(1, Math.min(Number(pos || 1), editor.state.doc.content.size));
           requestAnimationFrame(() => {
@@ -3370,6 +3433,11 @@ const FullPageEditor = ({
         }
 
         if (revisedParagraph) {
+          const anchor = findAnchorRange(anchorHints) || findBestKeywordAnchor(anchorHints, anchorType);
+          if (anchor) {
+            const done = insertHighlightedParagraph(revisedParagraph, anchor.to + 1);
+            return { applied: !!done, desc: descFound };
+          }
           const done = insertHighlightedParagraph(revisedParagraph);
           return { applied: !!done, desc: descAppend || 'AI fix appended — review position and adjust if needed' };
         }
@@ -3741,7 +3809,9 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                         suggestion.type === 'precedence_apply' ? `Citation from ${suggestion.caseName || 'case'} woven into document` :
                           suggestion.type === 'chronology_fix' ? 'Chronology corrected with AI (highlighted green)' :
                             'AI fix applied (highlighted green)',
-                  'AI fix appended — original text not found exactly, review position');
+                  'AI fix appended — original text not found exactly, review position',
+                  [suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle],
+                  suggestion.type);
                 applied = result.applied;
                 toastDesc = result.desc;
               }
@@ -3952,6 +4022,17 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         if (fileIdForSync) {
           setIsOnlyOfficeSyncing(true);
           try {
+            const serverDocxStatus = await fileService.getDocxStatus(fileIdForSync).catch(() => null);
+            const prevServerTextLen = String(serverDocxStatus?.docxHtml || '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .length;
+            const nextTextLen = String(editor.getText() || '').trim().length;
+            if (prevServerTextLen > 800 && nextTextLen < Math.max(180, Math.floor(prevServerTextLen * 0.35))) {
+              throw new Error('Sync blocked to prevent replacing document with partial content. Please reload and apply again.');
+            }
+
             await fileService.syncOnlyOfficeDocx(fileIdForSync, editor.getHTML(), editor.getText());
             setOnlyOfficeRefreshKey(prev => prev + 1);
             toastDesc = `${toastDesc}. Synced to OnlyOffice`;
