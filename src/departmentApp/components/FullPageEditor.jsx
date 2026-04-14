@@ -1350,6 +1350,7 @@ const FullPageEditor = ({
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
+  const [onlyOfficeRefreshKey, setOnlyOfficeRefreshKey] = useState(0);
   const [docxStatus, setDocxStatus] = useState(scanData?.docxStatus || session?.docxStatus || 'none');
   const [docxError, setDocxError] = useState('');
   const [docxHtmlState, setDocxHtmlState] = useState(scanData?.docxHtml || session?.docxHtml || '');
@@ -3945,6 +3946,20 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         return prev;
       });
 
+      if (applied && editorViewMode === 'editable' && editor) {
+        const fileIdForSync = selectedFile?._id || session?.fileId;
+        if (fileIdForSync) {
+          try {
+            await fileService.syncOnlyOfficeDocx(fileIdForSync, editor.getHTML(), editor.getText());
+            setOnlyOfficeRefreshKey(prev => prev + 1);
+            toastDesc = `${toastDesc}. Synced to OnlyOffice`;
+          } catch (syncErr) {
+            console.warn('OnlyOffice sync failed:', syncErr?.message || syncErr);
+            toastDesc = `${toastDesc}. Not yet synced to OnlyOffice`;
+          }
+        }
+      }
+
 
       const sid = suggestion.suggestionId;
       if (!sid) {
@@ -5234,7 +5249,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </VStack>
                     </Box>
                   )}
-                  <OnlyOfficeEditor fileId={selectedFile?._id || session?.fileId} />
+                  <OnlyOfficeEditor fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} />
                 </>
               )}
             </Box>

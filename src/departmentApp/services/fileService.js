@@ -340,6 +340,19 @@ const fileService = {
     }
   },
 
+  syncOnlyOfficeDocx: async (fileId, htmlContent, plainText = '') => {
+    try {
+      const response = await api.post(`${API_URL}/${fileId}/onlyoffice/sync`, {
+        htmlContent,
+        plainText,
+      }, { timeout: 120000 });
+      return response.data;
+    } catch (error) {
+      console.error('OnlyOffice sync error:', error);
+      throw error;
+    }
+  },
+
   
   aiChatAboutDocument: async (message, selectedText = '', chatHistory = [], language = 'en') => {
     try {

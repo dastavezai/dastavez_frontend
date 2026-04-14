@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
 import fileService from '../services/fileService';
 
-const OnlyOfficeEditor = ({ fileId }) => {
+const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
   const wrapperRef = useRef(null);
   const holderRef = useRef(null);
   const editorRef = useRef(null);
@@ -10,7 +10,7 @@ const OnlyOfficeEditor = ({ fileId }) => {
   const [frameHeightPx, setFrameHeightPx] = useState(860);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const holderId = useMemo(() => `onlyoffice-holder-${String(fileId || 'file')}`, [fileId]);
+  const holderId = useMemo(() => `onlyoffice-holder-${String(fileId || 'file')}-${String(refreshKey)}`, [fileId, refreshKey]);
 
   useLayoutEffect(() => {
     const updateHeight = () => {
