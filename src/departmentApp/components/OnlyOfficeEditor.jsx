@@ -125,8 +125,8 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
           attempts++;
           setTimeout(poll, 150);
         } else {
-          console.error('[CONNECTOR-TRACE] poll-timeout: giving up, triggering parent refresh...');
-          // Return false or similar to let the parent know we failed
+          console.error('[CONNECTOR-TRACE] poll-timeout: triggering auto-refresh to show local sync...');
+          window.location.reload(); // Hard refresh to ensure we see the new backend file
         }
       };
 
