@@ -310,6 +310,11 @@ const fileService = {
       const response = await api.get(`${API_URL}/${fileId}/docx/status`, { timeout: 60000 });
       return response.data;
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 404) {
+        // Older backend build without DOCX routes — fallback silently.
+        return { success: false, docxStatus: 'none', docxHtml: '', docxFileUrl: '', docxError: 'DOCX endpoint not available (404)' };
+      }
       console.error('DOCX status error:', error);
       throw error;
     }
@@ -321,6 +326,16 @@ const fileService = {
       return new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
     } catch (error) {
       console.error('DOCX download error:', error);
+      throw error;
+    }
+  },
+
+  getOnlyOfficeConfig: async (fileId) => {
+    try {
+      const response = await api.get(`${API_URL}/${fileId}/onlyoffice/config`, { timeout: 120000 });
+      return response.data;
+    } catch (error) {
+      console.error('OnlyOffice config error:', error);
       throw error;
     }
   },

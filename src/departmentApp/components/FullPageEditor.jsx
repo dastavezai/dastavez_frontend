@@ -83,6 +83,7 @@ import LegalParagraphStyle from './editor/LegalParagraphStyleExtension.jsx';
 import DocumentConverter from './editor/DocumentConverter.jsx';
 import { buildDocFlow } from './editor/DocFlowEngine.js';
 import { extractPageObjects } from './editor/ObjectLayer.js';
+import OnlyOfficeEditor from './OnlyOfficeEditor';
 import { useAppTheme } from '../context/ThemeContext';
 import DemoLauncher from './DemoMode/DemoLauncher';
 import './FullPageEditor.css';
@@ -663,18 +664,18 @@ const scoreTextMatch = (haystack = '', needle = '') => {
 };
 
 const buildTableHtml = (chunk) => {
-  const grid = new Map();
-  let maxRow = 0;
-  let maxCol = 0;
+        const grid = new Map();
+        let maxRow = 0;
+        let maxCol = 0;
   const fontSizes = [];
   const colWidths = new Map();
-  for (const cell of chunk) {
+        for (const cell of chunk) {
     const r = Number(cell?.table?.rowIndex ?? cell?.table?.row ?? 0);
     const c = Number(cell?.table?.columnIndex ?? cell?.table?.col ?? 0);
-    if (!Number.isFinite(r) || !Number.isFinite(c)) continue;
-    maxRow = Math.max(maxRow, r);
-    maxCol = Math.max(maxCol, c);
-    if (!grid.has(r)) grid.set(r, new Map());
+          if (!Number.isFinite(r) || !Number.isFinite(c)) continue;
+          maxRow = Math.max(maxRow, r);
+          maxCol = Math.max(maxCol, c);
+          if (!grid.has(r)) grid.set(r, new Map());
     if (!grid.get(r).has(c)) grid.get(r).set(c, cell);
     const fs = Number(cell?.style?.fontSize || 0);
     if (Number.isFinite(fs) && fs > 0) fontSizes.push(fs);
@@ -701,21 +702,21 @@ const buildTableHtml = (chunk) => {
 
   const tParts = [`<table style="border-collapse:collapse;width:100%;margin:6px 0;font-size:${tableFontPt}pt;table-layout:fixed;">`];
   if (colGroup) tParts.push(colGroup);
-  for (let r = 0; r <= maxRow; r += 1) {
+        for (let r = 0; r <= maxRow; r += 1) {
     tParts.push('<tr>');
-    for (let c = 0; c <= maxCol; c += 1) {
-      const cell = grid.get(r)?.get(c) || null;
-      if (!cell) {
+          for (let c = 0; c <= maxCol; c += 1) {
+            const cell = grid.get(r)?.get(c) || null;
+            if (!cell) {
         tParts.push('<td style="border:1px solid #333;padding:4px 8px;vertical-align:top;"> </td>');
-        continue;
-      }
+              continue;
+            }
       const runs = Array.isArray(cell.runs) && cell.runs.length > 0
         ? cell.runs
         : [{ text: cell.text, style: cell.style || {} }];
       const inline = runs.map((run) => renderStyledRun(run, cell.style || {})).join('');
-      const rowSpan = Math.max(1, Number(cell?.table?.rowSpan || 1));
+            const rowSpan = Math.max(1, Number(cell?.table?.rowSpan || 1));
       const colSpan = Math.max(1, Number(cell?.table?.columnSpan || cell?.table?.colSpan || 1));
-      const spanAttrs = `${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ''}${colSpan > 1 ? ` colspan="${colSpan}"` : ''}`;
+            const spanAttrs = `${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ''}${colSpan > 1 ? ` colspan="${colSpan}"` : ''}`;
       tParts.push(`<td${spanAttrs} style="border:1px solid #333;padding:4px 8px;vertical-align:top;">${inline || '&nbsp;'}</td>`);
     }
     tParts.push('</tr>');
@@ -761,8 +762,8 @@ const groupLinesIntoParagraphs = (lines, width) => {
     if (cur.type === 'tableCell' || cur.type === 'paragraph' || prev.type === 'tableCell' || prev.type === 'paragraph') {
       out.push(finalizeGroup(group));
       group = [cur];
-      continue;
-    }
+        continue;
+      }
 
     // Never merge list items
     if (parseListMarker(cur.text) || parseListMarker(prev.text)) {
@@ -787,7 +788,7 @@ const groupLinesIntoParagraphs = (lines, width) => {
 
     if (smallGap && sameIndent && sameFontSize && sameBold && sameRole) {
       group.push(cur);
-    } else {
+      } else {
       out.push(finalizeGroup(group));
       group = [cur];
     }
@@ -802,8 +803,8 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
   const widthLooksLikePdfPoints = width > 0 && width < 700;
   // 1) Normalize and sort
   const normalized = rawBlocks
-    .map((b, idx) => {
-      const bbox = Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0];
+      .map((b, idx) => {
+        const bbox = Array.isArray(b?.bbox) ? b.bbox : [0, 0, 0, 0];
       const x = Number(bbox[0] || 0);
       const y = Number(bbox[1] || 0);
       const right = Number(bbox[2] || 0);
@@ -820,26 +821,26 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
         lineHeight: rawStyle.lineHeight || b?.lineHeight || null,
         bold:       rawStyle.bold       || b?.bold       || null,
       };
-      return {
-        idx,
-        type: String(b?.type || 'line'),
-        role: String(b?.role || 'body'),
-        text: String(b?.text || '').trim(),
+        return {
+          idx,
+          type: String(b?.type || 'line'),
+          role: String(b?.role || 'body'),
+          text: String(b?.text || '').trim(),
         x,
         y,
         right,
         bottom,
         bbox: [x, y, right, bottom],
         style,
-        runs: Array.isArray(b?.runs) ? b.runs : [],
+          runs: Array.isArray(b?.runs) ? b.runs : [],
         table: b?.table || null,
         tableKey: b?.type === 'tableCell'
           ? String(b?.table?.tableId || b?.table?.id || b?.table?.tableIndex || 'table')
           : null,
-      };
-    })
-    .filter((b) => b.text && b.role !== 'pageHeader' && b.role !== 'pageFooter')
-    .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
+        };
+      })
+      .filter((b) => b.text && b.role !== 'pageHeader' && b.role !== 'pageFooter')
+      .sort((a, b) => (a.y - b.y) || (a.x - b.x) || (a.idx - b.idx));
 
   // 1.5) Remove duplicates (Azure sometimes provides both paragraph + line blocks)
   const hasParagraphBlocks = normalized.some((b) => b.type === 'paragraph');
@@ -950,13 +951,13 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
     const row = rows[i];
 
     // ── Separator ──
-    if (isSeparatorText(row.text)) {
-      parts.push(closeListTag(listState));
+      if (isSeparatorText(row.text)) {
+        parts.push(closeListTag(listState));
       parts.push('<hr style="border:none;border-top:2px solid #222;margin:10px 0;" />');
       prevY = Number(row.y || 0);
       i += 1;
-      continue;
-    }
+        continue;
+      }
 
     // ── Table ──
     if (row.type === 'tableCell') {
@@ -1044,7 +1045,7 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
       : (rawAlign === 'left' && textForRender.length > 60 && !listMarker ? 'justify' : rawAlign);
 
     // ── List rendering ──
-    if (listMarker) {
+      if (listMarker) {
       // Extract numeric index from the marker text (e.g. "3." → 3)
       const markerNum = listMarker.kind === 'ol'
         ? (Number(String(listMarker.text || '').replace(/\D/g, '') || 0) || listState.olCounter)
@@ -1053,8 +1054,8 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
       // Close and reopen only when switching list type or if the list was closed
       // by an intervening non-list block (closeListTag set currentListTag=null).
       if (!listState.currentListTag || listState.currentListTag !== listMarker.kind) {
-        parts.push(closeListTag(listState));
-        listState.currentListTag = listMarker.kind;
+          parts.push(closeListTag(listState));
+          listState.currentListTag = listMarker.kind;
         const listStyle = listMarker.kind === 'ol'
           ? 'list-style-type:decimal;'
           : 'list-style-type:disc;';
@@ -1067,15 +1068,15 @@ const blocksToEditableHtml = (rawBlocks, pageWidth) => {
 
       if (markerNum !== null) listState.olCounter = markerNum + 1;
 
-      parts.push(
+        parts.push(
         `<li style="font-size:${fontSize}pt;font-weight:${fontWeight};` +
         `font-style:${isItalic ? 'italic' : 'normal'};` +
         `text-decoration:${isUnderline ? 'underline' : 'none'};` +
         `line-height:${lineHeight};${fontFamily}margin-bottom:2px;">${inlineHtml}</li>`
-      );
-    } else {
+        );
+      } else {
       // ── Close any open list ──
-      parts.push(closeListTag(listState));
+        parts.push(closeListTag(listState));
       const tag = headingTag || 'p';
       // sectionBreak → large gap; paraBreak (new paragraph) → moderate gap for headings,
       // small gap for body text; same-paragraph continuation → zero margin so lines
@@ -1147,6 +1148,43 @@ const layoutModelToEditableHtml = (layoutModel) => {
   return allParts.join('\n');
 };
 
+// Cache PDF document loading so multi-page previews don't refetch the same file
+// on every page component mount.
+const pdfDocByUrlPromiseCache = new Map();
+const pdfDocByFileIdPromiseCache = new Map();
+
+const getCachedPdfDocument = async ({ pdfUrl, fileId }) => {
+  if (pdfUrl) {
+    if (!pdfDocByUrlPromiseCache.has(pdfUrl)) {
+      const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
+      pdfDocByUrlPromiseCache.set(pdfUrl, loadingTask.promise);
+    }
+    try {
+      return await pdfDocByUrlPromiseCache.get(pdfUrl);
+    } catch (e) {
+      pdfDocByUrlPromiseCache.delete(pdfUrl);
+      throw e;
+    }
+  }
+  if (fileId) {
+    if (!pdfDocByFileIdPromiseCache.has(fileId)) {
+      pdfDocByFileIdPromiseCache.set(fileId, (async () => {
+        const blob = await fileService.downloadFile(fileId, 'pdf');
+        const arr = await blob.arrayBuffer();
+        const dataTask = pdfjsLib.getDocument({ data: new Uint8Array(arr) });
+        return dataTask.promise;
+      })());
+    }
+    try {
+      return await pdfDocByFileIdPromiseCache.get(fileId);
+    } catch (e) {
+      pdfDocByFileIdPromiseCache.delete(fileId);
+      throw e;
+    }
+  }
+  throw new Error('No pdfUrl/fileId provided');
+};
+
 const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx, fileId }) => {
   const canvasRef = useRef(null);
   const [renderErr, setRenderErr] = useState('');
@@ -1170,8 +1208,7 @@ const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx, fileId }) => {
         }
         let pdf = null;
         try {
-          const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
-          pdf = await loadingTask.promise;
+          pdf = await getCachedPdfDocument({ pdfUrl, fileId: null });
         } catch (urlErr) {
           const canFallbackToApi = !!fileId;
           const isLikely404 = /404|not found|MissingPDF|ResponseException/i.test(String(urlErr?.message || ''));
@@ -1184,14 +1221,11 @@ const PdfPageCanvas = ({ pdfUrl, pageNumber, targetWidthPx, fileId }) => {
             isLikely404,
           });
           if (!canFallbackToApi) throw urlErr;
-          const blob = await fileService.downloadFile(fileId, 'pdf');
-          const arr = await blob.arrayBuffer();
-          const dataTask = pdfjsLib.getDocument({ data: new Uint8Array(arr) });
-          pdf = await dataTask.promise;
+          pdf = await getCachedPdfDocument({ pdfUrl: null, fileId });
           console.log('[PDF-CANVAS]', 'api-download-fallback-success', {
             fileId,
             pageNumber,
-            bytes: arr.byteLength,
+            bytes: 'cached',
           });
         }
         const page = await pdf.getPage(pageNumber);
@@ -1319,6 +1353,14 @@ const FullPageEditor = ({
   const [editorViewMode, setEditorViewMode] = useState('editable');
   const [docxStatus, setDocxStatus] = useState(scanData?.docxStatus || session?.docxStatus || 'none');
   const [docxError, setDocxError] = useState('');
+  const [docxHtmlState, setDocxHtmlState] = useState(scanData?.docxHtml || session?.docxHtml || '');
+  const [docxFileUrlState, setDocxFileUrlState] = useState(scanData?.docxFileUrl || session?.docxFileUrl || '');
+  const [devRawDocxPreview, setDevRawDocxPreview] = useState(true);
+  const docxFileUrl = docxFileUrlState || scanData?.docxFileUrl || session?.docxFileUrl || '';
+  const isDevBuild = !!import.meta?.env?.DEV;
+  const EDITABLE_ONLY_MODE = true;
+  const USE_ONLYOFFICE_EDITABLE = true;
+  const showEditablePdfPreview = false;
   const [fidelityEdits, setFidelityEdits] = useState({});
   const [fidelityOffsets, setFidelityOffsets] = useState({});
   const [pdfTextLayersByPage, setPdfTextLayersByPage] = useState({});
@@ -1421,30 +1463,73 @@ const FullPageEditor = ({
       .join('');
   }, []);
 
-  const estimateHtmlUniqueness = useCallback((html = '') => {
+  const sanitizeDocxHtmlForEditor = useCallback((html = '') => {
     const raw = String(html || '');
-    if (!raw.trim()) return 1;
-    const text = raw
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<[^>]+>/g, '\n')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/\r/g, '\n')
-      .split('\n')
-      .map((l) => l.replace(/\s+/g, ' ').trim())
-      .filter((l) => l.length >= 20);
-    if (text.length < 6) return 1;
-    const unique = new Set(text).size;
-    return unique / text.length;
+    if (!raw.trim()) return raw;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(raw, 'text/html');
+      const all = Array.from(doc.body.querySelectorAll('*'));
+      all.forEach((el) => {
+        const style = String(el.getAttribute('style') || '');
+        if (!style) return;
+        const cleaned = style
+          // Prevent text-box anchored fragments from stacking at page top.
+          .replace(/position\s*:\s*(absolute|fixed)\s*;?/gi, '')
+          .replace(/z-index\s*:\s*[^;]+;?/gi, '')
+          .replace(/left\s*:\s*[^;]+;?/gi, '')
+          .replace(/top\s*:\s*[^;]+;?/gi, '')
+          .replace(/right\s*:\s*[^;]+;?/gi, '')
+          .replace(/bottom\s*:\s*[^;]+;?/gi, '')
+          .replace(/transform\s*:\s*[^;]+;?/gi, '')
+          // Negative margins are a common overlap trigger in imported html.
+          .replace(/margin-top\s*:\s*-\s*[^;]+;?/gi, '')
+          .replace(/margin\s*:\s*-\s*[^;]+;?/gi, '');
+        const normalized = cleaned.replace(/\s{2,}/g, ' ').trim();
+        if (normalized) el.setAttribute('style', normalized);
+        else el.removeAttribute('style');
+      });
+      return doc.body.innerHTML || raw;
+    } catch (_) {
+      return raw;
+    }
   }, []);
 
-
   const getInitialContent = useCallback(() => {
-    // ── Priority 0: DOCX→HTML (best editable fidelity) ───────────────────────
-    const dHtml = scanData?.docxHtml || session?.docxHtml || '';
-    if (dHtml && dHtml.trim().length > 100) return dHtml;
+    const isPdfFile = String(selectedFile?.fileType || session?.fileType || '').toLowerCase().includes('pdf')
+      || String(selectedFile?.fileName || session?.fileName || '').toLowerCase().endsWith('.pdf');
+    // PDF editable path is always DOCX-first (no fallback reconstruction).
+    const rawDocxMode = isPdfFile ? true : (isDevBuild ? devRawDocxPreview : true);
+    const effectiveDocxHtml = docxHtmlState || scanData?.docxHtml || session?.docxHtml || '';
+    const effectiveDocxFileUrl = docxFileUrlState || scanData?.docxFileUrl || session?.docxFileUrl || '';
 
-    // ── Priority 0: Layout-model reconstruction (best editable alignment) ────
+    // ── Priority 0: DOCX→HTML (best editable fidelity) ───────────────────────
+    const dHtml = effectiveDocxHtml;
+    const hasReadyDocxPayload = String(dHtml || '').trim().length > 100 && String(effectiveDocxFileUrl || '').trim().length > 0;
+    if (rawDocxMode && hasReadyDocxPayload) {
+      const safeDocxHtml = sanitizeDocxHtmlForEditor(dHtml);
+      console.log('[DOCX-TEST][Editable-Source] using docxHtml', {
+        isPdfFile,
+        length: dHtml.length,
+        rawDocxMode,
+        hasReadyDocxPayload,
+        docxStatus,
+      });
+      return safeDocxHtml;
+    }
+
+    // In PDF mode, never fallback to reconstruction/htmlContent when DOCX isn't truly ready.
+    // This avoids the "looks good then degrades after 1-2s" overwrite behavior.
+    if (isPdfFile && rawDocxMode) {
+      console.warn('[DOCX-TEST][Editable-Source] blocking non-DOCX fallback for PDF while DOCX payload is not ready', {
+        docxStatus,
+        hasDocxHtml: String(dHtml || '').trim().length > 100,
+        hasDocxFileUrl: String(effectiveDocxFileUrl || '').trim().length > 0,
+      });
+      return '<p>Preparing high-fidelity DOCX view... Please wait or click "Convert now".</p>';
+    }
+
+    // ── Priority 1: Layout-model reconstruction (fallback only) ───────────────
     // For the editable window we prioritize a clean reconstruction from the
     // layout model (with page breaks + table de-duplication) so it visually
     // mimics the PDF instead of looking like plain text.
@@ -1456,36 +1541,37 @@ const FullPageEditor = ({
     const azureLayout = layoutCandidates.find((l) => isAzureLayoutModel(l)) || null;
     const layout = azureLayout || layoutCandidates[0] || null;
     const layoutHtml = layoutModelToEditableHtml(layout);
-    if (layoutHtml && layoutHtml.trim()) return layoutHtml;
-
-    // ── Priority 1: Gemini layout-aware HTML ─────────────────────────────────
-    // Use only if it has structure AND doesn't look duplicated.
-    const gHtml = scanData?.geminiHtml || session?.geminiHtml || '';
-    const geminiHasStructure = gHtml.length > 200 &&
-      /<h[1-6][\s>]|<strong[\s>]|<b[\s>]|<ul[\s>]|<ol[\s>]|<table[\s>]|font-weight\s*:\s*bold/i.test(gHtml);
-    const geminiUnique = estimateHtmlUniqueness(gHtml) >= 0.7;
-    if (geminiHasStructure && geminiUnique) return gHtml;
-
-    // ── Priority 2: Azure DI Markdown→HTML ───────────────────────────────────
-    // Use only if it has structure AND doesn't look duplicated.
-    const mdHtml = scanData?.markdownHtml || session?.markdownHtml || '';
-    const mdHasStructure = mdHtml.length > 100 && /<h[1-6][\s>]|<strong[\s>]|<em[\s>]|<ul[\s>]|<ol[\s>]|<table[\s>]/i.test(mdHtml);
-    const mdUnique = estimateHtmlUniqueness(mdHtml) >= 0.75;
-    if (mdHasStructure && mdUnique) return mdHtml;
+    if (layoutHtml && layoutHtml.trim()) {
+      console.log('[DOCX-TEST][Editable-Source] using layoutHtml fallback', { isPdfFile, length: layoutHtml.length });
+      return layoutHtml;
+    }
 
     // ── Priority 3: Document graph reconstruction ────────────────────────────
     const graphHtml = documentGraphToEditableHtml(graph);
-    if (graphHtml && graphHtml.trim()) return graphHtml;
+    if (graphHtml && graphHtml.trim()) {
+      console.log('[DOCX-TEST][Editable-Source] using documentGraph fallback', { isPdfFile, length: graphHtml.length });
+      return graphHtml;
+    }
 
     // ── Priority 4: Raw htmlContent from session ──────────────────────────────
     const htmlCandidate = (initialHtml && initialHtml.trim()) ? initialHtml : (session?.htmlContent || '');
-    if (htmlCandidate && htmlCandidate.trim()) return htmlCandidate;
+    if (htmlCandidate && htmlCandidate.trim()) {
+      console.log('[DOCX-TEST][Editable-Source] using htmlContent fallback', { isPdfFile, length: htmlCandidate.length });
+      return htmlCandidate;
+    }
 
     // ── Priority 5: Plain text fallback ──────────────────────────────────────
     const text = session?.currentText || session?.originalText || '';
     if (!text) return '<p></p>';
+    console.log('[DOCX-TEST][Editable-Source] using plainText fallback', { isPdfFile, textLength: text.length });
     return textToHtml(text);
-  }, [initialHtml, session, scanData?.layoutModel, scanData?.documentGraph, scanData?.markdownHtml, scanData?.geminiHtml, scanData?.docxHtml, session?.docxHtml, textToHtml, estimateHtmlUniqueness]);
+  }, [initialHtml, selectedFile?.fileType, selectedFile?.fileName, session, scanData?.layoutModel, scanData?.documentGraph, scanData?.docxHtml, session?.docxHtml, scanData?.docxFileUrl, session?.docxFileUrl, textToHtml, devRawDocxPreview, isDevBuild, docxStatus, docxHtmlState, docxFileUrlState, sanitizeDocxHtmlForEditor]);
+
+  useEffect(() => {
+    if (!isDevBuild) return;
+    console.clear();
+    console.log('[DOCX-TEST] Editor mount: console cleared for fresh test run');
+  }, [isDevBuild, selectedFile?._id, session?.fileId]);
 
   useEffect(() => {
     pdfTextLayersByPageRef.current = pdfTextLayersByPage;
@@ -1498,19 +1584,27 @@ const FullPageEditor = ({
   }, [editorViewMode, FIDELITY_LOCKED]);
 
   useEffect(() => {
+    if (!EDITABLE_ONLY_MODE) return;
+    if (editorViewMode !== 'editable') setEditorViewMode('editable');
+  }, [editorViewMode, EDITABLE_ONLY_MODE]);
+
+  useEffect(() => {
     setDocxStatus(scanData?.docxStatus || session?.docxStatus || 'none');
     setDocxError(scanData?.docxError || session?.docxError || '');
-  }, [scanData?.docxStatus, session?.docxStatus, scanData?.docxError, session?.docxError]);
+    setDocxHtmlState(scanData?.docxHtml || session?.docxHtml || '');
+    setDocxFileUrlState(scanData?.docxFileUrl || session?.docxFileUrl || '');
+  }, [scanData?.docxStatus, session?.docxStatus, scanData?.docxError, session?.docxError, scanData?.docxHtml, session?.docxHtml, scanData?.docxFileUrl, session?.docxFileUrl]);
 
   useEffect(() => {
     if (!selectedFile?._id && !session?.fileId) return;
-    console.log('[DOCX-Pipeline][UI] state', {
+    console.log('[DOCX-TEST][Pipeline-State]', {
       fileId: selectedFile?._id || session?.fileId,
       docxStatus,
-      hasDocxHtml: !!(scanData?.docxHtml || session?.docxHtml),
-      docxFileUrl: scanData?.docxFileUrl || session?.docxFileUrl || '',
+      hasDocxHtml: !!(docxHtmlState || scanData?.docxHtml || session?.docxHtml),
+      docxFileUrl: docxFileUrlState || scanData?.docxFileUrl || session?.docxFileUrl || '',
+      docxHtmlLength: String(docxHtmlState || scanData?.docxHtml || session?.docxHtml || '').length,
     });
-  }, [docxStatus, selectedFile?._id, session?.fileId, scanData?.docxHtml, session?.docxHtml, scanData?.docxFileUrl, session?.docxFileUrl]);
+  }, [docxStatus, selectedFile?._id, session?.fileId, scanData?.docxHtml, session?.docxHtml, scanData?.docxFileUrl, session?.docxFileUrl, docxHtmlState, docxFileUrlState]);
 
   useEffect(() => {
     if (editorViewMode !== 'editable') return;
@@ -1521,14 +1615,55 @@ const FullPageEditor = ({
       try {
         const st = await fileService.getDocxStatus(fileId);
         if (cancelled) return;
+        if (st?.docxError) {
+          console.warn('[DOCX-TEST][Status] fallback', { fileId, error: st.docxError });
+        }
         if (st?.docxStatus) setDocxStatus(st.docxStatus);
         if (st?.docxError != null) setDocxError(st.docxError || '');
+        if (st?.docxHtml != null) setDocxHtmlState(st.docxHtml || '');
+        if (st?.docxFileUrl != null) setDocxFileUrlState(st.docxFileUrl || '');
         // If DOCX is ready and editor is still using a non-docx source, allow rebuild
       } catch (_) {}
     };
     run();
     return () => { cancelled = true; };
   }, [editorViewMode, selectedFile?._id, session?.fileId]);
+
+  useEffect(() => {
+    const isPdfFile = String(selectedFile?.fileType || session?.fileType || '').toLowerCase().includes('pdf')
+      || String(selectedFile?.fileName || session?.fileName || '').toLowerCase().endsWith('.pdf');
+    if (!isPdfFile || editorViewMode !== 'editable') return;
+    const fileId = selectedFile?._id || session?.fileId || null;
+    if (!fileId) return;
+    const hasReadyPayload = String(docxHtmlState || '').trim().length > 100 && String(docxFileUrlState || '').trim().length > 0;
+    if (docxStatus === 'pending' || hasReadyPayload) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        console.log('[DOCX-TEST][Auto-Convert] start', { fileId, docxStatus });
+        setDocxStatus('pending');
+        await fileService.convertPdfToDocx(fileId);
+        const st = await fileService.getDocxStatus(fileId);
+        if (cancelled) return;
+        if (st?.docxStatus) setDocxStatus(st.docxStatus);
+        if (st?.docxError != null) setDocxError(st.docxError || '');
+        if (st?.docxHtml != null) setDocxHtmlState(st.docxHtml || '');
+        if (st?.docxFileUrl != null) setDocxFileUrlState(st.docxFileUrl || '');
+        console.log('[DOCX-TEST][Auto-Convert] finished', {
+          fileId,
+          status: st?.docxStatus || 'none',
+          hasDocxHtml: !!String(st?.docxHtml || '').trim(),
+          hasDocxFileUrl: !!String(st?.docxFileUrl || '').trim(),
+        });
+      } catch (e) {
+        if (cancelled) return;
+        setDocxStatus('failed');
+        setDocxError(e?.message || 'Auto DOCX conversion failed');
+        console.warn('[DOCX-TEST][Auto-Convert] failed', { fileId, error: e?.message || String(e) });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedFile?.fileType, selectedFile?.fileName, session?.fileType, session?.fileName, editorViewMode, selectedFile?._id, session?.fileId, docxStatus, docxHtmlState, docxFileUrlState]);
 
 
   const editor = useEditor({
@@ -1565,6 +1700,8 @@ const FullPageEditor = ({
     ],
     content: getInitialContent(),
     onUpdate: ({ editor: ed }) => {
+      // Ignore programmatic/hydration updates; only autosave user-driven edits.
+      if (!ed?.isFocused) return;
       setHasUnsavedChanges(true);
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = setTimeout(() => {
@@ -1594,16 +1731,33 @@ const FullPageEditor = ({
 
   useEffect(() => {
     if (!editor || !session) return;
+    const isPdfFile = String(selectedFile?.fileType || session?.fileType || '').toLowerCase().includes('pdf')
+      || String(selectedFile?.fileName || session?.fileName || '').toLowerCase().endsWith('.pdf');
+    // For PDF->DOCX flow, avoid post-mount auto-rewrites that can degrade layout.
+    // User can still manually refresh via "Rebuild" or the dev Raw DOCX toggle.
+    if (isPdfFile) return;
     // Never clobber user edits.
     if (hasUnsavedChanges) return;
     if (editor.isFocused) return;
-    const content = getInitialContent();
+      const content = getInitialContent();
     if (!content) return;
     const normalize = (h) => String(h || '').replace(/\s+/g, ' ').trim();
     if (normalize(editor.getHTML()) !== normalize(content)) {
-      editor.commands.setContent(content);
-    }
-  }, [editor, session, getInitialContent, hasUnsavedChanges]);
+      console.log('[DOCX-TEST][Editor-Apply] applying getInitialContent via sync effect', {
+        contentLength: String(content || '').length,
+      });
+        editor.commands.setContent(content);
+      }
+  }, [editor, session, getInitialContent, hasUnsavedChanges, selectedFile?.fileType, selectedFile?.fileName]);
+
+  useEffect(() => {
+    if (!isDevBuild) return;
+    if (editorViewMode !== 'editable') return;
+    if (!editor) return;
+    if (hasUnsavedChanges) return;
+    const content = getInitialContent();
+    if (content) editor.commands.setContent(content);
+  }, [devRawDocxPreview, isDevBuild, editorViewMode, editor, hasUnsavedChanges, getInitialContent]);
 
 
   // Re-sync localScanArrays ONLY when a genuinely new scan completes.
@@ -2209,10 +2363,24 @@ const FullPageEditor = ({
     });
   }, [fidelityPagesToRender, pdfTextLayersByPage, getFidelityBlockKey, getFidelityText]);
 
-  const { flowMap, tableFlow, pageHeights: flowPageHeights } = useMemo(
-    () => buildDocFlow(fidelityOverlayPages),
-    [fidelityOverlayPages],
-  );
+  const shouldUseFidelityDocFlow = useMemo(() => {
+    // Reflow is useful when we have real layout blocks.
+    // When layout is missing and we rely on pdf.js text lines, reflow can
+    // compress multiple pages and cause top-page overlap artifacts.
+    const pages = Array.isArray(fidelityLayout?.pages) ? fidelityLayout.pages : [];
+    return pages.some((p) => Array.isArray(p?.blocks) && p.blocks.length > 0);
+  }, [fidelityLayout?.pages]);
+
+  const { flowMap, tableFlow, pageHeights: flowPageHeights } = useMemo(() => {
+    if (!shouldUseFidelityDocFlow) {
+      return {
+        flowMap: new Map(),
+        tableFlow: new Map(),
+        pageHeights: (fidelityOverlayPages || []).map((p) => Number(p?.height || 1123)),
+      };
+    }
+    return buildDocFlow(fidelityOverlayPages);
+  }, [fidelityOverlayPages, shouldUseFidelityDocFlow]);
 
   const fidelityFlowPages = useMemo(() => {
     const byPage = new Map();
@@ -2244,12 +2412,12 @@ const FullPageEditor = ({
         let renderPage = block.pageNumber;
         let renderY = Number(block.baseY || 0);
 
-        if (block.type === 'tableCell' && block.table?.tableId) {
+        if (shouldUseFidelityDocFlow && block.type === 'tableCell' && block.table?.tableId) {
           const tId = `${block.pageNumber}:${block.table.tableId}`;
           const flow = tableFlow.get(tId);
           if (flow?.pageNumber) renderPage = flow.pageNumber;
           if (flow?.yShift) renderY = renderY + flow.yShift;
-        } else {
+        } else if (shouldUseFidelityDocFlow) {
           const flow = flowMap.get(blockKey);
           if (flow?.pageNumber) renderPage = flow.pageNumber;
           if (Number.isFinite(flow?.y)) renderY = flow.y;
@@ -2272,7 +2440,7 @@ const FullPageEditor = ({
       }
     }
     return Array.from(byPage.values()).sort((a, b) => Number(a.pageNumber || 0) - Number(b.pageNumber || 0));
-  }, [fidelityOverlayPages, fidelityOffsets, flowMap, tableFlow, flowPageHeights]);
+  }, [fidelityOverlayPages, fidelityOffsets, flowMap, tableFlow, flowPageHeights, shouldUseFidelityDocFlow]);
 
   // ── Table grouping for fidelity overlay ───────────────────────────────────
   const fidelityTableGroups = useMemo(() => {
@@ -2832,10 +3000,30 @@ const FullPageEditor = ({
 
   const executeDownloadWithDesign = async (format, designConfig) => {
     setIsDesignSuggestionOpen(false);
-    if (editor) await handleAutosave(editor);
+    if (editor && !USE_ONLYOFFICE_EDITABLE) await handleAutosave(editor);
 
     toast({ title: `Generating ${format.toUpperCase()}...`, status: 'info', duration: 2000 });
     try {
+      const isPdfSource = String(selectedFile?.fileType || session?.fileType || '').toLowerCase().includes('pdf')
+        || String(selectedFile?.fileName || session?.fileName || '').toLowerCase().endsWith('.pdf');
+      const fileId = selectedFile?._id || session?.fileId || null;
+
+      // Strict converter-equivalent path for PDF -> DOCX downloads.
+      if (format === 'docx' && isPdfSource && fileId) {
+        const blob = await fileService.downloadDocx(fileId);
+        if (blob && blob.size > 0) {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const baseName = selectedFile?.fileName?.replace(/\.[^/.]+$/, '') || 'converted_document';
+          a.download = `${baseName}_converted_raw.docx`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+          toast({ title: 'Downloaded raw converted DOCX', status: 'success', duration: 2200 });
+        }
+        return;
+      }
+
       const finalDesignConfig = designConfig || (formatMetadata ? {
         fontFamily: formatMetadata.defaultFont,
         bodyFontSize: formatMetadata.defaultFontSize,
@@ -3837,18 +4025,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               <HStack spacing={1}>
                 <Button
                   size="xs"
-                  variant={editorViewMode === 'fidelity' ? 'solid' : 'outline'}
-                  colorScheme={editorViewMode === 'fidelity' ? 'purple' : 'gray'}
-                  onClick={() => setEditorViewMode('fidelity')}
-                  isDisabled={!hasFidelityLayout}
-                >
-                  Fidelity
-                </Button>
-                <Button
-                  size="xs"
-                  variant={editorViewMode === 'editable' ? 'solid' : 'outline'}
-                  colorScheme={editorViewMode === 'editable' ? 'blue' : 'gray'}
-                  onClick={() => setEditorViewMode('editable')}
+                  variant="solid"
+                  colorScheme="blue"
+                  isDisabled
                 >
                   Editable
                 </Button>
@@ -3875,6 +4054,29 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                     </Button>
                   </span>
                 </Tooltip>
+                {isDevBuild && (
+                  <Tooltip
+                    label={(() => {
+                      const isPdfFile = String(selectedFile?.fileType || session?.fileType || '').toLowerCase().includes('pdf')
+                        || String(selectedFile?.fileName || session?.fileName || '').toLowerCase().endsWith('.pdf');
+                      if (isPdfFile) return 'PDF editable is locked to raw DOCX mode';
+                      return hasUnsavedChanges ? 'Save first, then switch preview mode' : 'Toggle raw Adobe DOCX HTML vs smart editor source';
+                    })()}
+                    fontSize="xs"
+                  >
+                    <span>
+                      <Button
+                        size="xs"
+                        variant={devRawDocxPreview ? 'solid' : 'outline'}
+                        colorScheme={devRawDocxPreview ? 'purple' : 'gray'}
+                        isDisabled={hasUnsavedChanges || String(selectedFile?.fileType || session?.fileType || '').toLowerCase().includes('pdf') || String(selectedFile?.fileName || session?.fileName || '').toLowerCase().endsWith('.pdf')}
+                        onClick={() => setDevRawDocxPreview((v) => !v)}
+                      >
+                        {devRawDocxPreview ? 'Raw DOCX Preview: ON' : 'Raw DOCX Preview: OFF'}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                )}
               </HStack>
 
               <Tooltip label="Search" fontSize="xs">
@@ -4142,14 +4344,17 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                         try {
                           const fileId = selectedFile?._id || session?.fileId;
                           if (!fileId) return;
+                          console.log('[DOCX-Pipeline][UI] convert-click', { fileId });
                           setDocxStatus('pending');
                           setDocxError('');
                           await fileService.convertPdfToDocx(fileId);
                           const st = await fileService.getDocxStatus(fileId);
+                          console.log('[DOCX-Pipeline][UI] convert-result', { fileId, status: st?.docxStatus, error: st?.docxError || '' });
                           if (st?.docxStatus) setDocxStatus(st.docxStatus);
                           if (st?.docxError != null) setDocxError(st.docxError || '');
                           toast({ title: 'DOCX conversion complete', status: 'success', duration: 2000 });
                         } catch (e) {
+                          console.warn('[DOCX-Pipeline][UI] convert-failed', { error: e?.response?.data?.error || e?.message || String(e) });
                           setDocxStatus('failed');
                           setDocxError(e?.response?.data?.error || e?.message || String(e));
                           toast({ title: 'DOCX conversion failed', status: 'error', duration: 2500 });
@@ -4157,6 +4362,48 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       }}
                     >
                       {docxStatus === 'failed' ? 'Retry DOCX' : 'Convert now'}
+                    </Button>
+                  </HStack>
+                </HStack>
+              </Box>
+            )}
+            {editorViewMode === 'editable' && docxStatus === 'ready' && !!docxFileUrl && (
+              <Box px={4} py={2} bg="green.50" borderBottom="1px solid" borderColor="gray.200">
+                <HStack justify="space-between" flexWrap="wrap" gap={2}>
+                  <VStack align="start" spacing={0}>
+                    <Text fontSize="xs" fontWeight="700" color="green.700">
+                      DOCX conversion ready
+                    </Text>
+                    <Text fontSize="xs" color="green.700">
+                      Download and open in Word to compare raw conversion vs editor rendering.
+                    </Text>
+                  </VStack>
+                  <HStack spacing={2}>
+                    <Button
+                      size="xs"
+                      colorScheme="green"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const fileId = selectedFile?._id || session?.fileId;
+                          if (!fileId) return;
+                          const blob = await fileService.downloadDocx(fileId);
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `converted_${fileId}.docx`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          URL.revokeObjectURL(url);
+                          console.log('[DOCX-Pipeline][UI] download-docx', { fileId });
+                        } catch (e) {
+                          console.warn('[DOCX-Pipeline][UI] download-docx-failed', { error: e?.message || String(e) });
+                          toast({ title: 'DOCX download failed', status: 'error', duration: 2500 });
+                        }
+                      }}
+                    >
+                      Download Converted DOCX
                     </Button>
                   </HStack>
                 </HStack>
@@ -4285,7 +4532,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 },
               }}
             >
-              {editorViewMode === 'fidelity' && hasFidelityLayout ? (
+              {false ? (
                 <VStack align="stretch" spacing={6} p={4}>
                   {/* ── Fidelity: Select-All toolbar ───────────────────────── */}
                   <HStack
@@ -4460,12 +4707,12 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                             transformOrigin="top left"
                           >
                             {(!pdfPageCount || pageNumber <= pdfPageCount) ? (
-                              <PdfPageCanvas
+                          <PdfPageCanvas
                                 pdfUrl={appliedFidelityPdfUrl || pdfCanvasUrl}
-                                pageNumber={pageNumber}
-                                targetWidthPx={pageWidth}
-                                fileId={selectedFile?._id || session?.fileId}
-                              />
+                            pageNumber={pageNumber}
+                            targetWidthPx={pageWidth}
+                            fileId={selectedFile?._id || session?.fileId}
+                          />
                             ) : (
                               <Box position="absolute" inset="0" bg="white" />
                             )}
@@ -4793,12 +5040,12 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                     setSelectedFidelityBlockIds([blockKey]);
                                   }
                                   setSelectedFidelityBlock({
-                                    id: blockKey,
-                                    page: pageNumber,
+                                  id: blockKey,
+                                  page: pageNumber,
                                     bbox: block?.bbox || [x1, y1, x1 + width, y1 + height],
-                                    role: block?.role || 'body',
-                                    confidence: block?.confidence ?? null,
-                                    type: block?.type || 'line',
+                                  role: block?.role || 'body',
+                                  confidence: block?.confidence ?? null,
+                                  type: block?.type || 'line',
                                   });
                                 }}
                                 zIndex={2}
@@ -4880,12 +5127,12 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                         Drag
                                       </Box>
                                     )}
-                                    <Textarea
-                                      variant="unstyled"
-                                      resize="none"
+                                  <Textarea
+                                    variant="unstyled"
+                                    resize="none"
                                       wrap={isLineLikeBlock ? 'off' : 'soft'}
-                                      value={text}
-                                      placeholder={hasManualEdit ? '' : ''}
+                                    value={text}
+                                    placeholder={hasManualEdit ? '' : ''}
                                       minH={`${Math.max(height, resolvedLineHeightPx + 2)}px`}
                                       ref={(el) => {
                                         if (!el) return;
@@ -4897,23 +5144,23 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                                         el.style.height = 'auto';
                                         el.style.height = `${el.scrollHeight}px`;
                                       }}
-                                      onFocus={() => {
-                                        if (!hasManualEdit) {
+                                    onFocus={() => {
+                                      if (!hasManualEdit) {
                                           setFidelityEdits((prev) => ({
                                             ...prev,
                                             [blockKey]: buildFidelityEditPayload(block, originalText),
                                           }));
-                                        }
-                                      }}
-                                      onChange={(e) => {
-                                        const next = e.target.value;
+                                      }
+                                    }}
+                                    onChange={(e) => {
+                                      const next = e.target.value;
                                         pushFidelityUndoSnapshot(fidelityEdits);
                                         setFidelityEdits((prev) => ({
                                           ...prev,
                                           [blockKey]: buildFidelityEditPayload(block, next),
                                         }));
-                                        setHasUnsavedChanges(true);
-                                      }}
+                                      setHasUnsavedChanges(true);
+                                    }}
                                       sx={{
                                         width: '100%',
                                         fontFamily: 'inherit',
@@ -4949,7 +5196,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 </VStack>
               ) : (
                 <>
-                  {editorViewMode === 'editable' && pdfPageCount > 0 && (
+                  {editorViewMode === 'editable' && pdfPageCount > 0 && showEditablePdfPreview && (
                     <Box mb={3} border="1px solid" borderColor="gray.200" borderRadius="md" bg="white" p={2}>
                       <Text fontSize="xs" color="gray.600" fontWeight="600" mb={2}>PDF preview (all pages)</Text>
                       <VStack align="stretch" spacing={3}>
@@ -4969,7 +5216,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </VStack>
                     </Box>
                   )}
-                  <EditorContent editor={editor} />
+                  {USE_ONLYOFFICE_EDITABLE
+                    ? <OnlyOfficeEditor fileId={selectedFile?._id || session?.fileId} />
+                    : <EditorContent editor={editor} />}
                 </>
               )}
             </Box>
