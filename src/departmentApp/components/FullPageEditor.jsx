@@ -1350,6 +1350,7 @@ const FullPageEditor = ({
   const [selectedText, setSelectedText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isOnlyOfficeSyncing, setIsOnlyOfficeSyncing] = useState(false);
+  const [onlyOfficeCallbackWritable, setOnlyOfficeCallbackWritable] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
   const [onlyOfficeRefreshKey, setOnlyOfficeRefreshKey] = useState(0);
@@ -3220,6 +3221,11 @@ const FullPageEditor = ({
 
 const strictPlacementTypes = new Set(['precedence_apply', 'compliance_fix', 'missing_clause', 'insert_clause']);
 
+const handleOnlyOfficeConfigLoaded = useCallback((cfg) => {
+  if (!cfg || typeof cfg.callbackWriteEnabled !== 'boolean') return;
+  setOnlyOfficeCallbackWritable(cfg.callbackWriteEnabled);
+}, []);
+
 const handleApplySuggestion = async (suggestion) => {
     try {
       console.log('[APPLY][DEBUG] handleApplySuggestion start', { 
@@ -3268,6 +3274,16 @@ const handleApplySuggestion = async (suggestion) => {
           description: 'Could not insert suggestion. Please retry once the editor is fully loaded.',
           status: 'warning',
           duration: 3000,
+        });
+        return;
+      }
+
+      if (editorViewMode === 'editable' && onlyOfficeCallbackWritable === false) {
+        toast({
+          title: 'OnlyOffice save pipeline unavailable',
+          description: 'Suggestion application is blocked because callback persistence is disabled on the server. Re-enable callback writes and retry.',
+          status: 'warning',
+          duration: 4000,
         });
         return;
       }
@@ -5600,7 +5616,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </VStack>
                     </Box>
                   )}
-                  <OnlyOfficeEditor ref={onlyOfficeRef} fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} />
+                  <OnlyOfficeEditor ref={onlyOfficeRef} fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} onConfigLoaded={handleOnlyOfficeConfigLoaded} />
                 </>
               )}
             </Box>

@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
 import fileService from '../services/fileService';
 
-const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
+const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoaded = null }, ref) => {
   const wrapperRef = useRef(null);
   const holderRef = useRef(null);
   const editorRef = useRef(null);
@@ -253,6 +253,9 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
               }
               const next = await fetchConfigWhenReady();
               if (cancelled || !next || next.pending) return;
+              if (typeof onConfigLoaded === 'function') {
+                try { onConfigLoaded(next); } catch (_) {}
+              }
               clearInterval(pollTimer);
               await mountEditor(next);
             } catch (pollErr) {
@@ -264,6 +267,10 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
             }
           }, 1500);
           return;
+        }
+
+        if (typeof onConfigLoaded === 'function') {
+          try { onConfigLoaded(cfgRes); } catch (_) {}
         }
 
         await mountEditor(cfgRes);
@@ -279,7 +286,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
       if (pollTimer) clearInterval(pollTimer);
       safeDestroyEditor('cleanup');
     };
-  }, [fileId, holderId, refreshKey, internalRefreshKey]);
+  }, [fileId, holderId, refreshKey, internalRefreshKey, onConfigLoaded]);
 
   if (error) {
     return (
