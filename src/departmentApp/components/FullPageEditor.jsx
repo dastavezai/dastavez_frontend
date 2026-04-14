@@ -3296,6 +3296,38 @@ const FullPageEditor = ({
         return;
       }
 
+      // If local editor snapshot is stale/partial compared to server DOCX, rehydrate before applying.
+      const fileIdForHydration = selectedFile?._id || session?.fileId;
+      if (editorViewMode === 'editable' && fileIdForHydration) {
+        try {
+          const st = await fileService.getDocxStatus(fileIdForHydration);
+          const serverTextLen = String(st?.docxHtml || '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .length;
+          const localTextLen = String(editor.getText() || '').trim().length;
+          const serverHtml = String(st?.docxHtml || '').trim();
+
+          if (serverHtml && serverTextLen > 800 && localTextLen < Math.max(180, Math.floor(serverTextLen * 0.35))) {
+            console.warn('[APPLY][FRONTEND] rehydrating-editor-from-server-docx', {
+              traceId: applyTraceId,
+              fileId: fileIdForHydration,
+              localTextLen,
+              serverTextLen,
+            });
+            editor.commands.setContent(serverHtml);
+            setDocxHtmlState(serverHtml);
+            if (st?.docxFileUrl) setDocxFileUrlState(st.docxFileUrl);
+          }
+        } catch (rehydrateErr) {
+          console.warn('[APPLY][FRONTEND] rehydrate-check-failed', {
+            traceId: applyTraceId,
+            message: rehydrateErr?.message || String(rehydrateErr),
+          });
+        }
+      }
+
 
 
       const AI_DRIVEN_TYPES = new Set([
@@ -3381,6 +3413,7 @@ const FullPageEditor = ({
         if (tokens.length < 2) return null;
 
         const candidates = [];
+        const docSize = editor.state.doc.content.size || 1;
         editor.state.doc.descendants((node, pos) => {
           const isTextBlock = node?.type?.name === 'paragraph' || node?.type?.name === 'heading';
           if (!isTextBlock) return true;
@@ -3395,9 +3428,13 @@ const FullPageEditor = ({
 
           if (anchorType === 'precedence_apply') {
             if (/precedent|precedence|authorit|citation|case law|judgment/.test(low)) score += 3;
+            const isVeryTop = (pos / docSize) < 0.12;
+            const hasStrongHeading = /precedent|precedence|authorit|citation|case law|judgment|grounds|legal basis/.test(low);
+            if (isVeryTop && !hasStrongHeading) score -= 2;
           }
           if (anchorType === 'compliance_fix') {
             if (/compliance|mandatory|required|shall|obligation|penalty/.test(low)) score += 2;
+            if ((pos / docSize) < 0.1 && !/compliance|obligation|mandatory|required/.test(low)) score -= 1;
           }
 
           if (score > 0) {
@@ -3434,6 +3471,11 @@ HINTS: ${(Array.isArray(hints) ? hints : [hints]).map(h => String(h || '').trim(
 PARAGRAPHS (JSON):
 ${JSON.stringify(shortlist)}
 
+PLACEMENT RULES:
+- Do not choose opening/title/intro paragraphs unless they explicitly contain legal precedent/compliance heading keywords.
+- For precedence_apply, prefer sections such as precedents, authorities, case law, legal basis, grounds, or argument blocks.
+- Return the index of the most contextually relevant paragraph, not the first paragraph.
+
 Respond ONLY JSON:
 {"paragraphIndex":<number>}`;
 
@@ -3447,7 +3489,24 @@ Respond ONLY JSON:
           const parsed = JSON.parse(match[0]);
           const idx = Number(parsed?.paragraphIndex);
           if (!Number.isInteger(idx) || idx < 0) return null;
-          const target = blocks.find(b => b.index === idx);
+          let target = blocks.find(b => b.index === idx);
+
+          // Guard against low-quality AI placements at the document start.
+          if (target && (anchorType === 'precedence_apply' || anchorType === 'compliance_fix')) {
+            const isNearTop = target.index <= 1;
+            const targetLow = String(target.text || '').toLowerCase();
+            const hasExpectedHeading = anchorType === 'precedence_apply'
+              ? /precedent|precedence|authorit|citation|case law|judgment|grounds|legal basis/.test(targetLow)
+              : /compliance|obligation|mandatory|required|penalty/.test(targetLow);
+
+            if (isNearTop && !hasExpectedHeading) {
+              const keywordAnchor = findBestKeywordAnchor(hints, anchorType);
+              if (keywordAnchor) return keywordAnchor;
+
+              const laterIndex = Math.floor(blocks.length * 0.62);
+              target = blocks[Math.min(Math.max(laterIndex, 0), blocks.length - 1)];
+            }
+          }
           return target ? { from: target.from, to: target.to } : null;
         } catch (_) {
           return null;
@@ -4114,17 +4173,6 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         if (fileIdForSync) {
           setIsOnlyOfficeSyncing(true);
           try {
-            const serverDocxStatus = await fileService.getDocxStatus(fileIdForSync).catch(() => null);
-            const prevServerTextLen = String(serverDocxStatus?.docxHtml || '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .length;
-            const nextTextLen = String(editor.getText() || '').trim().length;
-            if (prevServerTextLen > 800 && nextTextLen < Math.max(180, Math.floor(prevServerTextLen * 0.35))) {
-              throw new Error('Sync blocked to prevent replacing document with partial content. Please reload and apply again.');
-            }
-
             console.info('[SYNC][FRONTEND] start', {
               traceId: applyTraceId,
               fileId: fileIdForSync,
@@ -4135,6 +4183,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               traceId: applyTraceId,
               suggestionType: suggestion?.type || '',
               suggestionId: suggestion?.suggestionId || '',
+              forceSuggestionSync: true,
+              htmlLength: String(editor.getHTML() || '').length,
+              textLength: String(editor.getText() || '').length,
             });
             setOnlyOfficeRefreshKey(prev => prev + 1);
             toastDesc = `${toastDesc}. Synced to OnlyOffice`;
