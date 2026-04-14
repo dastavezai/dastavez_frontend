@@ -1301,6 +1301,7 @@ const FullPageEditor = ({
 }) => {
 
   const aiHelperRef = useRef(null);
+  const onlyOfficeRef = useRef(null);
 
   const [leftTabIndex, setLeftTabIndex] = useState(0);
 
@@ -1635,8 +1636,13 @@ const FullPageEditor = ({
     if (!isPdfFile || editorViewMode !== 'editable') return;
     const fileId = selectedFile?._id || session?.fileId || null;
     if (!fileId) return;
-    const hasReadyPayload = String(docxHtmlState || '').trim().length > 100 && String(docxFileUrlState || '').trim().length > 0;
-    if (docxStatus === 'pending' || hasReadyPayload) return;
+    
+    const currentHtml = docxHtmlState || scanData?.docxHtml || session?.docxHtml || '';
+    const currentUrl = docxFileUrlState || scanData?.docxFileUrl || session?.docxFileUrl || '';
+    const currentStatus = (docxStatus && docxStatus !== 'none') ? docxStatus : (scanData?.docxStatus || session?.docxStatus || 'none');
+    
+    const hasReadyPayload = currentHtml.trim().length > 100 && currentUrl.trim().length > 0;
+    if (currentStatus === 'pending' || currentStatus === 'ready' || hasReadyPayload) return;
     let cancelled = false;
     (async () => {
       try {
@@ -4202,10 +4208,21 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               suggestionType: suggestion?.type || '',
               suggestionId: suggestion?.suggestionId || '',
               forceSuggestionSync: true,
+              originalText: suggestion?.originalText || '',
+              suggestedText: suggestion?.suggestedText || '',
               htmlLength: String(htmlForSync || '').length,
               textLength: String(editor.getText() || '').length,
             });
-            setOnlyOfficeRefreshKey(prev => prev + 1);
+
+            // If OnlyOffice is open, attempt to reflect the change immediately without a full reload.
+            // Direct insertion preserves layout fidelity and prevents DOM reconciliation crashes.
+            if (onlyOfficeRef.current && isAIDriven && revisedParagraph) {
+              const inserted = onlyOfficeRef.current.insertText(revisedParagraph);
+              if (inserted) {
+                console.info('[APPLY][ONLYOFFICE] direct-insertion-success', { traceId: applyTraceId });
+              }
+            }
+
             toastDesc = `${toastDesc}. Synced to OnlyOffice`;
             console.info('[SYNC][FRONTEND] success', {
               traceId: applyTraceId,
@@ -5533,7 +5550,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </VStack>
                     </Box>
                   )}
-                  <OnlyOfficeEditor fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} />
+                  <OnlyOfficeEditor ref={onlyOfficeRef} fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} />
                 </>
               )}
             </Box>

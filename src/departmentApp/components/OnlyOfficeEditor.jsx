@@ -2,10 +2,11 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
 import fileService from '../services/fileService';
 
-const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
+const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
   const wrapperRef = useRef(null);
   const holderRef = useRef(null);
   const editorRef = useRef(null);
+  const connectorRef = useRef(null);
   const mountSeqRef = useRef(0);
   const frameHeightRef = useRef(860);
   const pollAttemptsRef = useRef(0);
@@ -29,6 +30,7 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
   const safeDestroyEditor = (reason = 'unknown') => {
     const inst = editorRef.current;
     editorRef.current = null;
+    connectorRef.current = null;
     if (!inst?.destroyEditor) return;
     try {
       inst.destroyEditor();
@@ -38,6 +40,29 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
       }
     }
   };
+
+  React.useImperativeHandle(ref, () => ({
+    insertText: (text) => {
+      if (!editorRef.current) return false;
+      try {
+        // Try creating connector if not already exists
+        if (!connectorRef.current && editorRef.current.createConnector) {
+          connectorRef.current = editorRef.current.createConnector();
+        }
+        
+        if (connectorRef.current) {
+          connectorRef.current.executeMethod("PasteText", [text]);
+          return true;
+        }
+        
+        // Fallback for non-connector instances/editions
+        return false;
+      } catch (err) {
+        console.warn('[OnlyOffice][insert-error]', err);
+        return false;
+      }
+    }
+  }));
 
   useEffect(() => {
     frameHeightRef.current = frameHeightPx;
@@ -123,6 +148,10 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
             },
             onDocumentReady: () => {
               console.log('[OnlyOffice][onDocumentReady]');
+              // Initialize connector once ready
+              if (editorRef.current?.createConnector) {
+                connectorRef.current = editorRef.current.createConnector();
+              }
             },
             onAppReady: () => {
               console.log('[OnlyOffice][onAppReady]');
@@ -241,28 +270,37 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
       bg="white"
       overflow="hidden"
     >
-      {loading && (
-        <VStack position="absolute" inset={0} justify="center" align="center" spacing={2} bg="whiteAlpha.900" zIndex={1}>
-          <Spinner />
-          <Text fontSize="sm" color="gray.600">Loading OnlyOffice editor...</Text>
-        </VStack>
-      )}
-      <Box
-        id={holderId}
-        ref={holderRef}
-        w="100%"
-        h="100%"
-        sx={{
-          '& iframe': {
-            width: '100% !important',
-            height: '100% !important',
-            border: '0',
-            display: 'block',
-          },
-        }}
-      />
+      <VStack 
+        position="absolute" 
+        inset={0} 
+        justify="center" 
+        align="center" 
+        spacing={2} 
+        bg="whiteAlpha.900" 
+        zIndex={10}
+        display={loading ? 'flex' : 'none'}
+      >
+        <Spinner />
+        <Text fontSize="sm" color="gray.600">Loading OnlyOffice editor...</Text>
+      </VStack>
+      <Box w="100%" h="100%">
+        <Box
+          id={holderId}
+          ref={holderRef}
+          w="100%"
+          h="100%"
+          sx={{
+            '& iframe': {
+              width: '100% !important',
+              height: '100% !important',
+              border: '0',
+              display: 'block',
+            },
+          }}
+        />
+      </Box>
     </Box>
   );
-};
+});
 
 export default OnlyOfficeEditor;
