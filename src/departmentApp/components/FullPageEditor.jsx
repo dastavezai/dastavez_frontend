@@ -3212,7 +3212,15 @@ const FullPageEditor = ({
   }, [editor]);
 
 
-  const handleApplySuggestion = async (suggestion) => {
+  const AI_DRIVEN_TYPES = new Set([
+  'contradiction_fix', 'outdated_ref', 'compliance_fix',
+  'missing_clause', 'chronology_fix', 'precedence_apply', 'insert_clause',
+  'legal_compliance', 'risk_warning', 'language', 'formatting',
+]);
+
+const strictPlacementTypes = new Set(['precedence_apply', 'compliance_fix', 'missing_clause', 'insert_clause']);
+
+const handleApplySuggestion = async (suggestion) => {
     try {
       if (editorViewMode === 'fidelity') {
         const fidelityApplied = applySuggestionToFidelity(suggestion);
@@ -3366,14 +3374,6 @@ const FullPageEditor = ({
       }
 
 
-
-      const AI_DRIVEN_TYPES = new Set([
-        'contradiction_fix', 'outdated_ref', 'compliance_fix',
-        'missing_clause', 'chronology_fix', 'precedence_apply', 'insert_clause',
-
-        'legal_compliance', 'risk_warning', 'language', 'formatting',
-      ]);
-      const isAIDriven = AI_DRIVEN_TYPES.has(suggestion.type);
 
 
       const normalizeForSearch = (text) => text
@@ -3675,7 +3675,8 @@ Respond ONLY in JSON (no preamble, no markdown fences):
 
               const aiRes = await fileService.aiChatAboutDocument(aiPrompt, plainText.substring(0, 500), [], language || 'en');
               const responseText = (aiRes?.response || '').trim();
-              let originalParagraph = '', revisedParagraph = suggestion.suggestedText;
+              originalParagraph = '';
+              revisedParagraph = suggestion.suggestedText;
               try {
                 const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
                 if (jsonMatch) {
@@ -3972,7 +3973,6 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
               }
 
               if (!applied) {
-                const strictPlacementTypes = new Set(['precedence_apply', 'compliance_fix', 'missing_clause', 'insert_clause']);
                 if (strictPlacementTypes.has(suggestion.type) && revisedParagraph) {
                   const aiAnchor = await findAiAnchorRange([suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle], suggestion.type);
                   if (aiAnchor) {
