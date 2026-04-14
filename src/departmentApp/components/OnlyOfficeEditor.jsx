@@ -120,12 +120,12 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
         if (conn) {
           console.log('[CONNECTOR-TRACE] connection success!', { attempts });
           doApply(conn);
-        } else if (attempts < 30) {
-          if (attempts === 0) console.log('[CONNECTOR-TRACE] connector not yet available, starting polling loop...');
+        } else if (attempts < 100) {
+          if (attempts === 0) console.log('[CONNECTOR-TRACE] connector not yet available, polling up to 15s...');
           attempts++;
           setTimeout(poll, 150);
         } else {
-          console.error('[CONNECTOR-TRACE] poll-timeout: could not establish connection after 30 attempts (4.5s)');
+          console.error('[CONNECTOR-TRACE] poll-timeout: could not establish connection after 100 attempts (15s)');
         }
       };
 
