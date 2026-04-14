@@ -3397,8 +3397,51 @@ const FullPageEditor = ({
         return { from: candidates[0].from, to: candidates[0].to };
       };
 
+      const findAiAnchorRange = async (hints = [], anchorType = '') => {
+        try {
+          const blocks = [];
+          editor.state.doc.descendants((node, pos) => {
+            const isTextBlock = node?.type?.name === 'paragraph' || node?.type?.name === 'heading';
+            if (!isTextBlock) return true;
+            const text = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+            if (!text) return true;
+            blocks.push({ index: blocks.length, from: pos + 1, to: pos + node.nodeSize - 1, text: text.slice(0, 260) });
+            return true;
+          });
 
-      const insertAtLocationOrAppend = (originalParagraph, revisedParagraph, descFound, descAppend, anchorHints = [], anchorType = '') => {
+          if (!blocks.length) return null;
+
+          const shortlist = blocks.slice(0, 180).map(b => ({ index: b.index, text: b.text }));
+          const prompt = `You are a legal insertion planner. Choose the best paragraph index after which the new text should be inserted.
+
+INSERTION TYPE: ${anchorType || 'general'}
+HINTS: ${(Array.isArray(hints) ? hints : [hints]).map(h => String(h || '').trim()).filter(Boolean).join(' | ')}
+
+PARAGRAPHS (JSON):
+${JSON.stringify(shortlist)}
+
+Respond ONLY JSON:
+{"paragraphIndex":<number>}`;
+
+          const aiRes = await Promise.race([
+            fileService.aiChatAboutDocument(prompt, editor.getText().substring(0, 500), [], language || 'en'),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('anchor-timeout')), 20000)),
+          ]);
+          const raw = String(aiRes?.response || '').trim();
+          const match = raw.match(/\{[\s\S]*?\}/);
+          if (!match) return null;
+          const parsed = JSON.parse(match[0]);
+          const idx = Number(parsed?.paragraphIndex);
+          if (!Number.isInteger(idx) || idx < 0) return null;
+          const target = blocks.find(b => b.index === idx);
+          return target ? { from: target.from, to: target.to } : null;
+        } catch (_) {
+          return null;
+        }
+      };
+
+
+      const insertAtLocationOrAppend = (originalParagraph, revisedParagraph, descFound, descAppend, anchorHints = [], anchorType = '', allowAppend = true) => {
         const focusAt = (pos) => {
           const p = Math.max(1, Math.min(Number(pos || 1), editor.state.doc.content.size));
           requestAnimationFrame(() => {
@@ -3437,6 +3480,9 @@ const FullPageEditor = ({
           if (anchor) {
             const done = insertHighlightedParagraph(revisedParagraph, anchor.to + 1);
             return { applied: !!done, desc: descFound };
+          }
+          if (!allowAppend) {
+            return { applied: false, desc: 'Could not find a safe insertion point automatically. Please review and insert manually.' };
           }
           const done = insertHighlightedParagraph(revisedParagraph);
           return { applied: !!done, desc: descAppend || 'AI fix appended — review position and adjust if needed' };
@@ -3802,6 +3848,23 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
               }
 
               if (!applied) {
+                const strictPlacementTypes = new Set(['precedence_apply', 'compliance_fix', 'missing_clause', 'insert_clause']);
+                if (strictPlacementTypes.has(suggestion.type) && revisedParagraph) {
+                  const aiAnchor = await findAiAnchorRange([suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle], suggestion.type);
+                  if (aiAnchor) {
+                    const escaped = String(revisedParagraph).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
+                    editor.chain().focus().insertContentAt(aiAnchor.to + 1, insertHtml).run();
+                    editor.commands.setTextSelection({ from: Math.max(1, aiAnchor.to), to: Math.max(1, aiAnchor.to) });
+                    editor.commands.scrollIntoView();
+                    applied = true;
+                    toastDesc = 'AI placed insertion at the most relevant section (highlighted green)';
+                  }
+                }
+
+                if (applied) {
+                  // no-op; handled above
+                } else {
                 const result = insertAtLocationOrAppend(originalParagraph, revisedParagraph,
                   suggestion.type === 'contradiction_fix' ? 'Contradiction resolved with AI (highlighted green)' :
                     suggestion.type === 'outdated_ref' ? 'Reference updated with AI (highlighted green)' :
@@ -3811,9 +3874,11 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                             'AI fix applied (highlighted green)',
                   'AI fix appended — original text not found exactly, review position',
                   [suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle],
-                  suggestion.type);
+                  suggestion.type,
+                  !strictPlacementTypes.has(suggestion.type));
                 applied = result.applied;
                 toastDesc = result.desc;
+                }
               }
             }
 
@@ -3957,8 +4022,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       if (applied) {
         appliedSuggestionsRef.current.add(idKey);
       }
-      // Remove the resolved issue from overview stats — runs unconditionally on every Apply click
-      // so even suggestions with empty suggestedText (marked reviewed) reduce the count
+      if (applied) {
+      // Remove the resolved issue from overview stats only when a real edit was applied.
       setLocalScanArrays(prev => {
         const type = suggestion.type || '';
         const desc = (suggestion.description || '').toLowerCase().trim();
@@ -4016,6 +4081,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         }
         return prev;
       });
+      }
 
       if (applied && editorViewMode === 'editable' && editor) {
         const fileIdForSync = selectedFile?._id || session?.fileId;
@@ -4047,6 +4113,15 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
 
 
       const sid = suggestion.suggestionId;
+      if (!applied) {
+        toast({
+          title: 'Could not auto-insert safely',
+          description: toastDesc || 'No reliable target section found. Suggestion remains pending.',
+          status: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
       if (!sid) {
 
         const tempId = `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -4072,12 +4147,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
     } catch (outerErr) {
 
       console.warn('handleApplySuggestion error:', outerErr.message);
-      const sid = suggestion?.suggestionId;
-      setSuggestions(prev => prev.map(s =>
-        sid ? (s.suggestionId === sid ? { ...s, status: 'applied' } : s)
-          : (s === suggestion ? { ...s, status: 'applied' } : s)
-      ));
-      toast({ title: 'Applied locally', description: 'An unexpected error occurred but change was applied.', status: 'warning', duration: 3000 });
+      toast({ title: 'Apply failed', description: 'No change was committed. Please retry.', status: 'error', duration: 3000 });
     }
   };
 
