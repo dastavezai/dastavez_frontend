@@ -12,9 +12,13 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
   const [frameHeightPx, setFrameHeightPx] = useState(860);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Do not include refreshKey in holderId! 
+  // Changing the key forces React to unmount the Box exactly while DocsAPI is trying to destroy its own iframe,
+  // causing "Failed to execute 'removeChild' on 'Node'" DOM crashes.
   const holderId = useMemo(
-    () => `onlyoffice-holder-${String(fileId || 'file')}-${String(refreshKey || 0)}`,
-    [fileId, refreshKey]
+    () => `onlyoffice-holder-${String(fileId || 'file')}`,
+    [fileId]
   );
 
   const isIgnorableDomMutationError = (err) => {
@@ -244,7 +248,6 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
         </VStack>
       )}
       <Box
-        key={holderId}
         id={holderId}
         ref={holderRef}
         w="100%"
