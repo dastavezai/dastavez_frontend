@@ -1348,6 +1348,7 @@ const FullPageEditor = ({
   const dragStartWidth = useRef(0);
   const [selectedText, setSelectedText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isOnlyOfficeSyncing, setIsOnlyOfficeSyncing] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
   const [onlyOfficeRefreshKey, setOnlyOfficeRefreshKey] = useState(0);
@@ -3949,6 +3950,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       if (applied && editorViewMode === 'editable' && editor) {
         const fileIdForSync = selectedFile?._id || session?.fileId;
         if (fileIdForSync) {
+          setIsOnlyOfficeSyncing(true);
           try {
             await fileService.syncOnlyOfficeDocx(fileIdForSync, editor.getHTML(), editor.getText());
             setOnlyOfficeRefreshKey(prev => prev + 1);
@@ -3956,6 +3958,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           } catch (syncErr) {
             console.warn('OnlyOffice sync failed:', syncErr?.message || syncErr);
             toastDesc = `${toastDesc}. Not yet synced to OnlyOffice`;
+          } finally {
+            setIsOnlyOfficeSyncing(false);
           }
         }
       }
@@ -4066,6 +4070,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   )}
                   {hasUnsavedChanges && <Badge colorScheme="orange" fontSize="2xs">Unsaved</Badge>}
                   {isSaving && <Badge colorScheme="blue" fontSize="2xs">Saving...</Badge>}
+                  {isOnlyOfficeSyncing && <Badge colorScheme="purple" fontSize="2xs">Syncing to OnlyOffice...</Badge>}
                   {lastSaved && !hasUnsavedChanges && !isSaving && (
                     <Badge colorScheme="gray" fontSize="2xs">Saved</Badge>
                   )}
