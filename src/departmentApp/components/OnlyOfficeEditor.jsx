@@ -78,13 +78,13 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
 
         const conn = window.ONLYOFFICE_CONNECTOR || connectorRef.current;
         if (conn) {
-          console.info('[CONNECTOR-TRACE] successful link established!');
+          console.info('[CONNECTOR-TRACE] link established!');
           doApply(conn);
-        } else if (attempts < 20) {
+        } else if (attempts < 25) {
           attempts++;
-          setTimeout(poll, 100);
+          setTimeout(poll, 80);
         } else {
-          console.warn('[CONNECTOR-TRACE] poll-timeout: Direct insertion link failed. Fallback to background only.');
+          // Silent fallback to parent refresh
         }
       };
 

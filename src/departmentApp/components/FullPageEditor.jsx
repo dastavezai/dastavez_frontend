@@ -4238,13 +4238,15 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
             const inserted = onlyOfficeRef.current.insertText(revisedParagraph, anchorText || originalParagraph, action);
             if (inserted) {
-              console.info('[APPLY][SUCCESS] Direct insertion successful. OnlyOffice will auto-save alignment.');
+              console.info('[APPLY][SUCCESS] Direct insertion successful.');
               toastDesc = `${toastDesc}. (Live Sync)`;
             } else {
-              console.warn('[APPLY][WARN] Direct insertion failed to find target.');
+              console.warn('[APPLY][WARN] Direct insertion link failed. Refreshing for layout persistence.');
+              setOnlyOfficeRefreshKey(prev => prev + 1);
             }
           } catch (err) {
             console.error('[APPLY][ERROR] OnlyOffice insertion error:', err);
+            setOnlyOfficeRefreshKey(prev => prev + 1);
           } finally {
             setIsOnlyOfficeSyncing(false);
           }
