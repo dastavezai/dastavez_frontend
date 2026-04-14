@@ -3334,12 +3334,33 @@ const FullPageEditor = ({
 
 
       const insertAtLocationOrAppend = (originalParagraph, revisedParagraph, descFound, descAppend) => {
+        const focusAt = (pos) => {
+          const p = Math.max(1, Math.min(Number(pos || 1), editor.state.doc.content.size));
+          requestAnimationFrame(() => {
+            try {
+              editor.chain().focus().setTextSelection({ from: p, to: p }).scrollIntoView().run();
+            } catch (_) {}
+          });
+        };
+
+        const insertHighlightedParagraph = (text, insertPos = null) => {
+          if (!text) return false;
+          const escaped = String(text)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
+          const pos = typeof insertPos === 'number' ? insertPos : editor.state.doc.content.size;
+          editor.chain().focus().insertContentAt(pos, insertHtml).run();
+          focusAt(pos);
+          return true;
+        };
+
         if (originalParagraph && revisedParagraph) {
           const range = fuzzyFindRange(originalParagraph);
           if (range) {
             editor.chain().focus()
               .insertContentAt({ from: range.from, to: range.to }, revisedParagraph)
               .setTextSelection({ from: range.from, to: range.from + revisedParagraph.length })
+              .scrollIntoView()
               .toggleHighlight({ color: HIGHLIGHT_ADD })
               .run();
             return { applied: true, desc: descFound };
@@ -3347,11 +3368,8 @@ const FullPageEditor = ({
         }
 
         if (revisedParagraph) {
-          const escaped = revisedParagraph
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
-          editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
-          return { applied: true, desc: descAppend || 'AI fix appended — review position and adjust if needed' };
+          const done = insertHighlightedParagraph(revisedParagraph);
+          return { applied: !!done, desc: descAppend || 'AI fix appended — review position and adjust if needed' };
         }
         return { applied: false, desc: 'No text to apply' };
       };
@@ -3385,8 +3403,8 @@ const FullPageEditor = ({
               );
               const enhancePrompt = `You are an expert Indian legal editor. Improve this clause replacement so it is legally precise, contextually appropriate, and well-integrated with the surrounding text.
 
-ORIGINAL CLAUSE: ${suggestion.originalText.substring(0, 500)}
-SUGGESTED REPLACEMENT: ${suggestion.suggestedText.substring(0, 500)}
+ORIGINAL CLAUSE: ${String(suggestion.originalText || '').substring(0, 500)}
+SUGGESTED REPLACEMENT: ${String(suggestion.suggestedText || '').substring(0, 500)}
 SURROUNDING CONTEXT: ${surroundingText.substring(0, 600)}
 SUGGESTION TITLE: ${suggestion.title || ''}
 
@@ -3405,6 +3423,7 @@ Return ONLY the improved replacement text — no explanation, no JSON, no markdo
             editor.chain().focus()
               .insertContentAt({ from: range.from, to: range.to }, finalText)
               .setTextSelection({ from: range.from, to: range.from + finalText.length })
+              .scrollIntoView()
               .toggleHighlight({ color: HIGHLIGHT_ADD })
               .run();
             applied = true;
@@ -3415,8 +3434,8 @@ Return ONLY the improved replacement text — no explanation, no JSON, no markdo
               const plainText = editor.getText();
               const aiPrompt = `You are a legal document editor. Apply this fix to the correct location in the document.
 
-ORIGINAL TEXT (may be approximate): ${suggestion.originalText.substring(0, 500)}
-SUGGESTED FIX: ${suggestion.suggestedText.substring(0, 500)}
+ORIGINAL TEXT (may be approximate): ${String(suggestion.originalText || '').substring(0, 500)}
+SUGGESTED FIX: ${String(suggestion.suggestedText || '').substring(0, 500)}
 TITLE: ${suggestion.title || ''}
 
 FULL DOCUMENT TEXT (up to 6000 chars):
@@ -3452,7 +3471,7 @@ Respond ONLY in JSON (no preamble, no markdown fences):
           setChangeHistory(prev => [...prev, {
             type: 'suggestion',
             instruction: suggestion.instruction || suggestion.title || 'Smart Suggestion',
-            summary: `Replaced: "${suggestion.originalText.substring(0, 50)}..." → "${suggestion.suggestedText.substring(0, 50)}..."`,
+              summary: `Replaced: "${String(suggestion.originalText || '').substring(0, 50)}..." → "${String(suggestion.suggestedText || '').substring(0, 50)}..."`,
             originalText: suggestion.originalText,
             suggestedText: suggestion.suggestedText,
             timestamp: new Date().toISOString(),
@@ -3461,7 +3480,7 @@ Respond ONLY in JSON (no preamble, no markdown fences):
           }]);
 
 
-        } else if (hasSuggested && isAIDriven) {
+        } else if (isAIDriven) {
           try {
             const plainText = editor.getText();
             let llmPrompt;
@@ -3580,7 +3599,7 @@ OR
 ISSUE TYPE: ${suggestion.type}
 TITLE: ${suggestion.title || ''}
 DESCRIPTION: ${suggestion.description || ''}
-SUGGESTED FIX: ${suggestion.suggestedText.substring(0, 500)}
+SUGGESTED FIX: ${String(suggestion.suggestedText || '').substring(0, 500)}
 
 FULL DOCUMENT TEXT (up to 6000 chars):
 ${plainText.substring(0, 6000)}
@@ -3626,6 +3645,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                     const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                     editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
+                    editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
+                    editor.commands.scrollIntoView();
                     applied = true;
                     toastDesc = 'Clause appended — AI could not determine exact position';
                   }
@@ -3637,6 +3658,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                 const escaped = revisedParagraph.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                 editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
+                editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
+                editor.commands.scrollIntoView();
                 applied = true;
                 toastDesc = 'Clause appended (highlighted green)';
               }
@@ -3657,6 +3680,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                       const range = fuzzyFindRange(insertAfter);
                       if (range) {
                         editor.chain().focus().insertContentAt(range.to + 1, insertHtml).run();
+                        editor.commands.setTextSelection({ from: Math.max(1, range.to), to: Math.max(1, range.to) });
+                        editor.commands.scrollIntoView();
                         applied = true;
                         toastDesc = 'AI fix inserted at appropriate location (highlighted green)';
                         revisedParagraph = clauseText;
@@ -3664,6 +3689,8 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                     }
                     if (!applied) {
                       editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
+                      editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
+                      editor.commands.scrollIntoView();
                       applied = true;
                       toastDesc = 'AI fix appended (highlighted green)';
                       revisedParagraph = clauseText;
@@ -3677,17 +3704,27 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                 // For precedence_apply if the AI chose insertAfterParagraph instead
                 if (suggestion.type === 'precedence_apply' && !originalParagraph && parsed && parsed.insertAfterParagraph !== undefined) {
                   const insertAfter = parsed.insertAfterParagraph || '';
-                  const clauseText = parsed.clauseText;
+                  const clauseText = String(parsed.clauseText || revisedParagraph || suggestion.suggestedText || '').trim();
                   const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                   const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                   if (insertAfter) {
                     const range = fuzzyFindRange(insertAfter);
                     if (range) {
                       editor.chain().focus().insertContentAt(range.to + 1, insertHtml).run();
+                      editor.commands.setTextSelection({ from: Math.max(1, range.to), to: Math.max(1, range.to) });
+                      editor.commands.scrollIntoView();
                       applied = true;
                       toastDesc = 'Case citation inserted under specific section (highlighted green)';
                       revisedParagraph = clauseText;
                     }
+                  }
+                  if (!applied && clauseText) {
+                    editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
+                    editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
+                    editor.commands.scrollIntoView();
+                    applied = true;
+                    toastDesc = 'Case citation appended (highlighted green)';
+                    revisedParagraph = clauseText;
                   }
                 }
               } catch (_) {
@@ -3711,7 +3748,7 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
             setChangeHistory(prev => [...prev, {
               type: 'suggestion',
               instruction: suggestion.title || 'AI Resolution',
-              summary: `AI fixed: "${(revisedParagraph || suggestion.suggestedText).substring(0, 80)}…"`,
+              summary: `AI fixed: "${String(revisedParagraph || suggestion.suggestedText || '').substring(0, 80)}…"`,
               originalText: originalParagraph,
               suggestedText: revisedParagraph || suggestion.suggestedText,
               timestamp: new Date().toISOString(),
@@ -3721,10 +3758,14 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
             }]);
           } catch (aiError) {
             console.warn('LLM resolution failed, applying static text:', aiError.message);
-            const escaped = suggestion.suggestedText
+            const fallbackText = String(suggestion.suggestedText || suggestion.description || suggestion.title || 'Review this suggested edit manually')
+              .trim();
+            const escaped = fallbackText
               .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
             editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
+            editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
+            editor.commands.scrollIntoView();
             applied = true;
             toastDesc = 'Suggestion applied (fallback — LLM unavailable)';
           }
@@ -3735,7 +3776,7 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
             const plainText = editor.getText();
             const aiPrompt = `You are a legal document editor. Insert this clause/text into the most appropriate location in the document.
 
-TEXT TO INSERT: ${suggestion.suggestedText.substring(0, 1000)}
+TEXT TO INSERT: ${String(suggestion.suggestedText || '').substring(0, 1000)}
 CONTEXT: ${suggestion.title || ''} — ${suggestion.description || ''}
 
 FULL DOCUMENT (up to 6000 chars):
@@ -3759,6 +3800,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                     const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
                     editor.chain().focus().insertContentAt(range.to + 1, insertHtml).run();
+                    editor.commands.setTextSelection({ from: Math.max(1, range.to), to: Math.max(1, range.to) });
+                    editor.commands.scrollIntoView();
                     clauseInserted = true;
                   }
                 }
@@ -3769,6 +3812,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               const escaped = suggestion.suggestedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
               const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
               editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
+              editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
+              editor.commands.scrollIntoView();
             }
             applied = true;
             toastDesc = clauseInserted ? 'AI placed clause at appropriate location (highlighted)' : 'Clause appended to end of document (highlighted)';
@@ -3777,13 +3822,15 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             const escaped = suggestion.suggestedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
             editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
+            editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
+            editor.commands.scrollIntoView();
             applied = true;
             toastDesc = 'Clause appended (AI unavailable)';
           }
           setChangeHistory(prev => [...prev, {
             type: 'suggestion',
             instruction: suggestion.title || 'Missing Clause Added',
-            summary: `Appended: "${suggestion.suggestedText.substring(0, 80)}..."`,
+            summary: `Appended: "${String(suggestion.suggestedText || '').substring(0, 80)}..."`,
             originalText: '',
             suggestedText: suggestion.suggestedText,
             timestamp: new Date().toISOString(),
@@ -3804,6 +3851,8 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${generatedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 }</mark></p>`;
               editor.chain().focus().insertContentAt(editor.state.doc.content.size, insertHtml).run();
+              editor.commands.setTextSelection({ from: Math.max(1, editor.state.doc.content.size - 5), to: Math.max(1, editor.state.doc.content.size - 5) });
+              editor.commands.scrollIntoView();
               applied = true;
               toastDesc = 'AI-generated clause appended (highlighted in green)';
               setChangeHistory(prev => [...prev, {
