@@ -3239,6 +3239,17 @@ useEffect(() => {
 useEffect(() => {
   if (!pendingCitationPaste) return;
 
+  try {
+    const iframe = document.querySelector('iframe');
+    if (iframe?.contentWindow?.focus) {
+      iframe.contentWindow.focus();
+    } else if (iframe?.focus) {
+      iframe.focus();
+    }
+  } catch (_) {
+    // no-op
+  }
+
   const onKeyDown = (e) => {
     const key = String(e.key || '');
     const isPasteKey = (e.ctrlKey || e.metaKey) && key.toLowerCase() === 'v';
@@ -3274,6 +3285,7 @@ const handleApplySuggestion = async (suggestion) => {
 
       let applied = false;
       let syncSucceeded = true;
+      let manualPastePrepared = false;
       let toastDesc = 'Marked as reviewed';
       const applyTraceId = `apply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       
@@ -4204,6 +4216,137 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         }
       }
 
+      if (applied && editorViewMode === 'editable') {
+        const fileIdForSync = selectedFile?._id || session?.fileId;
+        let directInserted = false;
+        let directInsertAttempted = false;
+
+        // Phase 1 (best effort): direct OnlyOffice bridge insertion for immediate visual feedback.
+        // Phase 2 (authoritative): backend sync from editor HTML to guarantee persistence + alignment.
+        if (onlyOfficeRef.current && revisedParagraph) {
+          directInsertAttempted = true;
+          try {
+            console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
+            const inserted = await onlyOfficeRef.current.insertText(
+              revisedParagraph,
+              anchorText || originalParagraph,
+              action
+            );
+            if (inserted) {
+              directInserted = true;
+              console.info('[APPLY][SUCCESS] Direct insertion dispatched.');
+              toastDesc = `${toastDesc}. Inserted directly in OnlyOffice`;
+            } else {
+              console.warn('[APPLY][WARN] Direct insertion bridge not ready; relying on backend sync.');
+            }
+          } catch (err) {
+            console.error('[APPLY][ERROR] OnlyOffice insertion error:', err);
+          }
+        }
+
+        const skipRegenForCitation = suggestion?.type === 'precedence_apply';
+        if (skipRegenForCitation && directInsertAttempted && !directInserted) {
+          let copied = false;
+          const citationText = String(revisedParagraph || '').trim();
+          if (citationText) {
+            try {
+              await navigator.clipboard.writeText(citationText);
+              copied = true;
+            } catch (_) {
+              try {
+                const ta = document.createElement('textarea');
+                ta.value = citationText;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'absolute';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                copied = document.execCommand('copy');
+                document.body.removeChild(ta);
+              } catch {
+                copied = false;
+              }
+            }
+          }
+
+          syncSucceeded = false;
+          if (copied) {
+            const anchorHint = String(
+              suggestion?.insertAfterParagraph || anchorText || originalParagraph || ''
+            ).trim();
+            let jumped = false;
+            if (anchorHint.length >= 8 && onlyOfficeRef.current?.jumpToAnchor) {
+              try {
+                jumped = !!(await onlyOfficeRef.current.jumpToAnchor(anchorHint));
+              } catch (_) {
+                jumped = false;
+              }
+            }
+            setPendingCitationPaste({
+              text: citationText,
+              anchor: anchorHint.substring(0, 220),
+              jumpTried: anchorHint.length >= 8,
+              jumped,
+            });
+            manualPastePrepared = true;
+          }
+          toastDesc = copied
+            ? 'Citation copied to clipboard. Place cursor where needed in OnlyOffice and paste (Ctrl+V). Suggestion remains pending until re-applied.'
+            : 'Direct insert failed and clipboard copy was blocked. Copy citation manually and paste at the cursor in OnlyOffice.';
+        }
+
+        // If direct insertion worked, avoid full DOCX regeneration to preserve original layout fidelity.
+        if (fileIdForSync && !directInserted && !(skipRegenForCitation && directInsertAttempted)) {
+          setIsOnlyOfficeSyncing(true);
+          try {
+            const rawSyncHtml = String(editor.getHTML() || '');
+            const metadataAlign = String(session?.formatMetadata?.bodyAlignment || '').toLowerCase();
+            const normalizedMetadataAlign = metadataAlign === 'justified' ? 'justify' : metadataAlign;
+            const shouldInjectAlign = /^(left|center|right|justify)$/.test(normalizedMetadataAlign);
+
+            const htmlAligned = shouldInjectAlign
+              ? rawSyncHtml.replace(/<p(?![^>]*text-align)([^>]*)>/gi, `<p style="text-align:${normalizedMetadataAlign};"$1>`)
+              : rawSyncHtml;
+
+            const htmlForSync = String(htmlAligned || '')
+              .replace(/<mark\b[^>]*>/gi, '')
+              .replace(/<\/mark>/gi, '');
+
+            await fileService.syncOnlyOfficeDocx(fileIdForSync, htmlForSync, editor.getText(), {
+              traceId: applyTraceId,
+              suggestionType: suggestion?.type || '',
+              suggestionId: suggestion?.suggestionId || '',
+              forceSuggestionSync: true,
+              htmlLength: String(htmlForSync || '').length,
+              textLength: String(editor.getText() || '').length,
+            });
+
+            setOnlyOfficeRefreshKey(prev => prev + 1);
+            toastDesc = `${toastDesc}. Synced to OnlyOffice`;
+          } catch (syncErr) {
+            syncSucceeded = false;
+            const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Not yet synced to OnlyOffice';
+            toastDesc = `${toastDesc}. ${syncMsg}`;
+            console.warn('[SYNC][FRONTEND] failed', {
+              traceId: applyTraceId,
+              fileId: fileIdForSync,
+              message: syncErr?.message || String(syncErr),
+              status: syncErr?.response?.status || null,
+              data: syncErr?.response?.data || null,
+            });
+          } finally {
+            setIsOnlyOfficeSyncing(false);
+          }
+        }
+      }
+
+      if (applied && !syncSucceeded) {
+        applied = false;
+        console.warn('[APPLY][FRONTEND] not-marked-applied-because-sync-failed', {
+          traceId: applyTraceId,
+          type: suggestion?.type,
+        });
+      }
 
       if (applied) {
         appliedSuggestionsRef.current.add(idKey);
@@ -4269,126 +4412,18 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       });
       }
 
-      if (applied && editorViewMode === 'editable') {
-        const fileIdForSync = selectedFile?._id || session?.fileId;
-        let directInserted = false;
-        let directInsertAttempted = false;
-
-        // Phase 1 (best effort): direct OnlyOffice bridge insertion for immediate visual feedback.
-        // Phase 2 (authoritative): backend sync from editor HTML to guarantee persistence + alignment.
-        if (onlyOfficeRef.current && revisedParagraph) {
-          directInsertAttempted = true;
-          try {
-            console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
-            const inserted = await onlyOfficeRef.current.insertText(
-              revisedParagraph,
-              anchorText || originalParagraph,
-              action
-            );
-            if (inserted) {
-              directInserted = true;
-              console.info('[APPLY][SUCCESS] Direct insertion dispatched.');
-              toastDesc = `${toastDesc}. Inserted directly in OnlyOffice`;
-            } else {
-              console.warn('[APPLY][WARN] Direct insertion bridge not ready; relying on backend sync.');
-            }
-          } catch (err) {
-            console.error('[APPLY][ERROR] OnlyOffice insertion error:', err);
-          }
-        }
-
-        const skipRegenForCitation = suggestion?.type === 'precedence_apply';
-        if (skipRegenForCitation && directInsertAttempted && !directInserted) {
-          let copied = false;
-          const citationText = String(revisedParagraph || '').trim();
-          if (citationText) {
-            try {
-              await navigator.clipboard.writeText(citationText);
-              copied = true;
-            } catch (_) {
-              try {
-                const ta = document.createElement('textarea');
-                ta.value = citationText;
-                ta.setAttribute('readonly', '');
-                ta.style.position = 'absolute';
-                ta.style.left = '-9999px';
-                document.body.appendChild(ta);
-                ta.select();
-                copied = document.execCommand('copy');
-                document.body.removeChild(ta);
-              } catch {
-                copied = false;
-              }
-            }
-          }
-
-          syncSucceeded = false;
-          if (copied) {
-            setPendingCitationPaste({
-              text: citationText,
-              anchor: String(anchorText || originalParagraph || '').trim().substring(0, 180),
-            });
-          }
-          toastDesc = copied
-            ? 'Citation copied to clipboard. Place cursor where needed in OnlyOffice and paste (Ctrl+V). Suggestion remains pending until re-applied.'
-            : 'Direct insert failed and clipboard copy was blocked. Copy citation manually and paste at the cursor in OnlyOffice.';
-        }
-
-        // If direct insertion worked, avoid full DOCX regeneration to preserve original layout fidelity.
-        if (fileIdForSync && !directInserted && !(skipRegenForCitation && directInsertAttempted)) {
-          setIsOnlyOfficeSyncing(true);
-          try {
-            const rawSyncHtml = String(editor.getHTML() || '');
-            const metadataAlign = String(session?.formatMetadata?.bodyAlignment || '').toLowerCase();
-            const normalizedMetadataAlign = metadataAlign === 'justified' ? 'justify' : metadataAlign;
-            const shouldInjectAlign = /^(left|center|right|justify)$/.test(normalizedMetadataAlign);
-
-            const htmlAligned = shouldInjectAlign
-              ? rawSyncHtml.replace(/<p(?![^>]*text-align)([^>]*)>/gi, `<p style="text-align:${normalizedMetadataAlign};"$1>`)
-              : rawSyncHtml;
-
-            const htmlForSync = String(htmlAligned || '')
-              .replace(/<mark\b[^>]*>/gi, '')
-              .replace(/<\/mark>/gi, '');
-
-            await fileService.syncOnlyOfficeDocx(fileIdForSync, htmlForSync, editor.getText(), {
-              traceId: applyTraceId,
-              suggestionType: suggestion?.type || '',
-              suggestionId: suggestion?.suggestionId || '',
-              forceSuggestionSync: true,
-              htmlLength: String(htmlForSync || '').length,
-              textLength: String(editor.getText() || '').length,
-            });
-
-            setOnlyOfficeRefreshKey(prev => prev + 1);
-            toastDesc = `${toastDesc}. Synced to OnlyOffice`;
-          } catch (syncErr) {
-            syncSucceeded = false;
-            const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Not yet synced to OnlyOffice';
-            toastDesc = `${toastDesc}. ${syncMsg}`;
-            console.warn('[SYNC][FRONTEND] failed', {
-              traceId: applyTraceId,
-              fileId: fileIdForSync,
-              message: syncErr?.message || String(syncErr),
-              status: syncErr?.response?.status || null,
-              data: syncErr?.response?.data || null,
-            });
-          } finally {
-            setIsOnlyOfficeSyncing(false);
-          }
-        }
-      }
-
-      if (applied && !syncSucceeded) {
-        applied = false;
-        console.warn('[APPLY][FRONTEND] not-marked-applied-because-sync-failed', {
-          traceId: applyTraceId,
-          type: suggestion?.type,
-        });
-      }
-
       const sid = suggestion.suggestionId;
       if (!applied) {
+        if (manualPastePrepared) {
+          toast({
+            title: 'Citation Ready To Paste',
+            description: 'Instruction: paste citation exactly after the shown target paragraph in OnlyOffice. Press Ctrl+V to paste; any other key cancels paste mode.',
+            status: 'success',
+            duration: 7000,
+            isClosable: true,
+          });
+          return;
+        }
         toast({
           title: 'Could not auto-insert safely',
           description: toastDesc || 'No reliable target section found. Suggestion remains pending.',
@@ -4662,9 +4697,16 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             <HStack justify="space-between" align="start" spacing={3}>
               <VStack align="start" spacing={0}>
                 <Text fontSize="xs" fontWeight="700" color="yellow.800">Citation Paste Mode</Text>
-                <Text fontSize="xs" color="yellow.900">Citation copied. Move cursor to target and press Ctrl+V. Press any other key to cancel.</Text>
+                <Text fontSize="xs" color="yellow.900">
+                  {pendingCitationPaste?.jumped
+                    ? 'Instruction: cursor moved near target. Paste citation exactly there with Ctrl+V. Press any other key to cancel.'
+                    : 'Instruction: move cursor to the target paragraph shown below, then press Ctrl+V to paste citation. Press any other key to cancel.'}
+                </Text>
+                {!!pendingCitationPaste?.jumpTried && !pendingCitationPaste?.jumped && (
+                  <Text fontSize="2xs" color="yellow.800">Auto-jump is unavailable in this session. Follow the target paragraph instruction below.</Text>
+                )}
                 {!!pendingCitationPaste.anchor && (
-                  <Text fontSize="2xs" color="yellow.800" noOfLines={1}>Target hint: {pendingCitationPaste.anchor}</Text>
+                  <Text fontSize="2xs" color="yellow.800" noOfLines={1}>Paste after this paragraph: {pendingCitationPaste.anchor}</Text>
                 )}
               </VStack>
               <HStack spacing={2}>

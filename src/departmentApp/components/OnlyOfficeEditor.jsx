@@ -143,7 +143,41 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
         documentReady: documentReadyRef.current,
       });
       return false;
-    }
+    },
+
+    jumpToAnchor: async (anchorText = '') => {
+      const anchor = String(anchorText || '').trim();
+      if (anchor.length < 8) return false;
+
+      const ready = await waitForEditorReady(12000);
+      if (!ready) return false;
+
+      const conn = await ensureConnector(8000);
+      if (!conn?.executeMethod) return false;
+
+      const candidates = [
+        anchor,
+        anchor.substring(0, 160),
+        anchor.substring(0, 100),
+        anchor.substring(0, 60),
+      ].map((s) => s.trim()).filter((s, idx, arr) => s.length >= 8 && arr.indexOf(s) === idx);
+
+      for (const candidate of candidates) {
+        try {
+          // SearchAndReplace with identical text acts as a no-op update while nudging caret/view to the hit.
+          conn.executeMethod('SearchAndReplace', [{
+            searchString: candidate,
+            replaceString: candidate,
+            isCaseSelected: false,
+            isMatchCase: false,
+          }]);
+          return true;
+        } catch (_) {
+          // try shorter candidate
+        }
+      }
+      return false;
+    },
   }));
 
   useEffect(() => {
