@@ -4208,10 +4208,12 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       if (applied && editorViewMode === 'editable') {
         const fileIdForSync = selectedFile?._id || session?.fileId;
         let directInserted = false;
+        let directInsertAttempted = false;
 
         // Phase 1 (best effort): direct OnlyOffice bridge insertion for immediate visual feedback.
         // Phase 2 (authoritative): backend sync from editor HTML to guarantee persistence + alignment.
         if (onlyOfficeRef.current && revisedParagraph) {
+          directInsertAttempted = true;
           try {
             console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
             const inserted = await onlyOfficeRef.current.insertText(
@@ -4231,8 +4233,14 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
           }
         }
 
+        const skipRegenForCitation = suggestion?.type === 'precedence_apply';
+        if (skipRegenForCitation && directInsertAttempted && !directInserted) {
+          syncSucceeded = false;
+          toastDesc = 'OnlyOffice insertion bridge was not ready. Click inside the document and apply again (no file regeneration performed).';
+        }
+
         // If direct insertion worked, avoid full DOCX regeneration to preserve original layout fidelity.
-        if (fileIdForSync && !directInserted) {
+        if (fileIdForSync && !directInserted && !(skipRegenForCitation && directInsertAttempted)) {
           setIsOnlyOfficeSyncing(true);
           try {
             const rawSyncHtml = String(editor.getHTML() || '');
