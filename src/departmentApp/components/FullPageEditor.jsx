@@ -1352,6 +1352,7 @@ const FullPageEditor = ({
   const [isOnlyOfficeSyncing, setIsOnlyOfficeSyncing] = useState(false);
   const [onlyOfficeCallbackWritable, setOnlyOfficeCallbackWritable] = useState(null);
   const [onlyOfficeEditorReady, setOnlyOfficeEditorReady] = useState(false);
+  const [pendingCitationPaste, setPendingCitationPaste] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
   const [onlyOfficeRefreshKey, setOnlyOfficeRefreshKey] = useState(0);
@@ -3235,6 +3236,34 @@ useEffect(() => {
   setOnlyOfficeEditorReady(false);
 }, [selectedFile?._id, session?.fileId, onlyOfficeRefreshKey]);
 
+useEffect(() => {
+  if (!pendingCitationPaste) return;
+
+  const onKeyDown = (e) => {
+    const key = String(e.key || '');
+    const isPasteKey = (e.ctrlKey || e.metaKey) && key.toLowerCase() === 'v';
+
+    if (isPasteKey) {
+      toast({ title: 'Paste mode confirmed', description: 'Paste at cursor in OnlyOffice.', status: 'success', duration: 1800 });
+      setPendingCitationPaste(null);
+      return;
+    }
+
+    if (key === 'Enter') {
+      toast({ title: 'Insertion point confirmed', description: 'Now press Ctrl+V to paste citation.', status: 'info', duration: 2000 });
+      return;
+    }
+
+    if (['Control', 'Shift', 'Alt', 'Meta', 'Tab'].includes(key)) return;
+
+    setPendingCitationPaste(null);
+    toast({ title: 'Paste mode cancelled', description: 'Apply Principle again when ready.', status: 'warning', duration: 1800 });
+  };
+
+  window.addEventListener('keydown', onKeyDown, true);
+  return () => window.removeEventListener('keydown', onKeyDown, true);
+}, [pendingCitationPaste, toast]);
+
 const handleApplySuggestion = async (suggestion) => {
     try {
       console.log('[APPLY][DEBUG] handleApplySuggestion start', { 
@@ -4270,69 +4299,39 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
 
         const skipRegenForCitation = suggestion?.type === 'precedence_apply';
         if (skipRegenForCitation && directInsertAttempted && !directInserted) {
-          try {
-            // Connector readiness can lag for a few seconds after mount/focus.
-            // Retry a few times before declaring a safe fail for citation apply.
-            for (let retry = 0; retry < 3 && !directInserted; retry += 1) {
-              await new Promise((resolve) => setTimeout(resolve, 550 + (retry * 250)));
-              const retried = await onlyOfficeRef.current?.insertText(
-                revisedParagraph,
-                anchorText || originalParagraph,
-                action
-              );
-              if (retried) {
-                directInserted = true;
-                toastDesc = `${toastDesc}. Inserted directly in OnlyOffice (retry)`;
+          let copied = false;
+          const citationText = String(revisedParagraph || '').trim();
+          if (citationText) {
+            try {
+              await navigator.clipboard.writeText(citationText);
+              copied = true;
+            } catch (_) {
+              try {
+                const ta = document.createElement('textarea');
+                ta.value = citationText;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'absolute';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                copied = document.execCommand('copy');
+                document.body.removeChild(ta);
+              } catch {
+                copied = false;
               }
             }
-          } catch (_) {
-            // no-op
           }
-        }
 
-        if (skipRegenForCitation && directInsertAttempted && !directInserted) {
-          if (fileIdForSync) {
-            setIsOnlyOfficeSyncing(true);
-            try {
-              const citationHtmlForSync = String(editor.getHTML() || '')
-                .replace(/<mark\b[^>]*>/gi, '')
-                .replace(/<\/mark>/gi, '');
-
-              await fileService.syncOnlyOfficeDocx(fileIdForSync, citationHtmlForSync, editor.getText(), {
-                traceId: applyTraceId,
-                suggestionType: suggestion?.type || '',
-                suggestionId: suggestion?.suggestionId || '',
-                forceSuggestionSync: true,
-                allowCitationRegen: false,
-                surgicalOnly: true,
-                originalText: anchorText || originalParagraph || '',
-                suggestedText: revisedParagraph || '',
-                action: action === 'append' ? 'append_after' : 'replace',
-                htmlLength: String(citationHtmlForSync || '').length,
-                textLength: String(editor.getText() || '').length,
-              });
-
-              directInserted = true;
-              setOnlyOfficeRefreshKey(prev => prev + 1);
-              toastDesc = `${toastDesc}. Applied via surgical DOCX patch`;
-            } catch (syncErr) {
-              syncSucceeded = false;
-              const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Citation patch failed';
-              toastDesc = `${toastDesc}. ${syncMsg}`;
-              console.warn('[SYNC][FRONTEND][CITATION-SURGICAL] failed', {
-                traceId: applyTraceId,
-                fileId: fileIdForSync,
-                message: syncErr?.message || String(syncErr),
-                status: syncErr?.response?.status || null,
-                data: syncErr?.response?.data || null,
-              });
-            } finally {
-              setIsOnlyOfficeSyncing(false);
-            }
-          } else {
-            syncSucceeded = false;
-            toastDesc = 'OnlyOffice is still initializing or connector is not ready yet. Click inside the document, wait for full load, and apply again (no file regeneration performed).';
+          syncSucceeded = false;
+          if (copied) {
+            setPendingCitationPaste({
+              text: citationText,
+              anchor: String(anchorText || originalParagraph || '').trim().substring(0, 180),
+            });
           }
+          toastDesc = copied
+            ? 'Citation copied to clipboard. Place cursor where needed in OnlyOffice and paste (Ctrl+V). Suggestion remains pending until re-applied.'
+            : 'Direct insert failed and clipboard copy was blocked. Copy citation manually and paste at the cursor in OnlyOffice.';
         }
 
         // If direct insertion worked, avoid full DOCX regeneration to preserve original layout fidelity.
@@ -4657,6 +4656,38 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             </HStack>
           </HStack>
         </ModalHeader>
+
+        {pendingCitationPaste && (
+          <Box px={4} py={2} bg="yellow.50" borderBottom="1px solid" borderColor="yellow.200">
+            <HStack justify="space-between" align="start" spacing={3}>
+              <VStack align="start" spacing={0}>
+                <Text fontSize="xs" fontWeight="700" color="yellow.800">Citation Paste Mode</Text>
+                <Text fontSize="xs" color="yellow.900">Citation copied. Move cursor to target and press Ctrl+V. Press any other key to cancel.</Text>
+                {!!pendingCitationPaste.anchor && (
+                  <Text fontSize="2xs" color="yellow.800" noOfLines={1}>Target hint: {pendingCitationPaste.anchor}</Text>
+                )}
+              </VStack>
+              <HStack spacing={2}>
+                <Button
+                  size="xs"
+                  colorScheme="yellow"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(String(pendingCitationPaste.text || ''));
+                      toast({ title: 'Citation copied again', status: 'success', duration: 1200 });
+                    } catch {
+                      toast({ title: 'Clipboard blocked', status: 'warning', duration: 1500 });
+                    }
+                  }}
+                >
+                  Copy Again
+                </Button>
+                <Button size="xs" variant="ghost" onClick={() => setPendingCitationPaste(null)}>Cancel</Button>
+              </HStack>
+            </HStack>
+          </Box>
+        )}
 
         {searchVisible && (
           <Box px={4} py={1.5} bg={headerBg} borderBottom="1px solid" borderColor={borderColor}>
