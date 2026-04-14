@@ -6,11 +6,16 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
   const wrapperRef = useRef(null);
   const holderRef = useRef(null);
   const editorRef = useRef(null);
+  const frameHeightRef = useRef(860);
   const pollAttemptsRef = useRef(0);
   const [frameHeightPx, setFrameHeightPx] = useState(860);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const holderId = useMemo(() => `onlyoffice-holder-${String(fileId || 'file')}-${String(refreshKey)}`, [fileId, refreshKey]);
+  const holderId = useMemo(() => `onlyoffice-holder-${String(fileId || 'file')}`, [fileId]);
+
+  useEffect(() => {
+    frameHeightRef.current = frameHeightPx;
+  }, [frameHeightPx]);
 
   useLayoutEffect(() => {
     const updateHeight = () => {
@@ -77,7 +82,7 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
           }
 
           // Do not rely on inherited 100% height; explicit height prevents blank iframe render.
-          config.height = `${frameHeightPx}px`;
+          config.height = `${frameHeightRef.current}px`;
           config.width = '100%';
 
           config.events = {
@@ -103,9 +108,15 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
             try { editorRef.current.destroyEditor(); } catch (_) {}
             editorRef.current = null;
           }
+
+          // Ensure container is empty before a fresh DocsAPI mount.
+          if (holderRef.current) {
+            holderRef.current.innerHTML = '';
+          }
+
           editorRef.current = new window.DocsAPI.DocEditor(holderId, config);
           requestAnimationFrame(() => {
-            const h = `${frameHeightPx}px`;
+            const h = `${frameHeightRef.current}px`;
             const iframe = holderRef.current?.querySelector('iframe');
             if (iframe) {
               iframe.style.height = h;
@@ -173,7 +184,7 @@ const OnlyOfficeEditor = ({ fileId, refreshKey = 0 }) => {
       }
       editorRef.current = null;
     };
-  }, [fileId, holderId, frameHeightPx]);
+  }, [fileId, holderId, refreshKey]);
 
   if (error) {
     return (

@@ -3,13 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "npm@10.9.3",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "npm run build && PORT=${PORT:-8080} npx serve -s dist -l $PORT"
+    "start": "serve -s dist -l ${PORT:-8080}"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
