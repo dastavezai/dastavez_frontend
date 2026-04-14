@@ -4291,8 +4291,48 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         }
 
         if (skipRegenForCitation && directInsertAttempted && !directInserted) {
-          syncSucceeded = false;
-          toastDesc = 'OnlyOffice is still initializing or connector is not ready yet. Click inside the document, wait for full load, and apply again (no file regeneration performed).';
+          if (fileIdForSync) {
+            setIsOnlyOfficeSyncing(true);
+            try {
+              const citationHtmlForSync = String(editor.getHTML() || '')
+                .replace(/<mark\b[^>]*>/gi, '')
+                .replace(/<\/mark>/gi, '');
+
+              await fileService.syncOnlyOfficeDocx(fileIdForSync, citationHtmlForSync, editor.getText(), {
+                traceId: applyTraceId,
+                suggestionType: suggestion?.type || '',
+                suggestionId: suggestion?.suggestionId || '',
+                forceSuggestionSync: true,
+                allowCitationRegen: false,
+                surgicalOnly: true,
+                originalText: anchorText || originalParagraph || '',
+                suggestedText: revisedParagraph || '',
+                action: action === 'append' ? 'append_after' : 'replace',
+                htmlLength: String(citationHtmlForSync || '').length,
+                textLength: String(editor.getText() || '').length,
+              });
+
+              directInserted = true;
+              setOnlyOfficeRefreshKey(prev => prev + 1);
+              toastDesc = `${toastDesc}. Applied via surgical DOCX patch`;
+            } catch (syncErr) {
+              syncSucceeded = false;
+              const syncMsg = syncErr?.response?.data?.error || syncErr?.message || 'Citation patch failed';
+              toastDesc = `${toastDesc}. ${syncMsg}`;
+              console.warn('[SYNC][FRONTEND][CITATION-SURGICAL] failed', {
+                traceId: applyTraceId,
+                fileId: fileIdForSync,
+                message: syncErr?.message || String(syncErr),
+                status: syncErr?.response?.status || null,
+                data: syncErr?.response?.data || null,
+              });
+            } finally {
+              setIsOnlyOfficeSyncing(false);
+            }
+          } else {
+            syncSucceeded = false;
+            toastDesc = 'OnlyOffice is still initializing or connector is not ready yet. Click inside the document, wait for full load, and apply again (no file regeneration performed).';
+          }
         }
 
         // If direct insertion worked, avoid full DOCX regeneration to preserve original layout fidelity.
