@@ -3965,7 +3965,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
   } : { fontSize: '12pt' };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="full" motionPreset="slideInBottom">
+    <Modal isOpen={isOpen} onClose={onClose} size="full" motionPreset="slideInBottom" closeOnEsc={false}>
       <ModalOverlay bg="blackAlpha.800" />
       <ModalContent bg={bgColor} m={0} borderRadius={0} maxH="100vh" h="100vh">
         <ModalHeader bg={headerBg} borderBottom="1px solid" borderColor={borderColor} py={2} px={4}>

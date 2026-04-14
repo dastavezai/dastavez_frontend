@@ -21,6 +21,19 @@ const EditorPage = () => {
     }
   }, [state, navigate]);
 
+  // Temporary guard: disable Escape key behavior on editor page
+  // to avoid unintended modal-close + homepage redirects.
+  useEffect(() => {
+    const blockEscape = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', blockEscape, true);
+    return () => window.removeEventListener('keydown', blockEscape, true);
+  }, []);
+
   useEffect(() => {
     const run = async () => {
       if (!state?.fileId) return;

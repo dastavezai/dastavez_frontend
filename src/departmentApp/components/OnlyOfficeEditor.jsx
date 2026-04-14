@@ -1,14 +1,41 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
 import fileService from '../services/fileService';
 
 const OnlyOfficeEditor = ({ fileId }) => {
+  const wrapperRef = useRef(null);
   const holderRef = useRef(null);
   const editorRef = useRef(null);
   const pollAttemptsRef = useRef(0);
+  const [frameHeightPx, setFrameHeightPx] = useState(860);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const holderId = useMemo(() => `onlyoffice-holder-${String(fileId || 'file')}`, [fileId]);
+
+  useLayoutEffect(() => {
+    const updateHeight = () => {
+      const top = wrapperRef.current?.getBoundingClientRect?.().top ?? 0;
+      const viewport = typeof window !== 'undefined' ? window.innerHeight : 900;
+      const available = Math.round(viewport - top - 16);
+      // Keep a comfortable minimum for legal-document work and avoid oversized jumps.
+      const next = Math.max(700, Math.min(1200, available));
+      setFrameHeightPx(next);
+    };
+
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
+
+  useEffect(() => {
+    const iframe = holderRef.current?.querySelector('iframe');
+    if (!iframe) return;
+    const h = `${frameHeightPx}px`;
+    iframe.style.height = h;
+    iframe.style.minHeight = h;
+    iframe.style.width = '100%';
+    iframe.style.display = 'block';
+  }, [frameHeightPx, holderId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +76,10 @@ const OnlyOfficeEditor = ({ fileId }) => {
             throw new Error('Invalid OnlyOffice configuration from server.');
           }
 
+          // Do not rely on inherited 100% height; explicit height prevents blank iframe render.
+          config.height = `${frameHeightPx}px`;
+          config.width = '100%';
+
           config.events = {
             ...(config.events || {}),
             onError: (event) => {
@@ -73,6 +104,16 @@ const OnlyOfficeEditor = ({ fileId }) => {
             editorRef.current = null;
           }
           editorRef.current = new window.DocsAPI.DocEditor(holderId, config);
+          requestAnimationFrame(() => {
+            const h = `${frameHeightPx}px`;
+            const iframe = holderRef.current?.querySelector('iframe');
+            if (iframe) {
+              iframe.style.height = h;
+              iframe.style.minHeight = h;
+              iframe.style.width = '100%';
+              iframe.style.display = 'block';
+            }
+          });
           setLoading(false);
         };
 
@@ -132,7 +173,7 @@ const OnlyOfficeEditor = ({ fileId }) => {
       }
       editorRef.current = null;
     };
-  }, [fileId, holderId]);
+  }, [fileId, holderId, frameHeightPx]);
 
   if (error) {
     return (
@@ -143,14 +184,37 @@ const OnlyOfficeEditor = ({ fileId }) => {
   }
 
   return (
-    <Box position="relative" minH="70vh" border="1px solid" borderColor="gray.200" borderRadius="md" bg="white" overflow="hidden">
+    <Box
+      ref={wrapperRef}
+      position="relative"
+      h={`${frameHeightPx}px`}
+      minH="700px"
+      border="1px solid"
+      borderColor="gray.200"
+      borderRadius="md"
+      bg="white"
+      overflow="hidden"
+    >
       {loading && (
         <VStack position="absolute" inset={0} justify="center" align="center" spacing={2} bg="whiteAlpha.900" zIndex={1}>
           <Spinner />
           <Text fontSize="sm" color="gray.600">Loading OnlyOffice editor...</Text>
         </VStack>
       )}
-      <Box id={holderId} ref={holderRef} w="100%" h="80vh" />
+      <Box
+        id={holderId}
+        ref={holderRef}
+        w="100%"
+        h="100%"
+        sx={{
+          '& iframe': {
+            width: '100% !important',
+            height: '100% !important',
+            border: '0',
+            display: 'block',
+          },
+        }}
+      />
     </Box>
   );
 };
