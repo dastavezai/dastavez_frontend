@@ -72,7 +72,6 @@ import Subscript from '@tiptap/extension-subscript';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 import fileService from '../services/fileService';
 import DesignSuggestionModal from './DesignSuggestionModal';
-import EditorToolbar from './EditorToolbar';
 import SmartSuggestionsPanel from './SmartSuggestionsPanel';
 import DocumentAnalysisPanel from './DocumentAnalysisPanel';
 import AIHelperPanel from './AIHelperPanel';
@@ -4159,16 +4158,6 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             </HStack>
           </Box>
         )}
-
-        <EditorToolbar
-          data-tour="editor-toolbar"
-          editor={editor}
-          onUndo={editorViewMode === 'fidelity' ? handleFidelityUndo : undefined}
-          onRedo={editorViewMode === 'fidelity' ? handleFidelityRedo : undefined}
-          canUndo={editorViewMode === 'fidelity' ? fidelityUndoStackRef.current.length > 0 : undefined}
-          canRedo={editorViewMode === 'fidelity' ? fidelityRedoStackRef.current.length > 0 : undefined}
-        />
-
 
         <ModalBody p={0} display="flex" flexDirection="row" overflow="hidden" data-editor-flex-row>
           {leftSidebarOpen && (
