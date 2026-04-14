@@ -4235,8 +4235,26 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
 
         const skipRegenForCitation = suggestion?.type === 'precedence_apply';
         if (skipRegenForCitation && directInsertAttempted && !directInserted) {
+          try {
+            // Auto-retry once after a short delay; connector often becomes ready right after document focus settles.
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            const retried = await onlyOfficeRef.current?.insertText(
+              revisedParagraph,
+              anchorText || originalParagraph,
+              action
+            );
+            if (retried) {
+              directInserted = true;
+              toastDesc = `${toastDesc}. Inserted directly in OnlyOffice (retry)`;
+            }
+          } catch (_) {
+            // no-op
+          }
+        }
+
+        if (skipRegenForCitation && directInsertAttempted && !directInserted) {
           syncSucceeded = false;
-          toastDesc = 'OnlyOffice insertion bridge was not ready. Click inside the document and apply again (no file regeneration performed).';
+          toastDesc = 'OnlyOffice insertion bridge was not ready. Auto-retry failed. Click inside the document and apply again (no file regeneration performed).';
         }
 
         // If direct insertion worked, avoid full DOCX regeneration to preserve original layout fidelity.
