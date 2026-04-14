@@ -43,21 +43,27 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
 
   React.useImperativeHandle(ref, () => ({
     insertText: (text, anchorText = '', mode = 'replace') => {
-      if (!editorRef.current) return false;
+      console.log('[CONNECTOR-TRACE] insertText-called', { hasEditor: !!editorRef.current, hasConnector: !!connectorRef.current, mode });
+      if (!editorRef.current) {
+        console.warn('[CONNECTOR-TRACE] aborted: editorRef.current is null');
+        return false;
+      }
       try {
         if (!connectorRef.current && editorRef.current.createConnector) {
+          console.log('[CONNECTOR-TRACE] attempting to createConnector...');
           connectorRef.current = editorRef.current.createConnector();
         }
         
         if (connectorRef.current) {
           if (anchorText && anchorText.length > 5) {
-            console.log(`[OnlyOfficeEditor] Searching for anchor: "${anchorText.substring(0, 60)}..."`);
+            console.log(`[CONNECTOR-TRACE] searching for anchor: "${anchorText.substring(0, 60)}..."`);
             connectorRef.current.executeMethod("Search", [anchorText, true], (result) => {
+              console.log('[CONNECTOR-TRACE] search-result', { count: result?.length || 0 });
               if (mode === 'replace' || !result || result.length === 0) {
-                console.info('[OnlyOfficeEditor] Anchor not found or mode=replace, using PasteText fallback');
+                console.info('[CONNECTOR-TRACE] using PasteText fallback');
                 connectorRef.current.executeMethod("PasteText", [text]);
               } else {
-                console.info(`[OnlyOfficeEditor] Anchor found (${result.length} matches), using callCommand for precise ${mode}`);
+                console.info(`[CONNECTOR-TRACE] using callCommand for ${mode}`);
                 connectorRef.current.callCommand(function(t, a, m) {
                   var oDocument = Api.GetDocument();
                   var oRange = oDocument.GetRangeBySearch(a, true);
@@ -68,7 +74,6 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
                       oDocument.InsertContent([Api.CreateParagraph().AddText(t)], false, oParagraph.GetIndex());
                     } else {
                       var oNewPara = Api.CreateParagraph();
-                      // CLONE LAYOUT PROPERTIES
                       try {
                         var oStyle = oParagraph.GetStyle();
                         if (oStyle) oNewPara.SetStyle(oStyle);
@@ -89,14 +94,15 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0 }, ref) => {
               }
             });
           } else {
-            console.info('[OnlyOfficeEditor] No anchor provided, using PasteText');
+            console.log('[CONNECTOR-TRACE] no anchor, using PasteText directly');
             connectorRef.current.executeMethod("PasteText", [text]);
           }
           return true;
         }
+        console.warn('[CONNECTOR-TRACE] failed to initialize connector');
         return false;
       } catch (err) {
-        console.warn('[OnlyOffice][insert-error]', err);
+        console.warn('[CONNECTOR-TRACE] runtime-error', err);
         return false;
       }
     }

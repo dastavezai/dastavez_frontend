@@ -3502,6 +3502,28 @@ Respond ONLY JSON:
           let target = blocks.find(b => b.index === idx);
 
           // Guard against low-quality AI placements at the document start.
+          // DEEP TRACE FOR ANCHOR SCORING
+          const tiptapBlocks = editor.getJSON().content || [];
+          console.log('[TIPTAP-TRACE] findAiAnchorRange-scoring-start', { blocksCount: tiptapBlocks.length, keywords: anchorKeywords });
+          
+          let bestCandidate = null;
+          let maxScore = -1;
+
+          tiptapBlocks.forEach((block, idx) => {
+            const blockText = (block.content || []).map(c => c.text || '').join('');
+            if (!blockText.trim()) return;
+            const lowText = blockText.toLowerCase();
+            let score = 0;
+            anchorKeywords.forEach(kw => {
+              if (lowText.includes(kw.toLowerCase())) score += 1;
+            });
+            if (score > maxScore) {
+              maxScore = score;
+              bestCandidate = { idx, text: blockText, score };
+            }
+          });
+          console.log('[TIPTAP-TRACE] anchor-best-match', bestCandidate);
+
           if (target && (anchorType === 'precedence_apply' || anchorType === 'compliance_fix')) {
             const isNearTop = target.index <= 1;
             const targetLow = String(target.text || '').toLowerCase();
@@ -4234,7 +4256,14 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               refExists: !!onlyOfficeRef.current 
             });
 
-            await fileService.syncOnlyOfficeDocx(fileIdForSync, htmlForSync, editor.getText(), {
+            console.log('[SYNC-TRACE] sending-to-backend', { 
+              type: suggestion?.type,
+              htmlPreview: htmlForSync?.substring(0, 100),
+              anchorText: anchorText?.substring(0, 50),
+              suggestedText: revisedParagraph?.substring(0, 50)
+            });
+
+            const syncResult = await fileService.syncOnlyOfficeDocx(fileIdForSync, htmlForSync, editor.getText(), {
               traceId: applyTraceId,
               suggestionType: suggestion?.type || '',
               suggestionId: suggestion?.suggestionId || '',
@@ -4256,10 +4285,12 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               if (inserted) {
                 console.info('[APPLY][ONLYOFFICE] direct-insertion-success', { traceId: applyTraceId });
               } else {
-                console.warn('[APPLY][ONLYOFFICE] direct-insertion-failed-ref-init-error');
+                console.warn('[APPLY][ONLYOFFICE] direct-insertion-failed, forcing session reload...');
+                setOnlyOfficeRefreshKey(prev => prev + 1);
               }
-            } else {
-              console.warn('[APPLY][DEBUG] skipped-onlyoffice-connector-ref-missing');
+            } else if (revisedParagraph) {
+              console.warn('[APPLY][DEBUG] onlyOfficeRef missing, forcing background reload...');
+              setOnlyOfficeRefreshKey(prev => prev + 1);
             }
 
             console.log('[APPLY][DEBUG] sync-success', { 
