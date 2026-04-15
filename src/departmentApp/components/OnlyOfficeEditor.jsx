@@ -191,6 +191,26 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
       return false;
     },
 
+    replaceText: async (searchString, replaceString) => {
+      const ready = await waitForEditorReady(25000);
+      if (!ready) return false;
+
+      const conn = await ensureConnector(15000);
+      if (!conn?.executeMethod) return false;
+
+      try {
+        conn.executeMethod('SearchAndReplace', [{
+          searchString: String(searchString || ''),
+          replaceString: String(replaceString || ''),
+          matchCase: false,
+        }]);
+        return true;
+      } catch (err) {
+        console.error('[CONNECTOR-TRACE] replaceText failed:', err);
+        return false;
+      }
+    },
+
     jumpToAnchor: async (anchorText = '') => {
       const anchor = String(anchorText || '').trim();
       if (anchor.length < 8) return false;

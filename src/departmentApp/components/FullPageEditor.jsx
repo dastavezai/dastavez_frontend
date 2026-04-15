@@ -1314,32 +1314,6 @@ const FullPageEditor = ({
     setLeftTabIndex(1);
   }, []);
 
-  const sendCitationPromptToAssistant = useCallback((suggestion, citationText, targetAnchor, sectionLabel) => {
-    const citation = String(citationText || '').trim();
-    if (!citation) return false;
-
-    const target = String(targetAnchor || '').trim();
-    const section = String(sectionLabel || deriveSectionLabel(target) || 'relevant section').trim();
-    const prompt = [
-      'You are helping place a legal citation into the document.',
-      'Use the exact citation text below without rewriting it.',
-      `Target placement: ${section}${target ? ` after paragraph starting with "${shortenAnchorPhrase(target)}"` : ''}.`,
-      `Citation text:\n${citation}`,
-      '',
-      'Return a short placement instruction or a clean copy-ready insertion block. Do not add commentary unless necessary.'
-    ].join('\n');
-
-    aiHelperRef.current?.sendPrompt?.(prompt);
-    setLeftTabIndex(1);
-    toast({
-      title: 'Citation sent to AI Helper',
-      description: suggestion?.caseName ? `Prompted chatbot for ${suggestion.caseName}` : 'Prompted chatbot with the citation text.',
-      status: 'info',
-      duration: 2200,
-    });
-    return true;
-  }, []);
-
 
   const [suggestions, setSuggestions] = useState(initialSuggestions || []);
   const [editInstruction, setEditInstruction] = useState('');
@@ -3405,9 +3379,39 @@ const handleTryAnotherPlacement = useCallback(async () => {
   toast({ title: 'Alternate target selected', description: 'Ready to paste.', status: 'success', duration: 1600 });
 }, [pendingCitationPaste, toast]);
 
-const attemptCitationBridgeInsert = useCallback(async (citationText, anchorCandidates = []) => {
+  const attemptCitationBridgeInsert = useCallback(async (citationText, anchorCandidates = [], options = {}) => {
   const text = String(citationText || '').trim();
   if (!text || !onlyOfficeRef.current?.insertText) {
+    return { inserted: false, anchorUsed: '', jumped: false };
+  }
+
+  const preferTokenInsertion = !!options?.preferTokenInsertion;
+
+  if (preferTokenInsertion) {
+    const token = `__DASTAVEZAI_CIT_${Date.now()}_${Math.random().toString(36).slice(2, 8)}__`;
+
+    try {
+      const tokenInserted = await onlyOfficeRef.current.insertText(token, '', 'replace');
+      if (!tokenInserted) {
+        return { inserted: false, anchorUsed: '', jumped: false };
+      }
+
+      if (onlyOfficeRef.current?.replaceText) {
+        const replaced = await onlyOfficeRef.current.replaceText(token, text);
+        if (replaced) {
+          return { inserted: true, anchorUsed: token, jumped: false };
+        }
+      }
+
+      if (onlyOfficeRef.current?.undoLastAction) {
+        try { await onlyOfficeRef.current.undoLastAction(); } catch (_) { }
+      }
+    } catch (_) {
+      if (onlyOfficeRef.current?.undoLastAction) {
+        try { await onlyOfficeRef.current.undoLastAction(); } catch (_) { }
+      }
+    }
+
     return { inserted: false, anchorUsed: '', jumped: false };
   }
 
@@ -3866,7 +3870,8 @@ const handleApplySuggestion = async (suggestion) => {
 
       // If local editor snapshot is stale/partial compared to server DOCX, rehydrate before applying.
       const fileIdForHydration = selectedFile?._id || session?.fileId;
-      if (editorViewMode === 'editable' && fileIdForHydration) {
+      const skipRehydrateForCitation = suggestion.type === 'precedence_apply';
+      if (editorViewMode === 'editable' && fileIdForHydration && !skipRehydrateForCitation) {
         try {
           const st = await fileService.getDocxStatus(fileIdForHydration);
           const serverTextLen = String(st?.docxHtml || '')
@@ -4509,8 +4514,38 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   const anchorCandidates = findCitationAnchorCandidates(plainDoc, citationAnchorHint);
                   const bestAnchor = anchorCandidates[0] || citationAnchorHint;
                   const sectionLabel = deriveSectionLabel(bestAnchor);
-                  sendCitationPromptToAssistant(suggestion, revisedParagraph, bestAnchor, sectionLabel);
-                  return;
+                  const shortAnchor = shortenAnchorPhrase(bestAnchor);
+                  let jumped = false;
+
+                  if (bestAnchor.length >= 8 && onlyOfficeRef.current?.jumpToAnchor) {
+                    try {
+                      jumped = !!(await onlyOfficeRef.current.jumpToAnchor(bestAnchor));
+                    } catch (_) {
+                      jumped = false;
+                    }
+                  }
+
+                  citationInProgressRef.current.add(idKey);
+                  markSuggestionInProgress(suggestion?.suggestionId);
+                  setCitationWizardStep(1);
+                  setPendingCitationPaste({
+                    text: revisedParagraph,
+                    anchor: bestAnchor.substring(0, 220),
+                    shortAnchor,
+                    sectionLabel,
+                    anchorCandidates,
+                    jumpTried: bestAnchor.length >= 8,
+                    jumped,
+                    awaitingManualPaste: false,
+                    idKey,
+                    suggestionId: suggestion?.suggestionId || null,
+                    suggestion,
+                  });
+                  manualPastePrepared = true;
+                  applied = false;
+                  toastDesc = jumped
+                    ? 'Cursor moved to the most relevant section. Paste the citation, then click Confirm Paste.'
+                    : 'Could not jump exactly to the target. Use the target hint, paste the citation, then click Confirm Paste.';
                 } else if (strictPlacementTypes.has(suggestion.type) && revisedParagraph) {
                   const aiAnchor = await findAiAnchorRange([suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle], suggestion.type);
                   if (aiAnchor) {
@@ -4711,15 +4746,21 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
             const citationAnchorHint = String(suggestion?.insertAfterParagraph || anchorText || originalParagraph || '').trim();
             const citationAnchorCandidates = suggestion?.type === 'precedence_apply'
-              ? findCitationAnchorCandidates(String(editor.getText() || ''), citationAnchorHint)
-              : [citationAnchorHint].filter((value) => String(value || '').trim().length >= 8);
-            const inserted = suggestion?.type === 'precedence_apply'
-              ? (await attemptCitationBridgeInsert(revisedParagraph, citationAnchorCandidates)).inserted
-              : await onlyOfficeRef.current.insertText(
+                ? findCitationAnchorCandidates(String(editor.getText() || ''), citationAnchorHint)
+                : [citationAnchorHint].filter((value) => String(value || '').trim().length >= 8);
+              let inserted = false;
+              if (suggestion?.type === 'precedence_apply') {
+                inserted = (await attemptCitationBridgeInsert(revisedParagraph, citationAnchorCandidates, { preferTokenInsertion: true })).inserted;
+                if (!inserted) {
+                  inserted = (await attemptCitationBridgeInsert(revisedParagraph, citationAnchorCandidates)).inserted;
+                }
+              } else {
+                inserted = await onlyOfficeRef.current.insertText(
                 revisedParagraph,
                 anchorText || originalParagraph,
                 action
-              );
+                );
+              }
             if (inserted) {
               directInserted = true;
               console.info('[APPLY][SUCCESS] Direct insertion dispatched.');
@@ -4919,9 +4960,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       if (!applied) {
         if (manualPastePrepared) {
           toast({
-            title: 'Sent to AI Helper',
-            description: 'Open the AI Helper tab to review the citation prompt and continue from there.',
-            status: 'info',
+            title: 'Ready to paste.',
+            description: 'Use the assistant card: go to target, paste, then confirm.',
+            status: 'success',
             duration: 4000,
             isClosable: true,
           });

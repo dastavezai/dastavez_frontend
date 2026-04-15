@@ -90,11 +90,6 @@ const AIHelperPanel = forwardRef(({ selectedText, documentType, language = 'en',
       });
       setTimeout(() => inputRef.current?.focus(), 150);
     },
-    sendPrompt: async (promptText) => {
-      const prompt = String(promptText || '').trim();
-      if (!prompt) return;
-      await sendMessage(prompt);
-    },
   }), []);
 
   const [messages, setMessages] = useState([]);
