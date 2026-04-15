@@ -1314,6 +1314,32 @@ const FullPageEditor = ({
     setLeftTabIndex(1);
   }, []);
 
+  const sendCitationPromptToAssistant = useCallback((suggestion, citationText, targetAnchor, sectionLabel) => {
+    const citation = String(citationText || '').trim();
+    if (!citation) return false;
+
+    const target = String(targetAnchor || '').trim();
+    const section = String(sectionLabel || deriveSectionLabel(target) || 'relevant section').trim();
+    const prompt = [
+      'You are helping place a legal citation into the document.',
+      'Use the exact citation text below without rewriting it.',
+      `Target placement: ${section}${target ? ` after paragraph starting with "${shortenAnchorPhrase(target)}"` : ''}.`,
+      `Citation text:\n${citation}`,
+      '',
+      'Return a short placement instruction or a clean copy-ready insertion block. Do not add commentary unless necessary.'
+    ].join('\n');
+
+    aiHelperRef.current?.sendPrompt?.(prompt);
+    setLeftTabIndex(1);
+    toast({
+      title: 'Citation sent to AI Helper',
+      description: suggestion?.caseName ? `Prompted chatbot for ${suggestion.caseName}` : 'Prompted chatbot with the citation text.',
+      status: 'info',
+      duration: 2200,
+    });
+    return true;
+  }, []);
+
 
   const [suggestions, setSuggestions] = useState(initialSuggestions || []);
   const [editInstruction, setEditInstruction] = useState('');
@@ -4477,7 +4503,15 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
               }
 
               if (!applied) {
-                if (strictPlacementTypes.has(suggestion.type) && revisedParagraph) {
+                if (suggestion.type === 'precedence_apply' && revisedParagraph) {
+                  const citationAnchorHint = String(suggestion?.insertAfterParagraph || anchorText || originalParagraph || '').trim();
+                  const plainDoc = String(editor.getText() || '');
+                  const anchorCandidates = findCitationAnchorCandidates(plainDoc, citationAnchorHint);
+                  const bestAnchor = anchorCandidates[0] || citationAnchorHint;
+                  const sectionLabel = deriveSectionLabel(bestAnchor);
+                  sendCitationPromptToAssistant(suggestion, revisedParagraph, bestAnchor, sectionLabel);
+                  return;
+                } else if (strictPlacementTypes.has(suggestion.type) && revisedParagraph) {
                   const aiAnchor = await findAiAnchorRange([suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle], suggestion.type);
                   if (aiAnchor) {
                     anchorText = aiAnchor.text || suggestion.principle || suggestion.description || '';
@@ -4885,9 +4919,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
       if (!applied) {
         if (manualPastePrepared) {
           toast({
-            title: 'Ready to paste.',
-            description: 'Use the assistant card: go to target, paste, then confirm.',
-            status: 'success',
+            title: 'Sent to AI Helper',
+            description: 'Open the AI Helper tab to review the citation prompt and continue from there.',
+            status: 'info',
             duration: 4000,
             isClosable: true,
           });
