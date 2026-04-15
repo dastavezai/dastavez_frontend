@@ -3379,6 +3379,51 @@ const handleTryAnotherPlacement = useCallback(async () => {
   toast({ title: 'Alternate target selected', description: 'Ready to paste.', status: 'success', duration: 1600 });
 }, [pendingCitationPaste, toast]);
 
+const attemptCitationBridgeInsert = useCallback(async (citationText, anchorCandidates = []) => {
+  const text = String(citationText || '').trim();
+  if (!text || !onlyOfficeRef.current?.insertText) {
+    return { inserted: false, anchorUsed: '', jumped: false };
+  }
+
+  const uniqueCandidates = [];
+  for (const candidate of anchorCandidates) {
+    const value = String(candidate || '').trim();
+    if (value.length < 8) continue;
+    if (!uniqueCandidates.includes(value)) uniqueCandidates.push(value);
+  }
+
+  let jumped = false;
+  for (const candidate of uniqueCandidates) {
+    if (onlyOfficeRef.current?.jumpToAnchor) {
+      try {
+        jumped = !!(await onlyOfficeRef.current.jumpToAnchor(candidate)) || jumped;
+      } catch (_) {
+        // continue to insertion attempt
+      }
+    }
+
+    try {
+      const inserted = await onlyOfficeRef.current.insertText(text, candidate, 'append');
+      if (inserted) {
+        return { inserted: true, anchorUsed: candidate, jumped };
+      }
+    } catch (_) {
+      // try next candidate
+    }
+  }
+
+  try {
+    const inserted = await onlyOfficeRef.current.insertText(text, '', 'append');
+    if (inserted) {
+      return { inserted: true, anchorUsed: '', jumped };
+    }
+  } catch (_) {
+    // final fallback handled by caller
+  }
+
+  return { inserted: false, anchorUsed: '', jumped };
+}, []);
+
 const handleCancelCitationPaste = useCallback(() => {
   if (pendingCitationPaste?.idKey) {
     citationInProgressRef.current.delete(pendingCitationPaste.idKey);
@@ -3421,6 +3466,21 @@ const handleUndoLastCitation = useCallback(async () => {
 const handleConfirmCitationPaste = useCallback(async () => {
   const pending = pendingCitationPaste;
   if (!pending) return;
+
+  const anchorCandidates = Array.isArray(pending.anchorCandidates)
+    ? pending.anchorCandidates
+    : [];
+  const bridgeResult = await attemptCitationBridgeInsert(pending.text, [pending.anchor, ...anchorCandidates]);
+  if (!bridgeResult.inserted) {
+    setCitationWizardStep(2);
+    toast({
+      title: 'Could not place citation automatically',
+      description: 'Move the cursor to the target and paste manually, or try another placement.',
+      status: 'warning',
+      duration: 2600,
+    });
+    return;
+  }
 
   const sid = pending.suggestionId;
   const idKey = pending.idKey;
@@ -3508,8 +3568,13 @@ const handleConfirmCitationPaste = useCallback(async () => {
 
   setPendingCitationPaste(null);
   setCitationWizardStep(1);
-  toast({ title: 'Confirmed. Suggestion applied.', status: 'success', duration: 1900 });
-}, [pendingCitationPaste, selectedFile?._id, toast]);
+  toast({
+    title: 'Citation inserted',
+    description: bridgeResult.anchorUsed ? `Placed near ${deriveSectionLabel(bridgeResult.anchorUsed)}` : 'Placed in the document using the connector.',
+    status: 'success',
+    duration: 2200,
+  });
+}, [attemptCitationBridgeInsert, pendingCitationPaste, selectedFile?._id, toast]);
 
 useEffect(() => {
   setOnlyOfficeEditorReady(false);
@@ -4494,21 +4559,24 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
         const fileIdForSync = selectedFile?._id || session?.fileId;
         let directInserted = false;
         let directInsertAttempted = false;
-        const citationManualFirst = suggestion?.type === 'precedence_apply';
 
         // Phase 1 (best effort): direct OnlyOffice bridge insertion for immediate visual feedback.
         // Phase 2 (authoritative): backend sync from editor HTML to guarantee persistence + alignment.
-        if (citationManualFirst) {
-          directInsertAttempted = true;
-        } else if (onlyOfficeRef.current && revisedParagraph) {
+        if (onlyOfficeRef.current && revisedParagraph) {
           directInsertAttempted = true;
           try {
             console.log('[APPLY][DIRECT] typing into OnlyOffice editor...', { action });
-            const inserted = await onlyOfficeRef.current.insertText(
-              revisedParagraph,
-              anchorText || originalParagraph,
-              action
-            );
+            const citationAnchorHint = String(suggestion?.insertAfterParagraph || anchorText || originalParagraph || '').trim();
+            const citationAnchorCandidates = suggestion?.type === 'precedence_apply'
+              ? findCitationAnchorCandidates(String(editor.getText() || ''), citationAnchorHint)
+              : [citationAnchorHint].filter((value) => String(value || '').trim().length >= 8);
+            const inserted = suggestion?.type === 'precedence_apply'
+              ? (await attemptCitationBridgeInsert(revisedParagraph, citationAnchorCandidates)).inserted
+              : await onlyOfficeRef.current.insertText(
+                revisedParagraph,
+                anchorText || originalParagraph,
+                action
+              );
             if (inserted) {
               directInserted = true;
               console.info('[APPLY][SUCCESS] Direct insertion dispatched.');
