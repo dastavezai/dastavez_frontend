@@ -1355,6 +1355,7 @@ const FullPageEditor = ({
   const [pendingCitationPaste, setPendingCitationPaste] = useState(null);
   const [showCitationTour, setShowCitationTour] = useState(false);
   const [citationWizardStep, setCitationWizardStep] = useState(1);
+  const [citationTargetQuery, setCitationTargetQuery] = useState('');
   const [lastConfirmedCitation, setLastConfirmedCitation] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [editorViewMode, setEditorViewMode] = useState('editable');
@@ -3323,8 +3324,13 @@ const handleCitationCopyAgain = useCallback(async () => {
   }
 }, [pendingCitationPaste, toast]);
 
+useEffect(() => {
+  if (!pendingCitationPaste) return;
+  setCitationTargetQuery(String(pendingCitationPaste?.targetSearchText || pendingCitationPaste?.anchor || '').trim());
+}, [pendingCitationPaste?.idKey]);
+
 const handleCitationGoToTarget = useCallback(async () => {
-  const anchor = String(pendingCitationPaste?.anchor || '').trim();
+  const anchor = String(citationTargetQuery || pendingCitationPaste?.targetSearchText || pendingCitationPaste?.anchor || '').trim();
   if (!anchor) {
     toast({ title: 'Target is ready. Scroll to it in document.', status: 'info', duration: 1400 });
     setCitationWizardStep((step) => Math.max(step, 2));
@@ -3340,11 +3346,11 @@ const handleCitationGoToTarget = useCallback(async () => {
   }
   setCitationWizardStep((step) => Math.max(step, 2));
   toast({
-    title: jumped ? 'Ready to paste.' : 'Move to target section, then paste.',
+    title: jumped ? 'Ready to add citation.' : 'Move to target section, then click Add Citation.',
     status: 'success',
     duration: 1500,
   });
-}, [pendingCitationPaste, toast]);
+}, [citationTargetQuery, pendingCitationPaste, toast]);
 
 const handleTryAnotherPlacement = useCallback(async () => {
   if (!pendingCitationPaste) return;
@@ -3592,33 +3598,31 @@ const handleConfirmCitationPaste = useCallback(async () => {
     return;
   }
 
-  const anchorCandidates = Array.isArray(pending.anchorCandidates)
-    ? pending.anchorCandidates
-    : [];
-  const bridgeResult = await attemptCitationBridgeInsert(pending.text, [pending.anchor, ...anchorCandidates]);
-  if (!bridgeResult.inserted) {
-    const nextAnchor = String(pending.anchor || '').trim();
-    if (nextAnchor && onlyOfficeRef.current?.jumpToAnchor) {
+  if (!pending.awaitingManualPaste) {
+    let insertedAtCursor = false;
+    if (onlyOfficeRef.current?.insertText) {
       try {
-        await onlyOfficeRef.current.jumpToAnchor(nextAnchor);
+        insertedAtCursor = !!(await onlyOfficeRef.current.insertText(pending.text, '', 'replace'));
       } catch (_) {
-        // best effort only
+        insertedAtCursor = false;
       }
     }
 
-    setPendingCitationPaste((prev) => prev ? {
-      ...prev,
-      awaitingManualPaste: true,
-      jumped: true,
-    } : prev);
-    setCitationWizardStep(3);
-    toast({
-      title: 'Cursor moved to target',
-      description: 'Paste the citation with Ctrl+V, then click Mark as pasted.',
-      status: 'info',
-      duration: 2600,
-    });
-    return;
+    if (!insertedAtCursor) {
+      const anchorCandidates = Array.isArray(pending.anchorCandidates)
+        ? pending.anchorCandidates
+        : [];
+      const bridgeResult = await attemptCitationBridgeInsert(pending.text, [citationTargetQuery, pending.anchor, ...anchorCandidates]);
+      if (!bridgeResult.inserted) {
+        toast({
+          title: 'Could not insert citation',
+          description: 'Use Find Target, click into the paragraph, then click Add Citation again.',
+          status: 'warning',
+          duration: 2600,
+        });
+        return;
+      }
+    }
   }
 
   const sid = pending.suggestionId;
@@ -3708,12 +3712,12 @@ const handleConfirmCitationPaste = useCallback(async () => {
   setPendingCitationPaste(null);
   setCitationWizardStep(1);
   toast({
-    title: 'Citation inserted',
-    description: bridgeResult.anchorUsed ? `Placed near ${deriveSectionLabel(bridgeResult.anchorUsed)}` : 'Placed in the document using the connector.',
+    title: pending.awaitingManualPaste ? 'Citation marked as pasted' : 'Citation inserted',
+    description: pending.awaitingManualPaste ? 'Manual paste confirmed.' : 'Added at the current cursor position in OnlyOffice.',
     status: 'success',
     duration: 2200,
   });
-}, [attemptCitationBridgeInsert, pendingCitationPaste, selectedFile?._id, toast]);
+}, [attemptCitationBridgeInsert, citationTargetQuery, pendingCitationPaste, selectedFile?._id, toast]);
 
 useEffect(() => {
   setOnlyOfficeEditorReady(false);
@@ -4531,6 +4535,7 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   setPendingCitationPaste({
                     text: revisedParagraph,
                     anchor: bestAnchor.substring(0, 220),
+                    targetSearchText: bestAnchor,
                     shortAnchor,
                     sectionLabel,
                     anchorCandidates,
@@ -4822,6 +4827,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
             setPendingCitationPaste({
               text: citationText,
               anchor: bestAnchor.substring(0, 220),
+              targetSearchText: bestAnchor,
               shortAnchor,
               sectionLabel,
               anchorCandidates,
@@ -5443,11 +5449,25 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                     </Text>
                   </Box>
 
+                  <Box>
+                    <Text fontSize="11px" fontWeight="600" mb={1} color={useColorModeValue('gray.700', 'gray.100')}>
+                      Search exact target text
+                    </Text>
+                    <Textarea
+                      value={citationTargetQuery}
+                      onChange={(e) => setCitationTargetQuery(e.target.value)}
+                      rows={3}
+                      resize="vertical"
+                      fontSize="11px"
+                      placeholder="Paste or edit the exact paragraph text to search inside the document"
+                    />
+                  </Box>
+
                   <HStack spacing={2} flexWrap="wrap">
                     <Button size="xs" colorScheme="green" onClick={handleCitationCopyAgain}>Copy Again</Button>
-                    <Button size="xs" variant="outline" onClick={handleCitationGoToTarget}>Go To Target</Button>
+                    <Button size="xs" variant="outline" onClick={handleCitationGoToTarget}>Find Target</Button>
                     <Button size="xs" variant="outline" onClick={handleTryAnotherPlacement}>Try Another Placement</Button>
-                    <Button size="xs" colorScheme="blue" onClick={handleConfirmCitationPaste}>{pendingCitationPaste?.awaitingManualPaste ? 'Mark as pasted' : 'Confirm Paste'}</Button>
+                    <Button size="xs" colorScheme="blue" onClick={handleConfirmCitationPaste}>{pendingCitationPaste?.awaitingManualPaste ? 'Mark as pasted' : 'Add Citation'}</Button>
                   </HStack>
 
                   <HStack justify="space-between">
@@ -5458,7 +5478,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   {showCitationTour && (
                     <Box border="1px solid" borderColor="blue.200" bg="blue.50" borderRadius="10px" p={2}>
                       <Text fontSize="11px" color="blue.800" fontWeight="600">Quick tour</Text>
-                      <Text fontSize="10px" color="blue.700">1) Copy again if needed 2) Go to target 3) Paste with Ctrl+V 4) Click {pendingCitationPaste?.awaitingManualPaste ? 'Mark as pasted' : 'Confirm Paste'}.</Text>
+                      <Text fontSize="10px" color="blue.700">1) Copy again if needed 2) Find target 3) Click into the paragraph 4) Click {pendingCitationPaste?.awaitingManualPaste ? 'Mark as pasted' : 'Add Citation'}.</Text>
                       <HStack mt={2}>
                         <Button size="xs" colorScheme="blue" onClick={() => closeCitationTour(true)}>Got it</Button>
                         <Button size="xs" variant="ghost" onClick={() => closeCitationTour(false)}>Later</Button>
