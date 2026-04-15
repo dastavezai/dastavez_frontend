@@ -88,6 +88,48 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
     return null;
   };
 
+  const buildAnchorCandidates = (anchorText = '') => {
+    const raw = String(anchorText || '').replace(/\u00a0/g, ' ').trim();
+    if (!raw) return [];
+
+    const normalized = raw
+      .replace(/^[\s\u2022•·\-*\d.()]+/, '')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const chunks = normalized
+      .split(/(?:\n+|\.|;|:|\?|!|\u2014|\u2013)/)
+      .map((part) => part.replace(/\s+/g, ' ').trim())
+      .filter((part) => part.length >= 8);
+
+    const candidates = [
+      normalized,
+      ...chunks,
+      normalized.substring(0, 220),
+      normalized.substring(0, 160),
+      normalized.substring(0, 120),
+      normalized.substring(0, 80),
+      normalized.substring(0, 60),
+    ]
+      .map((s) => String(s || '').replace(/\s+/g, ' ').trim())
+      .filter((s, idx, arr) => s.length >= 8 && arr.indexOf(s) === idx);
+
+    return candidates;
+  };
+
+  const trySearchAndReplace = (conn, searchString, replaceString) => {
+    if (!conn?.executeMethod) return false;
+    conn.executeMethod('SearchAndReplace', [{
+      searchString,
+      replaceString,
+      isCaseSelected: false,
+      isMatchCase: false,
+    }]);
+    return true;
+  };
+
   React.useImperativeHandle(ref, () => ({
     insertText: async (text, anchorText = '', mode = 'replace') => {
       console.log('[CONNECTOR-TRACE] insertText-called. Searching for connection...');
@@ -107,21 +149,25 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
           return false;
         }
         try {
-          if (anchorText && anchorText.length > 5) {
-            const cleanedAnchor = String(anchorText || '').trim();
-            const cleanedText = String(text || '').trim();
+          const cleanedText = String(text || '').trim();
+          const candidates = buildAnchorCandidates(anchorText);
+          if (candidates.length > 0) {
             const replaceString = mode === 'append'
-              ? `${cleanedAnchor}\n${cleanedText}`
+              ? `${candidates[0]}\n${cleanedText}`
               : cleanedText;
 
-            console.log('[CONNECTOR-TRACE] attempting SearchAndReplace for:', cleanedAnchor.substring(0, 40), { mode });
-            conn.executeMethod('SearchAndReplace', [{
-              searchString: cleanedAnchor,
-              replaceString,
-              isCaseSelected: false,
-              isMatchCase: false,
-            }]);
-          } else {
+            for (const candidate of candidates) {
+              try {
+                console.log('[CONNECTOR-TRACE] attempting SearchAndReplace for:', candidate.substring(0, 40), { mode });
+                trySearchAndReplace(conn, candidate, mode === 'append' ? `${candidate}\n${cleanedText}` : cleanedText);
+                return true;
+              } catch (_) {
+                // try the next candidate
+              }
+            }
+          }
+
+          if (!candidates.length) {
             console.log('[CONNECTOR-TRACE] using PasteText at cursor');
             conn.executeMethod('PasteText', [text]);
           }
@@ -155,22 +201,12 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
       const conn = await ensureConnector(8000);
       if (!conn?.executeMethod) return false;
 
-      const candidates = [
-        anchor,
-        anchor.substring(0, 160),
-        anchor.substring(0, 100),
-        anchor.substring(0, 60),
-      ].map((s) => s.trim()).filter((s, idx, arr) => s.length >= 8 && arr.indexOf(s) === idx);
+      const candidates = buildAnchorCandidates(anchor);
 
       for (const candidate of candidates) {
         try {
           // SearchAndReplace with identical text acts as a no-op update while nudging caret/view to the hit.
-          conn.executeMethod('SearchAndReplace', [{
-            searchString: candidate,
-            replaceString: candidate,
-            isCaseSelected: false,
-            isMatchCase: false,
-          }]);
+          trySearchAndReplace(conn, candidate, candidate);
           return true;
         } catch (_) {
           // try shorter candidate

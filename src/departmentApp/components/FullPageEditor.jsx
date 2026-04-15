@@ -3467,16 +3467,125 @@ const handleConfirmCitationPaste = useCallback(async () => {
   const pending = pendingCitationPaste;
   if (!pending) return;
 
+  if (pending.awaitingManualPaste) {
+    const sid = pending.suggestionId;
+    const idKey = pending.idKey;
+    if (idKey) {
+      appliedSuggestionsRef.current.add(idKey);
+      citationInProgressRef.current.delete(idKey);
+    }
+
+    if (sid) {
+      try {
+        await fileService.updateSuggestionStatus(sid, 'applied', selectedFile?._id);
+      } catch (_) {
+        // Keep optimistic UI even if network fails.
+      }
+      setSuggestions((prev) => prev.map((s) => (s.suggestionId === sid ? { ...s, status: 'applied' } : s)));
+    }
+
+    const confirmedSuggestion = pending.suggestion || null;
+    if (confirmedSuggestion) {
+      setLocalScanArrays(prev => {
+        const type = confirmedSuggestion.type || '';
+        const desc = (confirmedSuggestion.description || '').toLowerCase().trim();
+        const title = (confirmedSuggestion.title || '').toLowerCase();
+        if (type === 'legal_compliance' || type === 'compliance_fix') {
+          return {
+            ...prev, complianceIssues: prev.complianceIssues.filter(c =>
+              (c.description || '').toLowerCase().trim() !== desc &&
+              !title.startsWith('compliance: ' + (c.rule || '').toLowerCase().trim().substring(0, 20))
+            )
+          };
+        }
+        if (type === 'clause_improvement') {
+          return {
+            ...prev, clauseFlaws: prev.clauseFlaws.filter(f =>
+              (f.issue || '').toLowerCase().trim() !== desc
+            )
+          };
+        }
+        if (type === 'missing_clause' || type === 'insert_clause') {
+          return {
+            ...prev, missingClauses: prev.missingClauses.filter(m =>
+              !title.includes((m.clauseType || '').toLowerCase().trim().substring(0, 20))
+            )
+          };
+        }
+        if (type === 'contradiction_fix') {
+          return {
+            ...prev, internalContradictions: prev.internalContradictions.filter(c =>
+              (c.description || '').toLowerCase().trim() !== desc &&
+              !(c.contradiction || '').toLowerCase().includes(desc.substring(0, 40))
+            )
+          };
+        }
+        if (type === 'outdated_ref') {
+          return {
+            ...prev, outdatedReferences: prev.outdatedReferences.filter(o =>
+              (o.description || o.reference || '').toLowerCase().trim() !== desc
+            )
+          };
+        }
+        if (type === 'chronology_fix') {
+          return {
+            ...prev, chronologicalIssues: prev.chronologicalIssues.filter(ci =>
+              (ci.description || '').toLowerCase().trim() !== desc
+            )
+          };
+        }
+        if (type === 'precedence_apply') {
+          return {
+            ...prev, precedenceAnalysis: prev.precedenceAnalysis.filter(p =>
+              (p.caseName || '').toLowerCase() !== (confirmedSuggestion.caseName || '').toLowerCase()
+            )
+          };
+        }
+        return prev;
+      });
+    }
+
+    setLastConfirmedCitation({
+      idKey,
+      suggestionId: sid,
+      suggestionType: pending?.suggestion?.type || 'precedence_apply',
+      confirmedAt: Date.now(),
+    });
+
+    setPendingCitationPaste(null);
+    setCitationWizardStep(1);
+    toast({
+      title: 'Citation marked as pasted',
+      status: 'success',
+      duration: 1800,
+    });
+    return;
+  }
+
   const anchorCandidates = Array.isArray(pending.anchorCandidates)
     ? pending.anchorCandidates
     : [];
   const bridgeResult = await attemptCitationBridgeInsert(pending.text, [pending.anchor, ...anchorCandidates]);
   if (!bridgeResult.inserted) {
-    setCitationWizardStep(2);
+    const nextAnchor = String(pending.anchor || '').trim();
+    if (nextAnchor && onlyOfficeRef.current?.jumpToAnchor) {
+      try {
+        await onlyOfficeRef.current.jumpToAnchor(nextAnchor);
+      } catch (_) {
+        // best effort only
+      }
+    }
+
+    setPendingCitationPaste((prev) => prev ? {
+      ...prev,
+      awaitingManualPaste: true,
+      jumped: true,
+    } : prev);
+    setCitationWizardStep(3);
     toast({
-      title: 'Could not place citation automatically',
-      description: 'Move the cursor to the target and paste manually, or try another placement.',
-      status: 'warning',
+      title: 'Cursor moved to target',
+      description: 'Paste the citation with Ctrl+V, then click Mark as pasted.',
+      status: 'info',
       duration: 2600,
     });
     return;
@@ -4643,6 +4752,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
               anchorCandidates,
               jumpTried: bestAnchor.length >= 8,
               jumped,
+              awaitingManualPaste: false,
               idKey,
               suggestionId: suggestion?.suggestionId || null,
               suggestion,
@@ -5238,7 +5348,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   <HStack justify="space-between" align="start">
                     <Box>
                       <Text fontSize="xs" fontWeight="700">Citation Assistant</Text>
-                      <Text fontSize="11px" color="gray.500">Step {citationWizardStep}/3: {citationWizardStep === 1 ? 'Citation copied' : citationWizardStep === 2 ? 'Go to target' : 'Paste and confirm'}</Text>
+                      <Text fontSize="11px" color="gray.500">Step {citationWizardStep}/3: {pendingCitationPaste?.awaitingManualPaste ? 'Paste and mark complete' : citationWizardStep === 1 ? 'Citation copied' : citationWizardStep === 2 ? 'Go to target' : 'Paste and confirm'}</Text>
                     </Box>
                     <Button size="xs" variant="ghost" onClick={handleCancelCitationPaste}>Cancel</Button>
                   </HStack>
@@ -5262,7 +5372,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                     <Button size="xs" colorScheme="green" onClick={handleCitationCopyAgain}>Copy Again</Button>
                     <Button size="xs" variant="outline" onClick={handleCitationGoToTarget}>Go To Target</Button>
                     <Button size="xs" variant="outline" onClick={handleTryAnotherPlacement}>Try Another Placement</Button>
-                    <Button size="xs" colorScheme="blue" onClick={handleConfirmCitationPaste}>Confirm Paste</Button>
+                    <Button size="xs" colorScheme="blue" onClick={handleConfirmCitationPaste}>{pendingCitationPaste?.awaitingManualPaste ? 'Mark as pasted' : 'Confirm Paste'}</Button>
                   </HStack>
 
                   <HStack justify="space-between">
@@ -5273,7 +5383,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   {showCitationTour && (
                     <Box border="1px solid" borderColor="blue.200" bg="blue.50" borderRadius="10px" p={2}>
                       <Text fontSize="11px" color="blue.800" fontWeight="600">Quick tour</Text>
-                      <Text fontSize="10px" color="blue.700">1) Copy again if needed 2) Go to target 3) Paste with Ctrl+V 4) Click Confirm Paste.</Text>
+                      <Text fontSize="10px" color="blue.700">1) Copy again if needed 2) Go to target 3) Paste with Ctrl+V 4) Click {pendingCitationPaste?.awaitingManualPaste ? 'Mark as pasted' : 'Confirm Paste'}.</Text>
                       <HStack mt={2}>
                         <Button size="xs" colorScheme="blue" onClick={() => closeCitationTour(true)}>Got it</Button>
                         <Button size="xs" variant="ghost" onClick={() => closeCitationTour(false)}>Later</Button>
