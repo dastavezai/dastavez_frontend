@@ -130,6 +130,27 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
     return true;
   };
 
+  const trySearchNext = (conn, searchString) => {
+    if (!conn?.executeMethod) return false;
+
+    try {
+      return conn.executeMethod('SearchNext', [{
+        searchString,
+        matchCase: false,
+      }, true]);
+    } catch (_) {
+      try {
+        return conn.executeMethod('SearchNext', [{
+          searchString,
+          matchCase: false,
+        }]);
+      } catch (err) {
+        console.error('[CONNECTOR-TRACE] SearchNext failed:', err);
+        return false;
+      }
+    }
+  };
+
   React.useImperativeHandle(ref, () => ({
     insertText: async (text, anchorText = '', mode = 'replace') => {
       console.log('[CONNECTOR-TRACE] insertText-called. Searching for connection...');
@@ -225,7 +246,10 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
 
       for (const candidate of candidates) {
         try {
-          // SearchAndReplace with identical text acts as a no-op update while nudging caret/view to the hit.
+          const found = trySearchNext(conn, candidate);
+          if (found) return true;
+
+          // Fallback for builds that do not expose SearchNext reliably.
           trySearchAndReplace(conn, candidate, candidate);
           return true;
         } catch (_) {

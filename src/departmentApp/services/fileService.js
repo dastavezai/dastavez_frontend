@@ -751,8 +751,12 @@ fileService.forgotPasswordRequest = forgotPasswordRequest;
 fileService.verifyResetOTP = verifyResetOTP;
 fileService.resetPassword = resetPassword;
 
-fileService.generateCounterAffidavit = async ({ fileId, petitionText, court, language }) => {
-  const response = await api.post('/api/draft/counter-affidavit', { fileId, petitionText, court, language }, { timeout: 120000 });
+fileService.generateCounterAffidavit = async ({ fileId, petitionText, court, language, createEditableDocument = false }) => {
+  const response = await api.post(
+    '/api/draft/counter-affidavit',
+    { fileId, petitionText, court, language, createEditableDocument },
+    { timeout: 180000 }
+  );
   return response.data;
 };
 

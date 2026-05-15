@@ -67,6 +67,7 @@ const AnalysisDashboard = ({
   onSofExpandToggle,
   sofValue,
   onSofChange,
+  onOpenGeneratedCounter,
 }) => {
   const [deepAnalysis, setDeepAnalysis] = useState(null);
   const [deepLoading, setDeepLoading] = useState(false);
@@ -757,6 +758,8 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
             <CounterAffidavitPanel
               compact={compact}
               currentFileId={currentFileId}
+              extractedParties={extractedParties}
+              onOpenGeneratedCounter={onOpenGeneratedCounter}
             />
           </TabPanel>
         </TabPanels>

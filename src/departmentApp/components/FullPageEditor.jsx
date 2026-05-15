@@ -1328,6 +1328,8 @@ const FullPageEditor = ({
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [dualViewMode, setDualViewMode] = useState(false);
+  const [generatedCounterDoc, setGeneratedCounterDoc] = useState(null);
+  const [activeOnlyOfficeDoc, setActiveOnlyOfficeDoc] = useState('main');
 
   const enterDualView = useCallback(() => {
     setDualViewMode(true);
@@ -3287,6 +3289,25 @@ const handleOnlyOfficeEditorReady = useCallback((ready) => {
   setOnlyOfficeEditorReady(!!ready);
 }, []);
 
+const handleOpenGeneratedCounter = useCallback((payload) => {
+  if (!payload?.editorFileId) return;
+  setGeneratedCounterDoc({
+    fileId: payload.editorFileId,
+    fileName: payload.editorFileName || 'Counter Affidavit.docx',
+    sessionId: payload.editorSessionId || null,
+    fileUrl: payload.editorFileUrl || null,
+    sourceDocumentType: payload.sourceDocumentType || '',
+  });
+  setActiveOnlyOfficeDoc('counter');
+  setOnlyOfficeRefreshKey((prev) => prev + 1);
+  toast({
+    title: 'Counter draft generated',
+    description: 'Use the Main File / Counter Draft buttons to switch documents in OnlyOffice.',
+    status: 'success',
+    duration: 3000,
+  });
+}, [toast]);
+
 const openCitationTourIfFirstTime = useCallback(() => {
   try {
     const key = 'dastavezai_citation_tour_seen_v1';
@@ -5039,6 +5060,13 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
   }, [selectedFile?._id, toast]);
 
   const fileName = session?.fileName || selectedFile?.fileName || 'Untitled';
+  const sourceOnlyOfficeFileId = selectedFile?._id || session?.fileId || null;
+  const currentOnlyOfficeFileId = activeOnlyOfficeDoc === 'counter' && generatedCounterDoc?.fileId
+    ? generatedCounterDoc.fileId
+    : sourceOnlyOfficeFileId;
+  const currentOnlyOfficeLabel = activeOnlyOfficeDoc === 'counter' && generatedCounterDoc?.fileId
+    ? (generatedCounterDoc.fileName || 'Counter Draft')
+    : fileName;
   const plainText = editor?.getText() || '';
   const wordCount = plainText.split(/\s+/).filter(w => w).length;
   const charCount = plainText.length;
@@ -5117,6 +5145,35 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   aria-label="Toggle dual view"
                 />
               </Tooltip>
+              {generatedCounterDoc?.fileId && (
+                <>
+                  <Divider orientation="vertical" h="20px" />
+                  <HStack spacing={1}>
+                    <Button
+                      size="xs"
+                      variant={activeOnlyOfficeDoc === 'main' ? 'solid' : 'outline'}
+                      colorScheme="teal"
+                      onClick={() => {
+                        setActiveOnlyOfficeDoc('main');
+                        setOnlyOfficeRefreshKey((prev) => prev + 1);
+                      }}
+                    >
+                      Main File
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant={activeOnlyOfficeDoc === 'counter' ? 'solid' : 'outline'}
+                      colorScheme="purple"
+                      onClick={() => {
+                        setActiveOnlyOfficeDoc('counter');
+                        setOnlyOfficeRefreshKey((prev) => prev + 1);
+                      }}
+                    >
+                      Counter Draft
+                    </Button>
+                  </HStack>
+                </>
+              )}
 
               <Divider orientation="vertical" h="20px" />
               <HStack spacing={1}>
@@ -6342,7 +6399,16 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </VStack>
                     </Box>
                   )}
-                  <OnlyOfficeEditor ref={onlyOfficeRef} fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} onConfigLoaded={handleOnlyOfficeConfigLoaded} onEditorReady={handleOnlyOfficeEditorReady} />
+                  <VStack align="stretch" spacing={2}>
+                    {generatedCounterDoc?.fileId && (
+                      <Box px={1}>
+                        <Text fontSize="xs" color="gray.600">
+                          Viewing in OnlyOffice: <strong>{currentOnlyOfficeLabel}</strong>
+                        </Text>
+                      </Box>
+                    )}
+                    <OnlyOfficeEditor ref={onlyOfficeRef} fileId={currentOnlyOfficeFileId} refreshKey={onlyOfficeRefreshKey} onConfigLoaded={handleOnlyOfficeConfigLoaded} onEditorReady={handleOnlyOfficeEditorReady} />
+                  </VStack>
                 </>
               )}
             </Box>
@@ -6483,6 +6549,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 editor={editor}
                 currentFileId={selectedFile?._id}
                 documentContext={editor?.getText()?.substring(0, 1500) || ''}
+                onOpenGeneratedCounter={handleOpenGeneratedCounter}
               />
             </Box>
           )}
