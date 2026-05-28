@@ -142,7 +142,7 @@ export const useAutoPageBreak = (editor, enabled = true, pageHeightPx = 1122) =>
     }
 
     const compute = () => {
-      const editorEl = document.querySelector('.tiptap-editor');
+      const editorEl = editor?.view?.dom || document.querySelector('.tiptap-editor');
       if (!editorEl) return;
       const totalH = editorEl.scrollHeight;
       const lines = [];

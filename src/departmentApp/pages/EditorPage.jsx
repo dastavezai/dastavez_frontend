@@ -66,16 +66,22 @@ const EditorPage = () => {
           hasFileUrl: !!status?.fileUrl,
         });
 
-        const statusHasAnalysis = !!(
-          (status?.scanResults && Object.keys(status.scanResults || {}).length > 0) ||
-          (status?.complianceIssues || []).length ||
-          (status?.clauseFlaws || []).length ||
-          (status?.missingClauses || []).length ||
-          (status?.precedenceAnalysis || []).length ||
-          (status?.internalContradictions || []).length ||
-          (status?.chronologicalIssues || []).length ||
-          (status?.outdatedReferences || []).length
+        const docTypeKnown = !!String(
+          status?.detectedDocType || status?.scanResults?.documentType || ''
+        ).trim();
+        const callACoreDone = (status?.scanResults?.performanceDiagnostics?.completedSteps || []).includes(
+          'call_a_core'
         );
+        const statusHasAnalysis =
+          docTypeKnown &&
+          (callACoreDone ||
+            (status?.complianceIssues || []).length > 0 ||
+            (status?.clauseFlaws || []).length > 0 ||
+            (status?.missingClauses || []).length > 0 ||
+            (status?.precedenceAnalysis || []).length > 0 ||
+            (status?.internalContradictions || []).length > 0 ||
+            (status?.chronologicalIssues || []).length > 0 ||
+            (status?.outdatedReferences || []).length > 0);
 
         if (!statusHasAnalysis && !smartScanRequested) {
           setSmartScanRequested(true);

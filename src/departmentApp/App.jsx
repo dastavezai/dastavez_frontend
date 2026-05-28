@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
 import EditorPage from './pages/EditorPage';
+import CounterEditorPage from './pages/CounterEditorPage';
 import Profile from './pages/Profile';
 import Subscription from './pages/Subscription';
 import AdminDashboard from './pages/AdminDashboard';
@@ -26,6 +27,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <EditorPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/counter_editor"
+              element={
+                <ProtectedRoute>
+                  <CounterEditorPage />
                 </ProtectedRoute>
               }
             />

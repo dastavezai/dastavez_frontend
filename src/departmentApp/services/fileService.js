@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { addRefreshInterceptors } from './axiosWithRefresh.js';
+import { getApiBaseUrl } from './apiBase.js';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const API_URL = `${BASE_URL}/api/files`;
+const BASE_URL = getApiBaseUrl();
+const API_URL = `${BASE_URL}/api/files`.replace(/([^:]\/)\/+/g, '$1');
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -751,22 +752,69 @@ fileService.forgotPasswordRequest = forgotPasswordRequest;
 fileService.verifyResetOTP = verifyResetOTP;
 fileService.resetPassword = resetPassword;
 
-fileService.generateCounterAffidavit = async ({ fileId, petitionText, court, language, createEditableDocument = false }) => {
+fileService.getCounterAffidavitDesigns = async () => {
+  const response = await api.get('/api/draft/counter-affidavit/designs', { timeout: 30000 });
+  return response.data;
+};
+
+fileService.generateCounterAffidavit = async ({
+  fileId,
+  petitionText,
+  court,
+  language,
+  createEditableDocument = false,
+  designId,
+  simplePreview = false,
+}) => {
   const response = await api.post(
     '/api/draft/counter-affidavit',
-    { fileId, petitionText, court, language, createEditableDocument },
+    { fileId, petitionText, court, language, createEditableDocument, designId, simplePreview },
     { timeout: 180000 }
   );
   return response.data;
 };
 
-fileService.exportCounterAffidavit = async ({ counterData, format, court, language }) => {
-  const response = await api.post('/api/draft/counter-affidavit/export', { counterData, format, court, language }, { responseType: format === 'pdf' ? 'blob' : 'text' });
+fileService.previewCounterAffidavit = async ({
+  counterData,
+  court,
+  language,
+  designId,
+  simpleLayout = false,
+  fileId,
+}) => {
+  const response = await api.post(
+    '/api/draft/counter-affidavit/preview',
+    { counterData, court, language, designId, simpleLayout, fileId },
+    { timeout: 120000 }
+  );
   return response.data;
 };
 
-fileService.exportAuditLog = async (sessionId, format = 'pdf') => {
-  const response = await api.get(`/api/files/edit/${sessionId}/audit-log?format=${format}`, {
+fileService.exportCounterAffidavit = async ({
+  counterData,
+  format,
+  court,
+  language,
+  designId,
+  editedHtml,
+  simpleLayout = false,
+  fileId,
+}) => {
+  const response = await api.post(
+    '/api/draft/counter-affidavit/export',
+    { counterData, format, court, language, designId, editedHtml, simpleLayout, fileId },
+    { responseType: format === 'pdf' ? 'blob' : 'text' }
+  );
+  return response.data;
+};
+
+fileService.exportAuditLog = async (sessionId, format = 'pdf', filters = {}) => {
+  const params = new URLSearchParams({ format });
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
+  if (filters.type && filters.type !== 'all') params.set('type', filters.type);
+  if (filters.q) params.set('q', filters.q);
+  const response = await api.get(`/api/files/edit/${sessionId}/audit-log?${params.toString()}`, {
     responseType: format === 'pdf' ? 'blob' : 'text',
     timeout: 60000,
   });

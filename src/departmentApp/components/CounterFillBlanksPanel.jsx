@@ -1,0 +1,469 @@
+import React from 'react';
+import {
+  Accordion,
+  AccordionButton,
+  AccordionIcon,
+  AccordionItem,
+  AccordionPanel,
+  Badge,
+  Box,
+  Button,
+  FormControl,
+  FormLabel,
+  HStack,
+  IconButton,
+  Input,
+  SimpleGrid,
+  Text,
+  Textarea,
+  VStack,
+  useColorModeValue,
+} from '@chakra-ui/react';
+import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
+import { isPlaceholderValue } from '../utils/counterStudioBlanks';
+import {
+  buildDefaultIndexEntries,
+  resolveCounterOnBehalfParticulars,
+} from '../utils/counterStudioIndex';
+
+const BLANK_PLACEHOLDER = '_______________';
+
+const fieldSx = (needsFill) => ({
+  w: '100%',
+  minH: needsFill ? '2.5rem' : '2.25rem',
+  ...(needsFill
+    ? {
+      borderColor: 'orange.300',
+      bg: 'orange.50',
+      _dark: { bg: 'whiteAlpha.100' },
+      _focus: { borderColor: 'orange.400', boxShadow: '0 0 0 1px var(--chakra-colors-orange-400)' },
+    }
+    : {}),
+});
+
+const textareaSx = (needsFill) => ({
+  w: '100%',
+  minH: needsFill ? '5rem' : '4rem',
+  resize: 'vertical',
+  ...(needsFill
+    ? {
+      borderColor: 'orange.300',
+      bg: 'orange.50',
+      _dark: { bg: 'whiteAlpha.100' },
+      _focus: { borderColor: 'orange.400', boxShadow: '0 0 0 1px var(--chakra-colors-orange-400)' },
+    }
+    : {}),
+});
+
+const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDraft }) => {
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const muted = useColorModeValue('gray.600', 'gray.400');
+  const sectionBg = useColorModeValue('gray.50', 'gray.750');
+
+  if (!result) return null;
+
+  const patch = (fields) => onPatch?.(fields);
+
+  const jurisdictionValue =
+    result.jurisdictionLine ||
+    (typeof result.jurisdiction === 'string' ? result.jurisdiction : '');
+
+  const counterDraft = result.counterDraft || [];
+  const objections = result.preliminaryObjections || [];
+  const addFacts = result.statementOfAdditionalFacts || [];
+
+  const indexEntries =
+    Array.isArray(result.indexEntries) && result.indexEntries.length > 0
+      ? result.indexEntries
+      : buildDefaultIndexEntries(result);
+
+  const patchIndexRow = (rowIndex, field, value) => {
+    const next = indexEntries.map((row, i) => (
+      i === rowIndex ? { ...row, [field]: value } : row
+    ));
+    patch({ indexEntries: next });
+  };
+
+  const addIndexRow = () => {
+    const next = [
+      ...indexEntries,
+      {
+        slNo: String(indexEntries.length + 1),
+        particulars: '',
+        page: '',
+        rowType: 'annexure',
+      },
+    ];
+    patch({ indexEntries: next });
+  };
+
+  const removeIndexRow = (rowIndex) => {
+    if (indexEntries.length <= 1) return;
+    const next = indexEntries
+      .filter((_, i) => i !== rowIndex)
+      .map((row, i) => ({ ...row, slNo: String(i + 1) }));
+    patch({ indexEntries: next });
+  };
+
+  const resetMainIndexRow = () => {
+    const next = [...indexEntries];
+    next[0] = {
+      ...next[0],
+      slNo: '1',
+      rowType: 'main',
+      particulars: resolveCounterOnBehalfParticulars(result),
+    };
+    patch({ indexEntries: next });
+  };
+
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor={borderColor}
+      borderRadius="lg"
+      overflow="hidden"
+    >
+      <Box px={4} py={2} borderBottomWidth="1px" borderColor={borderColor} bg={sectionBg}>
+        <Text fontSize="sm" fontWeight="semibold">Fill in the template</Text>
+        <Text fontSize="xs" color={muted} mt={0.5}>
+          Changes update the formatted preview above and are used for PDF/HTML export (court layout).
+        </Text>
+        {blankCount > 0 ? (
+          <Badge mt={2} colorScheme="orange" fontSize="2xs">
+            {blankCount} field{blankCount === 1 ? '' : 's'} still look blank
+          </Badge>
+        ) : (
+          <Badge mt={2} colorScheme="green" fontSize="2xs">No obvious blanks detected</Badge>
+        )}
+      </Box>
+
+      <Accordion allowMultiple defaultIndex={[0, 1, 2]} px={2} pb={2}>
+        <AccordionItem border="none">
+          <AccordionButton px={2} py={2}>
+            <Text flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">Caption & parties</Text>
+            <AccordionIcon />
+          </AccordionButton>
+          <AccordionPanel pb={3} px={1}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+              <FormControl>
+                <FormLabel fontSize="xs">Court</FormLabel>
+                <Input
+                  size="sm"
+                  value={result.court || ''}
+                  onChange={(e) => patch({ court: e.target.value })}
+                  placeholder={BLANK_PLACEHOLDER}
+                  sx={fieldSx(isPlaceholderValue(result.court))}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel fontSize="xs">Case number</FormLabel>
+                <Input
+                  size="sm"
+                  value={result.caseNumber || ''}
+                  onChange={(e) => patch({ caseNumber: e.target.value })}
+                  placeholder="MJC NO. ______ OF ______"
+                  sx={fieldSx(isPlaceholderValue(result.caseNumber))}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel fontSize="xs">Petitioner</FormLabel>
+                <Input
+                  size="sm"
+                  value={result.petitionerName || ''}
+                  onChange={(e) => patch({ petitionerName: e.target.value })}
+                  placeholder={BLANK_PLACEHOLDER}
+                  sx={fieldSx(isPlaceholderValue(result.petitionerName))}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel fontSize="xs">Respondent / opposite party</FormLabel>
+                <Input
+                  size="sm"
+                  value={result.respondentName || ''}
+                  onChange={(e) => patch({ respondentName: e.target.value })}
+                  placeholder={BLANK_PLACEHOLDER}
+                  sx={fieldSx(isPlaceholderValue(result.respondentName))}
+                />
+              </FormControl>
+              <FormControl gridColumn={{ md: 'span 2' }}>
+                <FormLabel fontSize="xs">Jurisdiction line (caption)</FormLabel>
+                <Input
+                  size="sm"
+                  value={jurisdictionValue}
+                  onChange={(e) => patch({ jurisdictionLine: e.target.value })}
+                  placeholder="(Miscellaneous Jurisdiction Case)"
+                  sx={fieldSx(isPlaceholderValue(jurisdictionValue))}
+                />
+              </FormControl>
+              <FormControl gridColumn={{ md: 'span 2' }}>
+                <FormLabel fontSize="xs">Document title (caption)</FormLabel>
+                <Input
+                  size="sm"
+                  value={result.documentTitle || ''}
+                  onChange={(e) => patch({ documentTitle: e.target.value })}
+                  placeholder={BLANK_PLACEHOLDER}
+                  sx={fieldSx(isPlaceholderValue(result.documentTitle))}
+                />
+              </FormControl>
+              {(result.oppositePartyNo != null || result.showCauseOnBehalfOfOpNo != null) && (
+                <>
+                  <FormControl>
+                    <FormLabel fontSize="xs">Opposite party no.</FormLabel>
+                    <Input
+                      size="sm"
+                      value={result.oppositePartyNo || ''}
+                      onChange={(e) => patch({ oppositePartyNo: e.target.value })}
+                      sx={fieldSx(isPlaceholderValue(result.oppositePartyNo))}
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel fontSize="xs">Show cause on behalf of (Op. no.)</FormLabel>
+                    <Input
+                      size="sm"
+                      value={result.showCauseOnBehalfOfOpNo || ''}
+                      onChange={(e) => patch({ showCauseOnBehalfOfOpNo: e.target.value })}
+                      sx={fieldSx(isPlaceholderValue(result.showCauseOnBehalfOfOpNo))}
+                    />
+                  </FormControl>
+                </>
+              )}
+            </SimpleGrid>
+          </AccordionPanel>
+        </AccordionItem>
+
+        <AccordionItem border="none">
+          <AccordionButton px={2} py={2}>
+            <Text flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">Subject &amp; index (first page)</Text>
+            <AccordionIcon />
+          </AccordionButton>
+          <AccordionPanel pb={3} px={1}>
+            <VStack align="stretch" spacing={3}>
+              <FormControl>
+                <FormLabel fontSize="xs">Subject line</FormLabel>
+                <Input
+                  size="sm"
+                  value={result.captionSubject || 'Counter Affidavit'}
+                  onChange={(e) => patch({ captionSubject: e.target.value })}
+                  placeholder="Counter Affidavit"
+                />
+                <Text fontSize="2xs" color={muted} mt={1}>
+                  Shown as &quot;Subject: …&quot; on the first page of the court template.
+                </Text>
+              </FormControl>
+              <HStack justify="space-between" align="center">
+                <Text fontSize="xs" fontWeight="semibold">INDEX table</Text>
+                <HStack spacing={1}>
+                  <Button size="xs" variant="ghost" onClick={resetMainIndexRow}>
+                    Reset row 1
+                  </Button>
+                  <Button size="xs" leftIcon={<AddIcon />} onClick={addIndexRow}>
+                    Add row
+                  </Button>
+                </HStack>
+              </HStack>
+              {indexEntries.map((row, i) => (
+                <Box
+                  key={`idx-${i}-${row.slNo}`}
+                  p={2}
+                  borderWidth="1px"
+                  borderColor={borderColor}
+                  borderRadius="md"
+                >
+                  <HStack justify="space-between" mb={2}>
+                    <Text fontSize="xs" fontWeight="medium">
+                      Row {row.slNo || i + 1}
+                      {i === 0 ? ' (counter on behalf of)' : ''}
+                    </Text>
+                    {indexEntries.length > 1 && (
+                      <IconButton
+                        aria-label="Remove index row"
+                        size="xs"
+                        variant="ghost"
+                        colorScheme="red"
+                        icon={<DeleteIcon />}
+                        onClick={() => removeIndexRow(i)}
+                      />
+                    )}
+                  </HStack>
+                  <VStack align="stretch" spacing={2}>
+                    <FormControl>
+                      <FormLabel fontSize="2xs">Particulars</FormLabel>
+                      <Textarea
+                        size="sm"
+                        rows={i === 0 ? 2 : 3}
+                        value={row.particulars || ''}
+                        onChange={(e) => patchIndexRow(i, 'particulars', e.target.value)}
+                        placeholder={i === 0 ? 'Counter Affidavit on behalf of …' : 'Annexure-A: …'}
+                        sx={textareaSx(isPlaceholderValue(row.particulars))}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="2xs">Page no.</FormLabel>
+                      <Input
+                        size="sm"
+                        value={row.page || ''}
+                        onChange={(e) => patchIndexRow(i, 'page', e.target.value)}
+                        placeholder="—"
+                      />
+                    </FormControl>
+                  </VStack>
+                </Box>
+              ))}
+            </VStack>
+          </AccordionPanel>
+        </AccordionItem>
+
+        <AccordionItem border="none">
+          <AccordionButton px={2} py={2}>
+            <Text flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">Body — deponent, prayer, verification</Text>
+            <AccordionIcon />
+          </AccordionButton>
+          <AccordionPanel pb={3} px={1}>
+            <VStack align="stretch" spacing={3}>
+              <FormControl>
+                <FormLabel fontSize="xs">Details of the deponent</FormLabel>
+                <Textarea
+                  size="sm"
+                  rows={4}
+                  value={result.deponentDetails || ''}
+                  onChange={(e) => patch({ deponentDetails: e.target.value })}
+                  placeholder={BLANK_PLACEHOLDER}
+                  sx={textareaSx(isPlaceholderValue(result.deponentDetails))}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel fontSize="xs">Prayer</FormLabel>
+                <Textarea
+                  size="sm"
+                  rows={3}
+                  value={result.prayer || ''}
+                  onChange={(e) => patch({ prayer: e.target.value })}
+                  placeholder={BLANK_PLACEHOLDER}
+                  sx={textareaSx(isPlaceholderValue(result.prayer))}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel fontSize="xs">Verification</FormLabel>
+                <Textarea
+                  size="sm"
+                  rows={3}
+                  value={result.verification || ''}
+                  onChange={(e) => patch({ verification: e.target.value })}
+                  placeholder="Verified at ______ on this ______ day of ______, 20____"
+                  sx={textareaSx(isPlaceholderValue(result.verification))}
+                />
+              </FormControl>
+            </VStack>
+          </AccordionPanel>
+        </AccordionItem>
+
+        {objections.length > 0 && (
+          <AccordionItem border="none">
+            <AccordionButton px={2} py={2}>
+              <Text flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">Preliminary objections</Text>
+              <Badge ml={2}>{objections.length}</Badge>
+              <AccordionIcon />
+            </AccordionButton>
+            <AccordionPanel pb={3} px={1}>
+              <VStack align="stretch" spacing={2}>
+                {objections.map((obj, i) => (
+                  <FormControl key={i}>
+                    <FormLabel fontSize="xs">Objection {i + 1}</FormLabel>
+                    <Textarea
+                      size="sm"
+                      rows={2}
+                      value={typeof obj === 'string' ? obj : String(obj?.text || obj || '')}
+                      onChange={(e) => {
+                        const next = [...objections];
+                        next[i] = e.target.value;
+                        patch({ preliminaryObjections: next });
+                      }}
+                      placeholder={BLANK_PLACEHOLDER}
+                      sx={textareaSx(isPlaceholderValue(obj))}
+                    />
+                  </FormControl>
+                ))}
+              </VStack>
+            </AccordionPanel>
+          </AccordionItem>
+        )}
+
+        {counterDraft.length > 0 && (
+          <AccordionItem border="none">
+            <AccordionButton px={2} py={2}>
+              <Text flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">Para-wise reply</Text>
+              <Badge ml={2} colorScheme="purple">{counterDraft.length}</Badge>
+              <AccordionIcon />
+            </AccordionButton>
+            <AccordionPanel pb={3} px={1} maxH="420px" overflowY="auto">
+              <VStack align="stretch" spacing={3}>
+                {counterDraft.map((item, i) => (
+                  <Box key={i} p={2} borderWidth="1px" borderColor={borderColor} borderRadius="md">
+                    <Text fontSize="xs" fontWeight="bold" mb={2}>
+                      Petition para {item.petitionParaNo ?? item.paraNo ?? i + 1}
+                      {item.stance ? ` · ${item.stance}` : ''}
+                    </Text>
+                    <FormControl mb={2}>
+                      <FormLabel fontSize="xs">Reply</FormLabel>
+                      <Textarea
+                        size="sm"
+                        rows={3}
+                        value={item.counterArgument || ''}
+                        onChange={(e) => onPatchCounterDraft?.(i, 'counterArgument', e.target.value)}
+                        placeholder={BLANK_PLACEHOLDER}
+                        sx={textareaSx(isPlaceholderValue(item.counterArgument))}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="xs">Supporting law (optional)</FormLabel>
+                      <Input
+                        size="sm"
+                        value={item.supportingLaw || ''}
+                        onChange={(e) => onPatchCounterDraft?.(i, 'supportingLaw', e.target.value)}
+                        placeholder={BLANK_PLACEHOLDER}
+                        sx={fieldSx(isPlaceholderValue(item.supportingLaw))}
+                      />
+                    </FormControl>
+                  </Box>
+                ))}
+              </VStack>
+            </AccordionPanel>
+          </AccordionItem>
+        )}
+
+        {addFacts.length > 0 && (
+          <AccordionItem border="none">
+            <AccordionButton px={2} py={2}>
+              <Text flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">Additional facts</Text>
+              <Badge ml={2}>{addFacts.length}</Badge>
+              <AccordionIcon />
+            </AccordionButton>
+            <AccordionPanel pb={3} px={1}>
+              <VStack align="stretch" spacing={2}>
+                {addFacts.map((f, i) => (
+                  <FormControl key={i}>
+                    <FormLabel fontSize="xs">Fact {i + 1}</FormLabel>
+                    <Textarea
+                      size="sm"
+                      rows={2}
+                      value={typeof f === 'string' ? f : String(f || '')}
+                      onChange={(e) => {
+                        const next = [...addFacts];
+                        next[i] = e.target.value;
+                        patch({ statementOfAdditionalFacts: next });
+                      }}
+                      placeholder={BLANK_PLACEHOLDER}
+                      sx={textareaSx(isPlaceholderValue(f))}
+                    />
+                  </FormControl>
+                ))}
+              </VStack>
+            </AccordionPanel>
+          </AccordionItem>
+        )}
+      </Accordion>
+    </Box>
+  );
+};
+
+export default CounterFillBlanksPanel;

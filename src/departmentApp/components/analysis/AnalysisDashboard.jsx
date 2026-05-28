@@ -67,7 +67,6 @@ const AnalysisDashboard = ({
   onSofExpandToggle,
   sofValue,
   onSofChange,
-  onOpenGeneratedCounter,
 }) => {
   const [deepAnalysis, setDeepAnalysis] = useState(null);
   const [deepLoading, setDeepLoading] = useState(false);
@@ -134,19 +133,6 @@ Be thorough, specific, and cite exact legal provisions where possible.`;
     aiSuggestedPrecedents = [],
   } = scanData;
 
-  
-  const healthScore = useMemo(() => Math.max(0, Math.min(100,
-    100
-    - (complianceIssues.length * 5)
-    - (missingClauses.length * 3)
-    - (internalContradictions.length * 8)
-    - (outdatedReferences.length * 4)
-    - (chronologicalIssues.length * 3)
-    - (clauseFlaws.length * 2)
-  )), [complianceIssues, missingClauses, internalContradictions, outdatedReferences, chronologicalIssues, clauseFlaws]);
-
-  const healthColor = healthScore >= 80 ? 'green' : healthScore >= 50 ? 'yellow' : 'red';
-
   const blankCount = useMemo(() => {
     if (!extractedParties) return 0;
     const allText = [
@@ -159,7 +145,43 @@ Be thorough, specific, and cite exact legal provisions where possible.`;
     return (allText.match(/_{3,}/g) || []).length;
   }, [extractedParties]);
 
-  
+  const healthScore = useMemo(() => {
+    let score = 100;
+    score -= complianceIssues.length * 5;
+    score -= missingClauses.length * 3;
+    score -= internalContradictions.length * 8;
+    score -= outdatedReferences.length * 4;
+    score -= chronologicalIssues.length * 3;
+    score -= clauseFlaws.length * 2;
+
+    const docType = String(detectedDocType || scanResults?.documentType || '').trim();
+    const completedSteps = scanResults?.performanceDiagnostics?.completedSteps || [];
+    const callACoreDone = completedSteps.includes('call_a_core');
+    const textChars = scanResults?.performanceDiagnostics?.textLength
+      ?? scanResults?.structure?.textLength
+      ?? 0;
+
+    if (!docType) score -= 25;
+    if (!callACoreDone && completedSteps.length > 0) score -= 20;
+    if (!callACoreDone && completedSteps.length === 0) score -= 15;
+    if (textChars > 0 && textChars < 200) score -= 20;
+    if (blankCount > 0) score -= Math.min(15, blankCount * 3);
+
+    return Math.max(0, Math.min(100, score));
+  }, [
+    complianceIssues,
+    missingClauses,
+    internalContradictions,
+    outdatedReferences,
+    chronologicalIssues,
+    clauseFlaws,
+    detectedDocType,
+    scanResults,
+    blankCount,
+  ]);
+
+  const healthColor = healthScore >= 80 ? 'green' : healthScore >= 50 ? 'yellow' : 'red';
+
   const exportAnalysisPdf = () => {
     const parties = extractedParties || {};
     const reportHtml = `<!DOCTYPE html><html><head><title>Legal Analysis Report</title>
@@ -416,6 +438,11 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
                 <Text fontWeight="bold" fontSize={compact ? 'sm' : 'md'} color={textColor}>
                   {detectedDocType || scanResults?.documentType || 'Unknown'}
                 </Text>
+                {!(detectedDocType || scanResults?.documentType) && (
+                  <Text fontSize="2xs" color="orange.500" mt={1}>
+                    AI could not classify this file — check backend logs for Smart Scan Call A, or re-run scan.
+                  </Text>
+                )}
                 {scanResults?.caseType && (
                   <Badge mt={1} colorScheme="blue" fontSize="xs">{scanResults.caseType}</Badge>
                 )}
@@ -523,7 +550,9 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
                   <Box flex={1}>
                     <Progress value={healthScore} colorScheme={healthColor} size="sm" borderRadius="full" mb={1} />
                     <Text fontSize="2xs" color={mutedColor}>
-                      {healthScore >= 80 ? 'Excellent — document is well-structured and compliant'
+                      {healthScore >= 80 && (detectedDocType || scanResults?.documentType)
+                        ? 'Strong — no major issues flagged (review findings below)'
+                        : healthScore >= 80 ? 'Score adjusted — document type or scan may be incomplete'
                         : healthScore >= 50 ? 'Moderate — some issues need attention before filing'
                         : 'Needs work — multiple compliance and structural issues detected'}
                     </Text>
@@ -759,7 +788,6 @@ Return ONLY the JSON array, no explanation. Suggest 3-8 clauses.`;
               compact={compact}
               currentFileId={currentFileId}
               extractedParties={extractedParties}
-              onOpenGeneratedCounter={onOpenGeneratedCounter}
             />
           </TabPanel>
         </TabPanels>

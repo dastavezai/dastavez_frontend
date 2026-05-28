@@ -55,24 +55,19 @@ import {
 } from 'react-icons/md';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import FontFamily from '@tiptap/extension-font-family';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
-import LegalParagraphStyle from '../../departmentApp/components/editor/LegalParagraphStyleExtension.jsx';
-import HardBreak from '@tiptap/extension-hard-break';
-import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
-import PageBreakExtension from '../../departmentApp/components/editor/PageBreakExtension.jsx';
 import fileService from '../services/fileService';
 import DesignSuggestionModal from './DesignSuggestionModal';
 import EditorToolbar from './EditorToolbar';
 import SmartSuggestionsPanel from './SmartSuggestionsPanel';
 import DocumentAnalysisPanel from './DocumentAnalysisPanel';
 import AIHelperPanel from './AIHelperPanel';
-import '../../departmentApp/components/FullPageEditor.css';
-
 
 /**
  * FullPageEditor - Full-screen rich-text document editor with TipTap
@@ -134,11 +129,10 @@ const FullPageEditor = ({
       StarterKit.configure({
         history: { depth: 100 },
       }),
+      Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
-        alignments: ['left', 'center', 'right', 'justify'],
       }),
-      LegalParagraphStyle,
       FontFamily,
       TextStyle.configure({
         types: ['textStyle'],
@@ -149,15 +143,9 @@ const FullPageEditor = ({
       Highlight.configure({
         multicolor: true,
       }),
-      HardBreak,
       Placeholder.configure({
         placeholder: 'Start typing your document...',
       }),
-      PageBreakExtension,
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableHeader,
-      TableCell,
     ],
     content: getInitialContent(),
     onUpdate: ({ editor: ed }) => {
@@ -613,9 +601,7 @@ const FullPageEditor = ({
                   '& h2': { fontSize: '1.5em', fontWeight: 'bold', marginBottom: '0.4em', marginTop: '0.7em' },
                   '& h3': { fontSize: '1.17em', fontWeight: 'bold', marginBottom: '0.3em', marginTop: '0.6em' },
                   '& h4': { fontSize: '1em', fontWeight: 'bold', marginBottom: '0.3em', marginTop: '0.5em' },
-                  '& ul': { paddingLeft: '1.5em', marginBottom: '0.5em', listStyleType: 'disc' },
-                  '& ol': { paddingLeft: '1.5em', marginBottom: '0.5em', listStyleType: 'decimal' },
-                  '& li': { marginBottom: '0.2em' },
+                  '& ul, & ol': { paddingLeft: '1.5em', marginBottom: '0.5em' },
                   '& blockquote': {
                     borderLeft: '3px solid',
                     borderColor: 'gray.300',

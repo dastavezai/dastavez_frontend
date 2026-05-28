@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, VStack, HStack, Text, Button, Badge, Textarea, Input, Select,
   Spinner, useColorModeValue, Divider, Icon, useToast, Accordion,
@@ -13,25 +14,46 @@ const cleanPartyScan = (val) => {
   return cleaned.length > 2 ? cleaned : '';
 };
 
+const counterStudioHref = (fileId) => {
+  const id = encodeURIComponent(fileId);
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/department')) {
+    return `/department/counter_editor?fileId=${id}`;
+  }
+  return `/counter_editor?fileId=${id}`;
+};
+
 const CounterAffidavitPanel = ({
   compact,
   currentFileId,
   extractedParties = null,
-  onOpenGeneratedCounter = null,
 }) => {
+  const navigate = useNavigate();
   const [petitionText, setPetitionText] = useState('');
   const [court, setCourt] = useState('');
   const [language, setLanguage] = useState('en');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState(null);
-  const [useFile, setUseFile] = useState(!!currentFileId);
+  const [designId, setDesignId] = useState('');
+  const [designOptions, setDesignOptions] = useState([]);
 
   useEffect(() => {
-    if (currentFileId) {
-      setUseFile(true);
-    }
-  }, [currentFileId]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fileService.getCounterAffidavitDesigns();
+        if (cancelled) return;
+        const list = data?.designs || [];
+        setDesignOptions(list);
+        if (!designId && data?.defaultDesignId) {
+          setDesignId(data.defaultDesignId);
+        }
+      } catch (_) {
+        if (!cancelled) setDesignOptions([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const toast = useToast();
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -56,13 +78,11 @@ const CounterAffidavitPanel = ({
   }, [result, extractedParties]);
 
   const handleGenerate = async () => {
-    const fileMode = !!currentFileId;
-    if (!useFile && petitionText.trim().length < 30) {
-      toast({ title: 'Enter at least 30 characters of petition text', status: 'warning', duration: 3000 });
+    if (currentFileId) {
       return;
     }
-    if ((useFile || fileMode) && !currentFileId) {
-      toast({ title: 'No file loaded. Upload a petition first.', status: 'warning', duration: 3000 });
+    if (petitionText.trim().length < 30) {
+      toast({ title: 'Enter at least 30 characters of petition text', status: 'warning', duration: 3000 });
       return;
     }
 
@@ -70,16 +90,15 @@ const CounterAffidavitPanel = ({
     setResult(null);
     try {
       const res = await fileService.generateCounterAffidavit({
-        fileId: fileMode || useFile ? currentFileId : undefined,
-        petitionText: fileMode || useFile ? undefined : petitionText,
-        court: fileMode ? undefined : court,
+        fileId: undefined,
+        petitionText,
+        court,
         language,
-        createEditableDocument: !!((fileMode || useFile) && currentFileId && onOpenGeneratedCounter),
+        designId: designId || undefined,
+        createEditableDocument: false,
       });
       setResult(res);
-      if (res?.editorFileId && typeof onOpenGeneratedCounter === 'function') {
-        onOpenGeneratedCounter(res);
-      }
+      if (res?.designId) setDesignId(res.designId);
       toast({ title: 'Counter affidavit generated', status: 'success', duration: 3000 });
     } catch (err) {
       toast({ title: err?.response?.data?.message || 'Generation failed', status: 'error', duration: 4000 });
@@ -99,7 +118,10 @@ const CounterAffidavitPanel = ({
           caseNumber: mergedResult.caseNumber,
           court: mergedResult.court,
           sourceDocumentType: mergedResult.sourceDocumentType,
+          documentTitle: mergedResult.documentTitle,
+          deponentDetails: mergedResult.deponentDetails,
           statementOfFacts: mergedResult.statementOfFacts,
+          statementOfAdditionalFacts: mergedResult.statementOfAdditionalFacts,
           preliminaryObjections: mergedResult.preliminaryObjections,
           counterDraft: mergedResult.counterDraft,
           prayer: mergedResult.prayer,
@@ -108,6 +130,7 @@ const CounterAffidavitPanel = ({
         format,
         court: mergedResult.court || court,
         language,
+        designId: result?.designId || designId || undefined,
       });
 
       const blob = data instanceof Blob ? data : new Blob([data], { type: format === 'pdf' ? 'application/pdf' : 'text/html' });
@@ -135,7 +158,7 @@ const CounterAffidavitPanel = ({
         </HStack>
         <Text fontSize="2xs" color={mutedColor} mt={0.5}>
           {currentFileId
-            ? 'One‑click counter draft from this document + Smart Scan. It opens in OnlyOffice and you can switch between Main / Counter from the top bar.'
+            ? 'Open Counter Studio for a full-page TipTap workspace: generate, edit, and export HTML or PDF without leaving the analysis flow.'
             : 'Paste a petition to extract grounds and generate a counter affidavit draft.'}
         </Text>
       </Box>
@@ -156,28 +179,26 @@ const CounterAffidavitPanel = ({
                   border="1px solid"
                   borderColor={dropBorder}
                   borderRadius="md"
-                  p={3}
+                  p={4}
                 >
-                  <HStack justify="space-between" align="center">
-                    <VStack align="start" spacing={0} minW={0}>
-                      <Text fontSize="xs" fontWeight="bold" color={headingColor}>
-                        Using current document
+                  <VStack align="stretch" spacing={3}>
+                    <VStack align="start" spacing={1}>
+                      <Text fontSize="sm" fontWeight="bold" color={headingColor}>
+                        Counter Studio
                       </Text>
-                      <Text fontSize="2xs" color={mutedColor}>
-                        Smart Scan fields, parties, statutes and summary will be used automatically.
+                      <Text fontSize="xs" color={mutedColor}>
+                        Uses this file and Smart Scan context (parties, doc type, extracted text). Choose template and language on the next page.
                       </Text>
                     </VStack>
-                    <Select
-                      size="xs"
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      w="140px"
-                      bg={cardBg}
+                    <Button
+                      size="md"
+                      colorScheme="purple"
+                      leftIcon={<MdAutoAwesome />}
+                      onClick={() => navigate(counterStudioHref(currentFileId))}
                     >
-                      <option value="en">English Draft</option>
-                      <option value="hi">Hindi Draft</option>
-                    </Select>
-                  </HStack>
+                      Open Counter Studio
+                    </Button>
+                  </VStack>
                 </Box>
               ) : (
                 <>
@@ -224,20 +245,39 @@ const CounterAffidavitPanel = ({
                       <option value="hi">Hindi</option>
                     </Select>
                   </HStack>
+                  {designOptions.length > 0 && (
+                    <Box>
+                      <Text fontSize="2xs" fontWeight="bold" color={headingColor} mb={1}>
+                        Court layout template
+                      </Text>
+                      <Select
+                        size="xs"
+                        value={designId}
+                        onChange={(e) => setDesignId(e.target.value)}
+                        bg={cardBg}
+                      >
+                        {designOptions.map((d) => (
+                          <option key={d.id} value={d.id}>{d.label || d.id}</option>
+                        ))}
+                      </Select>
+                    </Box>
+                  )}
                 </>
               )}
 
-              <Button
-                size="sm"
-                colorScheme="purple"
-                leftIcon={<MdAutoAwesome />}
-                onClick={handleGenerate}
-                isLoading={loading}
-                loadingText="Analyzing..."
-                isDisabled={!currentFileId && petitionText.trim().length < 30}
-              >
-                {currentFileId && onOpenGeneratedCounter ? 'Generate Counter' : 'Generate Counter Affidavit'}
-              </Button>
+              {!currentFileId && (
+                <Button
+                  size="sm"
+                  colorScheme="purple"
+                  leftIcon={<MdAutoAwesome />}
+                  onClick={handleGenerate}
+                  isLoading={loading}
+                  loadingText="Analyzing..."
+                  isDisabled={petitionText.trim().length < 30}
+                >
+                  Generate Counter Affidavit
+                </Button>
+              )}
               {!currentFileId && (
                 <Text fontSize="2xs" color={mutedColor} mt={-1}>
                   Tip: For best results, paste the full petition text (at least a few paragraphs).
@@ -259,6 +299,29 @@ const CounterAffidavitPanel = ({
                   </Button>
                 </HStack>
               </HStack>
+
+              {result.previewHtml && (
+                <Box
+                  borderWidth="1px"
+                  borderColor={borderColor}
+                  borderRadius="lg"
+                  overflow="hidden"
+                  bg="white"
+                >
+                  <Text fontSize="xs" fontWeight="bold" px={3} py={2} bg={panelBg} color={headingColor}>
+                    Formatted preview ({result.designId || designId || 'template'})
+                  </Text>
+                  <Box
+                    as="iframe"
+                    title="Counter affidavit preview"
+                    srcDoc={result.previewHtml}
+                    w="100%"
+                    h="420px"
+                    border="0"
+                    bg="white"
+                  />
+                </Box>
+              )}
 
               <Box p={3} bg={cardBg} borderWidth="1px" borderColor={borderColor} borderRadius="lg">
                 <HStack spacing={4} flexWrap="wrap">
@@ -317,6 +380,18 @@ const CounterAffidavitPanel = ({
                 </AccordionPanel>
               </AccordionItem>
 
+              {result.deponentDetails && (
+                <AccordionItem>
+                  <AccordionButton py={1}>
+                    <Text flex="1" fontSize="xs" fontWeight="bold" textAlign="left">Deponent</Text>
+                    <AccordionIcon />
+                  </AccordionButton>
+                  <AccordionPanel pb={2}>
+                    <Text fontSize="xs" whiteSpace="pre-wrap">{result.deponentDetails}</Text>
+                  </AccordionPanel>
+                </AccordionItem>
+              )}
+
               <AccordionItem>
                 <AccordionButton py={1}>
                   <HStack flex="1" spacing={2}>
@@ -348,7 +423,10 @@ const CounterAffidavitPanel = ({
                   <VStack align="stretch" spacing={2}>
                     {result.counterDraft?.map((item, i) => (
                       <Box key={i} p={2} bg="purple.50" borderRadius="sm" fontSize="xs">
-                        <Text fontWeight="bold">Para {item.paraNo}:</Text>
+                        <HStack spacing={2}>
+                          <Text fontWeight="bold">Petition Para {item.petitionParaNo ?? item.paraNo}:</Text>
+                          {item.stance && <Badge fontSize="2xs" colorScheme="gray">{item.stance}</Badge>}
+                        </HStack>
                         <Text mt={1}>{item.counterArgument}</Text>
                         {item.supportingLaw && (
                           <Text color="purple.600" mt={1} fontStyle="italic">{item.supportingLaw}</Text>
@@ -358,6 +436,25 @@ const CounterAffidavitPanel = ({
                   </VStack>
                 </AccordionPanel>
               </AccordionItem>
+
+              {result.statementOfAdditionalFacts?.length > 0 && (
+                <AccordionItem>
+                  <AccordionButton py={1}>
+                    <HStack flex="1" spacing={2}>
+                      <Text fontSize="xs" fontWeight="bold">Additional Facts</Text>
+                      <Badge colorScheme="teal" fontSize="2xs">{result.statementOfAdditionalFacts.length}</Badge>
+                    </HStack>
+                    <AccordionIcon />
+                  </AccordionButton>
+                  <AccordionPanel pb={2}>
+                    <VStack align="stretch" spacing={1}>
+                      {result.statementOfAdditionalFacts.map((fact, i) => (
+                        <Text key={i} fontSize="xs">{i + 1}. {fact}</Text>
+                      ))}
+                    </VStack>
+                  </AccordionPanel>
+                </AccordionItem>
+              )}
 
               <AccordionItem>
                 <AccordionButton py={1}>

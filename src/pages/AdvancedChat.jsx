@@ -3400,7 +3400,6 @@ const ChatPage = () => {
         initialValues={fieldsModalData?.initialValues || {}}
         language={language}
         isEditMode={isEditingDocument}
-        summaryBox={scanResults?.summary || fieldsModalData?.summary || null}
       />
 
       {/* Template Browser Modal */}
