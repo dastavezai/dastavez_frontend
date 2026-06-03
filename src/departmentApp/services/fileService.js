@@ -765,10 +765,12 @@ fileService.generateCounterAffidavit = async ({
   createEditableDocument = false,
   designId,
   simplePreview = false,
+  defenceText,
+  counterMaker,
 }) => {
   const response = await api.post(
     '/api/draft/counter-affidavit',
-    { fileId, petitionText, court, language, createEditableDocument, designId, simplePreview },
+    { fileId, petitionText, court, language, createEditableDocument, designId, simplePreview, defenceText, counterMaker },
     { timeout: 180000 }
   );
   return response.data;
@@ -785,6 +787,15 @@ fileService.previewCounterAffidavit = async ({
   const response = await api.post(
     '/api/draft/counter-affidavit/preview',
     { counterData, court, language, designId, simpleLayout, fileId },
+    { timeout: 120000 }
+  );
+  return response.data;
+};
+
+fileService.registerCounterAnnexure = async ({ fileId, description, annexureIndex = [] }) => {
+  const response = await api.post(
+    '/api/draft/counter-affidavit/annexure',
+    { fileId, description, annexureIndex },
     { timeout: 120000 }
   );
   return response.data;

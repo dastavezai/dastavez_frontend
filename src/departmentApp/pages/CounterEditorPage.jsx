@@ -24,6 +24,16 @@ import {
   Divider,
   Grid,
   GridItem,
+  Textarea,
+  Input,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { FaArrowLeft } from 'react-icons/fa';
 import { MdAutoAwesome, MdDownload, MdGavel, MdInsertPageBreak } from 'react-icons/md';
@@ -108,6 +118,13 @@ const buildFallbackEditorHtml = (result) => {
     parts.push('<h3 style="margin-top:14px; margin-bottom:6px; text-decoration:underline; text-transform:uppercase;">Details of the deponent</h3>');
     deponent.split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean)
       .forEach((p) => parts.push(`<p>${escapeHtmlText(p)}</p>`));
+  }
+
+  const defence = Array.isArray(result.defenceSection) ? result.defenceSection : [];
+  const defenceFilled = defence.map((p) => String(p || '').trim()).filter(Boolean);
+  if (defenceFilled.length) {
+    parts.push('<h3 style="margin-top:14px; margin-bottom:6px; text-decoration:underline; text-transform:uppercase;">Defence</h3>');
+    defenceFilled.forEach((p, i) => parts.push(`<p>${i + 1}. ${escapeHtmlText(p)}</p>`));
   }
 
   const objections = result.preliminaryObjections || [];
@@ -195,7 +212,11 @@ const CounterEditorPage = () => {
   const [pendingEditorHtml, setPendingEditorHtml] = useState('');
   const [formattedPreviewHtml, setFormattedPreviewHtml] = useState('');
   const [layoutMode, setLayoutMode] = useState('court');
+  const [viewMode, setViewMode] = useState('paged');
   const [previewRefreshing, setPreviewRefreshing] = useState(false);
+  const [defenceText, setDefenceText] = useState('');
+  const [counterMaker, setCounterMaker] = useState('');
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const skipPreviewRefreshRef = useRef(false);
 
   const bg = useColorModeValue('gray.50', 'gray.900');
@@ -236,6 +257,9 @@ const CounterEditorPage = () => {
     setResult((prev) => {
       if (!prev) return prev;
       const next = { ...prev, ...fields };
+      if ('annexureIndex' in fields) {
+        return { ...next, ...normalizeIndexState(next, { forceRebuildIndex: true }) };
+      }
       if ('indexEntries' in fields || 'captionSubject' in fields) {
         return { ...next, ...normalizeIndexState(next) };
       }
@@ -353,6 +377,7 @@ const CounterEditorPage = () => {
       deponentDetails: mergedResult.deponentDetails,
       statementOfFacts: mergedResult.statementOfFacts,
       statementOfAdditionalFacts: mergedResult.statementOfAdditionalFacts,
+      defenceSection: mergedResult.defenceSection,
       preliminaryObjections: mergedResult.preliminaryObjections,
       counterDraft: mergedResult.counterDraft,
       prayer: mergedResult.prayer,
@@ -430,6 +455,39 @@ const CounterEditorPage = () => {
     setPendingEditorHtml(resolveEditorHtmlFromResult(mergedResult));
   }, [mergedResult, layoutMode]);
 
+  const injectedPreviewHtml = useMemo(() => {
+    if (!formattedPreviewHtml) return '';
+    const isPaged = viewMode === 'paged';
+    const css = `
+      <style>
+        @media screen {
+          html { background-color: #f3f4f6 !important; }
+          body {
+            max-width: 793px !important;
+            margin: 24px auto !important;
+            padding: 72px !important;
+            box-sizing: border-box !important;
+            ${isPaged ? `
+            background: repeating-linear-gradient(
+              to bottom,
+              white,
+              white 1122px,
+              #f3f4f6 1122px,
+              #f3f4f6 1146px
+            ) !important;
+            ` : `background: white !important;`}
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+            min-height: 1122px !important;
+          }
+        }
+      </style>
+    `;
+    if (formattedPreviewHtml.includes('</head>')) {
+      return formattedPreviewHtml.replace('</head>', css + '</head>');
+    }
+    return css + formattedPreviewHtml;
+  }, [formattedPreviewHtml, viewMode]);
+
   const selectedDesignLabel = useMemo(() => {
     const match = designOptions.find((d) => d.id === designId);
     return match?.label || designId || 'Court template';
@@ -451,6 +509,8 @@ const CounterEditorPage = () => {
         designId: designId || undefined,
         createEditableDocument: false,
         simplePreview: layoutMode === 'simple',
+        defenceText,
+        counterMaker,
       });
       skipPreviewRefreshRef.current = true;
       applyGeneratedView(res);
@@ -464,6 +524,7 @@ const CounterEditorPage = () => {
         status: 'success',
         duration: 5000,
       });
+      onClose();
     } catch (err) {
       const msg = formatDepartmentApiError(err, 'Counter generation failed. Check LLM settings on the server.');
       setGenerateError(msg);
@@ -582,6 +643,17 @@ const CounterEditorPage = () => {
               <option value="court">Court template</option>
               <option value="simple">Word-style</option>
             </Select>
+            <Select
+              size="sm"
+              w="130px"
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              bg={cardBg}
+              title="Editor Page Layout"
+            >
+              <option value="continuous">Continuous</option>
+              <option value="paged">A4 Pages</option>
+            </Select>
             {designOptions.length > 0 && (
               <Select
                 size="sm"
@@ -600,7 +672,7 @@ const CounterEditorPage = () => {
               size="sm"
               colorScheme="purple"
               leftIcon={<MdAutoAwesome />}
-              onClick={handleGenerate}
+              onClick={onOpen}
               isLoading={loading}
               loadingText="Generating…"
               isDisabled={scanLoading}
@@ -697,7 +769,7 @@ const CounterEditorPage = () => {
                       <Box
                         as="iframe"
                         title="Counter affidavit preview"
-                        srcDoc={formattedPreviewHtml}
+                        srcDoc={injectedPreviewHtml}
                         w="100%"
                         h={{ base: '480px', lg: 'calc(100vh - 200px)' }}
                         minH="480px"
@@ -741,6 +813,7 @@ const CounterEditorPage = () => {
                       blankCount={blankCount}
                       onPatch={patchResult}
                       onPatchCounterDraft={patchCounterDraft}
+                      onAnnexureChange={refreshTemplatePreview}
                     />
                   </Box>
                 ) : (
@@ -751,10 +824,22 @@ const CounterEditorPage = () => {
                     borderRadius="lg"
                     bg={cardBg}
                     minH="200px"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
                   >
-                    <Text fontSize="sm" color={muted} textAlign="center">
-                      Generate a counter to show fill-in fields beside the preview.
-                    </Text>
+                    <Button
+                      size="lg"
+                      colorScheme="purple"
+                      leftIcon={<MdAutoAwesome />}
+                      onClick={onOpen}
+                      isLoading={loading}
+                      isDisabled={scanLoading}
+                      w="full"
+                      maxW="300px"
+                    >
+                      Generate counter with AI
+                    </Button>
                   </Box>
                 )}
               </GridItem>
@@ -799,35 +884,42 @@ const CounterEditorPage = () => {
                     '--pad-bottom': '72px',
                   }}
                 >
-                  {layoutMode === 'simple' && pageLineYs.map((y) => (
-                    <Box
-                      key={`page-guide-${y}`}
-                      position="absolute"
-                      left={{ base: 2, md: 4 }}
-                      right={{ base: 2, md: 4 }}
-                      top={`${y + 16}px`}
-                      h="1px"
-                      bg="blackAlpha.200"
-                      pointerEvents="none"
-                      zIndex={2}
-                    />
-                  ))}
+                  {layoutMode === 'simple' && viewMode === 'paged' && [0, ...pageLineYs].map((y, index, arr) => {
+                    const nextY = arr[index + 1] || Math.max(y + 1122, editor?.view?.dom?.scrollHeight || 1122);
+                    const height = nextY - y;
+                    return (
+                      <Box
+                        key={`page-bg-${y}`}
+                        position="absolute"
+                        left="50%"
+                        transform="translateX(-50%)"
+                        top={`${y + 16}px`}
+                        w="793px"
+                        h={`${Math.max(0, height - 24)}px`}
+                        bg="white"
+                        boxShadow="0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08)"
+                        zIndex={0}
+                        pointerEvents="none"
+                      />
+                    );
+                  })}
                   <Box
                     maxW="793px"
                     mx="auto"
-                    bg="white"
-                    boxShadow="md"
+                    bg={viewMode === 'paged' ? 'transparent' : 'white'}
+                    boxShadow={viewMode === 'paged' ? 'none' : 'md'}
                     position="relative"
                     zIndex={1}
                     sx={{
                       '.tiptap-editor': {
                         outline: 'none',
-                        minHeight: '1122px',
-                        padding: '72px',
+                        minHeight: viewMode === 'paged' ? '1122px' : 'auto',
+                        padding: viewMode === 'paged' ? '72px' : '32px 72px',
                         fontFamily: "'Times New Roman', Times, serif",
                         fontSize: '12pt',
                         lineHeight: 1.5,
                         color: 'gray.800',
+                        backgroundColor: 'transparent',
                         _dark: { color: 'gray.100' },
                       },
                       '.tiptap-editor p': { marginBottom: '0.6em' },
@@ -907,6 +999,57 @@ const CounterEditorPage = () => {
           </VStack>
         )}
       </Box>
+
+      <Modal isOpen={isOpen} onClose={onClose} size="xl">
+        <ModalOverlay />
+        <ModalContent bg={cardBg}>
+          <ModalHeader>Setup Counter Affidavit</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            <VStack spacing={4} align="stretch">
+              <Box>
+                <Text fontSize="sm" fontWeight="bold" mb={1}>
+                  Who is making the counter?
+                </Text>
+                <Input
+                  placeholder="e.g., Respondent No. 2, District Magistrate, Patna"
+                  value={counterMaker}
+                  onChange={(e) => setCounterMaker(e.target.value)}
+                />
+              </Box>
+
+              <Box>
+                <Text fontSize="sm" fontWeight="bold" mb={1}>
+                  Defence / Counter Arguments
+                </Text>
+                <Text fontSize="xs" color={muted} mb={2}>
+                  Provide the reasoning, facts, or arguments for your defence. The AI will structure these into paragraphs.
+                </Text>
+                <Textarea
+                  placeholder="e.g., The claims are false because the payment was already completed on 12th Jan..."
+                  value={defenceText}
+                  onChange={(e) => setDefenceText(e.target.value)}
+                  minH="180px"
+                />
+              </Box>
+            </VStack>
+          </ModalBody>
+
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose} isDisabled={loading}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="purple"
+              onClick={handleGenerate}
+              isLoading={loading}
+              loadingText="Generating..."
+            >
+              Generate
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

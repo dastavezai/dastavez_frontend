@@ -33,6 +33,9 @@ export const countBlanksInResult = (result) => {
   scalarFields.forEach((key) => {
     if (isPlaceholderValue(result[key])) n += 1;
   });
+  (result.defenceSection || []).forEach((para) => {
+    if (isPlaceholderValue(para)) n += 1;
+  });
   (result.preliminaryObjections || []).forEach((obj) => {
     if (isPlaceholderValue(obj)) n += 1;
   });

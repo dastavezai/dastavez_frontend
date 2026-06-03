@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Accordion,
   AccordionButton,
@@ -14,13 +14,17 @@ import {
   IconButton,
   Input,
   SimpleGrid,
+  Spinner,
   Text,
   Textarea,
   VStack,
   useColorModeValue,
+  useToast,
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import { isPlaceholderValue } from '../utils/counterStudioBlanks';
+import fileService from '../services/fileService';
+import { formatDepartmentApiError } from '../services/apiBase';
 import {
   buildDefaultIndexEntries,
   resolveCounterOnBehalfParticulars,
@@ -55,10 +59,14 @@ const textareaSx = (needsFill) => ({
     : {}),
 });
 
-const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDraft }) => {
+const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDraft, onAnnexureChange }) => {
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const muted = useColorModeValue('gray.600', 'gray.400');
   const sectionBg = useColorModeValue('gray.50', 'gray.750');
+  const toast = useToast();
+  const annexureFileRef = useRef(null);
+  const [annexureDescription, setAnnexureDescription] = useState('');
+  const [annexureUploading, setAnnexureUploading] = useState(false);
 
   if (!result) return null;
 
@@ -71,6 +79,22 @@ const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDra
   const counterDraft = result.counterDraft || [];
   const objections = result.preliminaryObjections || [];
   const addFacts = result.statementOfAdditionalFacts || [];
+  const defenceParagraphs = Array.isArray(result.defenceSection) ? result.defenceSection : [];
+
+  const patchDefenceParagraph = (index, value) => {
+    const next = [...defenceParagraphs];
+    next[index] = value;
+    patch({ defenceSection: next });
+  };
+
+  const addDefenceParagraph = () => {
+    patch({ defenceSection: [...defenceParagraphs, ''] });
+  };
+
+  const removeDefenceParagraph = (index) => {
+    const next = defenceParagraphs.filter((_, i) => i !== index);
+    patch({ defenceSection: next });
+  };
 
   const indexEntries =
     Array.isArray(result.indexEntries) && result.indexEntries.length > 0
@@ -105,6 +129,69 @@ const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDra
     patch({ indexEntries: next });
   };
 
+  const uploadedAnnexures = (Array.isArray(result.annexureIndex) ? result.annexureIndex : [])
+    .filter((a) => a?.userUploaded || a?.fileId);
+
+  const removeUploadedAnnexure = (letter) => {
+    const key = String(letter || '').toUpperCase();
+    const next = (result.annexureIndex || []).filter(
+      (a) => String(a?.letter || '').toUpperCase() !== key
+    );
+    patch({ annexureIndex: next });
+    onAnnexureChange?.();
+  };
+
+  const handleAnnexureFilePick = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const description = annexureDescription.trim();
+    if (!description) {
+      toast({
+        title: 'Describe the annexure',
+        description: 'Enter what this document is (shown in the INDEX particulars column).',
+        status: 'warning',
+        duration: 4000,
+      });
+      return;
+    }
+
+    setAnnexureUploading(true);
+    try {
+      const uploadRes = await fileService.uploadFile(file);
+      const fileId = uploadRes?.file?._id || uploadRes?.fileId;
+      if (!fileId) throw new Error('Upload did not return a file id');
+
+      const reg = await fileService.registerCounterAnnexure({
+        fileId,
+        description,
+        annexureIndex: result.annexureIndex || [],
+      });
+
+      patch({ annexureIndex: reg.annexureIndex || [] });
+      setAnnexureDescription('');
+      onAnnexureChange?.();
+      toast({
+        title: 'Annexure added',
+        description: reg.annexure?.letter
+          ? `Annexure-${reg.annexure.letter} — INDEX updated${reg.annexure.pageRange ? ` (pages ${reg.annexure.pageRange})` : ''}.`
+          : 'INDEX table updated.',
+        status: 'success',
+        duration: 4000,
+      });
+    } catch (err) {
+      toast({
+        title: 'Could not attach annexure',
+        description: formatDepartmentApiError(err, 'Upload or registration failed.'),
+        status: 'error',
+        duration: 6000,
+      });
+    } finally {
+      setAnnexureUploading(false);
+    }
+  };
+
   const resetMainIndexRow = () => {
     const next = [...indexEntries];
     next[0] = {
@@ -137,7 +224,7 @@ const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDra
         )}
       </Box>
 
-      <Accordion allowMultiple defaultIndex={[0, 1, 2]} px={2} pb={2}>
+      <Accordion allowMultiple defaultIndex={[0, 1, 2, 3]} px={2} pb={2}>
         <AccordionItem border="none">
           <AccordionButton px={2} py={2}>
             <Text flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">Caption & parties</Text>
@@ -167,22 +254,24 @@ const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDra
               </FormControl>
               <FormControl>
                 <FormLabel fontSize="xs">Petitioner</FormLabel>
-                <Input
+                <Textarea
                   size="sm"
+                  rows={2}
                   value={result.petitionerName || ''}
                   onChange={(e) => patch({ petitionerName: e.target.value })}
-                  placeholder={BLANK_PLACEHOLDER}
-                  sx={fieldSx(isPlaceholderValue(result.petitionerName))}
+                  placeholder="Enter ; to add more parties in new line"
+                  sx={textareaSx(isPlaceholderValue(result.petitionerName))}
                 />
               </FormControl>
               <FormControl>
                 <FormLabel fontSize="xs">Respondent / opposite party</FormLabel>
-                <Input
+                <Textarea
                   size="sm"
+                  rows={2}
                   value={result.respondentName || ''}
                   onChange={(e) => patch({ respondentName: e.target.value })}
-                  placeholder={BLANK_PLACEHOLDER}
-                  sx={fieldSx(isPlaceholderValue(result.respondentName))}
+                  placeholder="Enter ; to add more parties in new line"
+                  sx={textareaSx(isPlaceholderValue(result.respondentName))}
                 />
               </FormControl>
               <FormControl gridColumn={{ md: 'span 2' }}>
@@ -309,6 +398,71 @@ const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDra
                   </VStack>
                 </Box>
               ))}
+              <Box pt={3} mt={2} borderTopWidth="1px" borderColor={borderColor}>
+                <Text fontSize="xs" fontWeight="semibold" mb={2}>Attach annexure file</Text>
+                <Text fontSize="2xs" color={muted} mb={2}>
+                  PDF or image. We add an INDEX row (Annexure letter, particulars, page no.) and include photostat pages in court export when possible.
+                </Text>
+                <VStack align="stretch" spacing={2}>
+                  <FormControl isRequired>
+                    <FormLabel fontSize="2xs">What is this annexure?</FormLabel>
+                    <Input
+                      size="sm"
+                      value={annexureDescription}
+                      onChange={(e) => setAnnexureDescription(e.target.value)}
+                      placeholder="e.g. Copy of order dated 15.03.2024"
+                    />
+                  </FormControl>
+                  <input
+                    ref={annexureFileRef}
+                    type="file"
+                    accept=".pdf,image/jpeg,image/png,image/webp,image/gif"
+                    style={{ display: 'none' }}
+                    onChange={handleAnnexureFilePick}
+                  />
+                  <Button
+                    size="sm"
+                    colorScheme="purple"
+                    variant="outline"
+                    onClick={() => annexureFileRef.current?.click()}
+                    isLoading={annexureUploading}
+                    loadingText="Uploading…"
+                  >
+                    Choose file &amp; add to INDEX
+                  </Button>
+                  {uploadedAnnexures.length > 0 && (
+                    <VStack align="stretch" spacing={1} pt={1}>
+                      {uploadedAnnexures.map((a) => (
+                        <HStack
+                          key={`${a.letter}-${a.fileId}`}
+                          fontSize="2xs"
+                          justify="space-between"
+                          p={2}
+                          borderWidth="1px"
+                          borderColor={borderColor}
+                          borderRadius="md"
+                        >
+                          <Box flex="1" minW={0}>
+                            <Text fontWeight="semibold">Annexure-{a.letter}</Text>
+                            <Text noOfLines={2} color={muted}>{a.description || a.fileName}</Text>
+                            {(a.pageRange || a.page) && (
+                              <Text color={muted}>Pages in bundle: {a.pageRange || a.page}</Text>
+                            )}
+                          </Box>
+                          <IconButton
+                            aria-label="Remove annexure"
+                            size="xs"
+                            variant="ghost"
+                            colorScheme="red"
+                            icon={<DeleteIcon />}
+                            onClick={() => removeUploadedAnnexure(a.letter)}
+                          />
+                        </HStack>
+                      ))}
+                    </VStack>
+                  )}
+                </VStack>
+              </Box>
             </VStack>
           </AccordionPanel>
         </AccordionItem>
@@ -353,6 +507,59 @@ const CounterFillBlanksPanel = ({ result, blankCount, onPatch, onPatchCounterDra
                   sx={textareaSx(isPlaceholderValue(result.verification))}
                 />
               </FormControl>
+            </VStack>
+          </AccordionPanel>
+        </AccordionItem>
+
+        <AccordionItem border="none">
+          <AccordionButton px={2} py={2}>
+            <Text flex="1" textAlign="left" fontWeight="semibold" fontSize="sm">Defence</Text>
+            {defenceParagraphs.filter((p) => String(p || '').trim()).length > 0 && (
+              <Badge ml={2} colorScheme="blue">
+                {defenceParagraphs.filter((p) => String(p || '').trim()).length}
+              </Badge>
+            )}
+            <AccordionIcon />
+          </AccordionButton>
+          <AccordionPanel pb={3} px={1}>
+            <VStack align="stretch" spacing={2}>
+              <Text fontSize="2xs" color={muted}>
+                Added under the heading &quot;DEFENCE&quot; in the court template (after the deponent block, before preliminary objections). Use one box per numbered paragraph when the template uses numbered body paragraphs.
+              </Text>
+              {defenceParagraphs.length === 0 ? (
+                <Button size="sm" variant="outline" leftIcon={<AddIcon />} onClick={addDefenceParagraph}>
+                  Add defence paragraph
+                </Button>
+              ) : (
+                <>
+                  {defenceParagraphs.map((para, i) => (
+                    <FormControl key={`defence-${i}`}>
+                      <HStack justify="space-between" mb={1}>
+                        <FormLabel fontSize="xs" mb={0}>Paragraph {i + 1}</FormLabel>
+                        <IconButton
+                          aria-label="Remove defence paragraph"
+                          size="xs"
+                          variant="ghost"
+                          colorScheme="red"
+                          icon={<DeleteIcon />}
+                          onClick={() => removeDefenceParagraph(i)}
+                        />
+                      </HStack>
+                      <Textarea
+                        size="sm"
+                        rows={4}
+                        value={typeof para === 'string' ? para : String(para || '')}
+                        onChange={(e) => patchDefenceParagraph(i, e.target.value)}
+                        placeholder="That the respondent states that…"
+                        sx={textareaSx(isPlaceholderValue(para))}
+                      />
+                    </FormControl>
+                  ))}
+                  <Button size="xs" variant="ghost" leftIcon={<AddIcon />} alignSelf="flex-start" onClick={addDefenceParagraph}>
+                    Add another paragraph
+                  </Button>
+                </>
+              )}
             </VStack>
           </AccordionPanel>
         </AccordionItem>

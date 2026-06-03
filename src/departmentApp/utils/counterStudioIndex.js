@@ -72,7 +72,8 @@ export function fillIndexEntryPages(indexEntries, counterData = {}, layout = {})
 
     const annexIdx = i - 1;
     const annex = annexures[annexIdx] || {};
-    let count = parsePageRangeSpan(annex.pageRange || annex.page);
+    let count = parsePageRangeSpan(annex.pageRange || annex.page)
+      || Number(annex.pageCount) || 0;
     if (!count) count = 1;
 
     const page = formatPageSpan(annexCursor, count);
@@ -115,7 +116,7 @@ export function buildDefaultIndexEntries(result = {}) {
     rows.push({
       slNo: String(i + 2),
       particulars: annexureParticularsLabel(a, i),
-      page: String(a.pageRange || a.page || '').trim(),
+      page: '',
       rowType: 'annexure',
       letter: String(a.letter || a.id || '').trim() || String.fromCharCode(65 + i),
     });
@@ -123,8 +124,13 @@ export function buildDefaultIndexEntries(result = {}) {
   return rows;
 }
 
-export function annexureIndexFromIndexEntries(indexEntries = []) {
+export function annexureIndexFromIndexEntries(indexEntries = [], previousAnnexures = []) {
   if (!Array.isArray(indexEntries) || indexEntries.length < 2) return [];
+  const prevByLetter = {};
+  (previousAnnexures || []).forEach((a) => {
+    const key = String(a?.letter || a?.id || '').trim().toUpperCase();
+    if (key) prevByLetter[key] = a;
+  });
   return indexEntries.slice(1).map((row, i) => {
       let description = String(row.particulars || '').trim();
       const letterMatch = description.match(/^Annexure-([A-Za-z0-9]+)\s*:\s*/i);
@@ -133,20 +139,26 @@ export function annexureIndexFromIndexEntries(indexEntries = []) {
       if (description.startsWith('A Photostat copy of ')) {
         description = description.slice('A Photostat copy of '.length).trim();
       }
+      const prev = prevByLetter[String(letter).toUpperCase()] || {};
       return {
         letter,
-        description,
-        pageRange: String(row.page || '').trim(),
-        page: String(row.page || '').trim(),
+        description: description || prev.description || '',
+        pageRange: String(row.page || prev.pageRange || '').trim(),
+        page: String(row.page || prev.page || '').trim(),
+        pageCount: prev.pageCount,
+        fileId: prev.fileId,
+        fileName: prev.fileName,
+        userUploaded: prev.userUploaded,
       };
     });
 }
 
-export function normalizeIndexState(result = {}) {
+export function normalizeIndexState(result = {}, options = {}) {
   const captionSubject = String(result.captionSubject || 'Counter Affidavit').trim() || 'Counter Affidavit';
   const layout = inferIndexLayout(result);
+  const forceRebuild = options.forceRebuildIndex === true;
   let indexEntries =
-    Array.isArray(result.indexEntries) && result.indexEntries.length > 0
+    !forceRebuild && Array.isArray(result.indexEntries) && result.indexEntries.length > 0
       ? result.indexEntries.map((row, i) => ({
         slNo: String(row.slNo || i + 1),
         particulars: String(row.particulars || ''),
@@ -159,6 +171,17 @@ export function normalizeIndexState(result = {}) {
   return {
     captionSubject,
     indexEntries,
-    annexureIndex: annexureIndexFromIndexEntries(indexEntries),
+    annexureIndex: annexureIndexFromIndexEntries(indexEntries, result.annexureIndex),
   };
+}
+
+export function nextAnnexureLetterClient(annexureIndex = []) {
+  const used = new Set(
+    (annexureIndex || []).map((a) => String(a?.letter || a?.id || '').trim().toUpperCase()).filter(Boolean)
+  );
+  for (let i = 0; i < 26; i += 1) {
+    const letter = String.fromCharCode(65 + i);
+    if (!used.has(letter)) return letter;
+  }
+  return 'Z';
 }
