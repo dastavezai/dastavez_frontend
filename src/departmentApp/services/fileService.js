@@ -767,10 +767,11 @@ fileService.generateCounterAffidavit = async ({
   simplePreview = false,
   defenceText,
   counterMaker,
+  regenerate = false,
 }) => {
   const response = await api.post(
     '/api/draft/counter-affidavit',
-    { fileId, petitionText, court, language, createEditableDocument, designId, simplePreview, defenceText, counterMaker },
+    { fileId, petitionText, court, language, createEditableDocument, designId, simplePreview, defenceText, counterMaker, regenerate },
     { timeout: 180000 }
   );
   return response.data;

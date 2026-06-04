@@ -511,6 +511,7 @@ const CounterEditorPage = () => {
         simplePreview: layoutMode === 'simple',
         defenceText,
         counterMaker,
+        regenerate: true,
       });
       skipPreviewRefreshRef.current = true;
       applyGeneratedView(res);
