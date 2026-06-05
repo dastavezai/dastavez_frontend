@@ -1,4 +1,4 @@
-import { Scale, Mail, Phone, MapPin, Github, Linkedin, Twitter } from "lucide-react";
+import { Scale, Mail, Phone, MapPin, Linkedin, Instagram } from "lucide-react";
 import AIAssistantIcon from "./AIAssistantIcon";
 import Blog from "@/pages/Blog";
 
@@ -19,14 +19,11 @@ export function Footer() {
               Advanced AI-powered legal assistance, case analysis, and criminal precedent exploration.
             </p>
             <div className="flex space-x-4 pt-2">
-              <a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">
-                <Github className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-judicial-gold">
+              <a href="https://linkedin.com" className="text-gray-400 hover:text-judicial-gold" target="_blank" rel="noopener noreferrer">
                 <Linkedin className="h-5 w-5" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-judicial-gold">
-                <Twitter className="h-5 w-5" />
+              <a href="https://instagram.com" className="text-gray-400 hover:text-judicial-gold" target="_blank" rel="noopener noreferrer">
+                <Instagram className="h-5 w-5" />
               </a>
             </div>
           </div>
@@ -37,12 +34,12 @@ export function Footer() {
             <ul className="space-y-2">
               <li className="flex items-center space-x-2">
                 <AIAssistantIcon />
-                <a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">AI Legal Assistant</a>
+                <a href="/chat" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">AI Legal Assistant</a>
               </li>
-              <li><a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Case Analyzer</a></li>
-              <li><a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Document Summarizer</a></li>
-              <li><a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Precedent Explorer</a></li>
-              <li><a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Legal Research</a></li>
+              <li><a href="/smart-analysis" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Case Analyzer</a></li>
+              <li><a href="/smart-analysis" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Document Summarizer</a></li>
+              <li><a href="/smart-analysis" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Precedent Explorer</a></li>
+              <li><a href="/features" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Legal Research</a></li>
             </ul>
           </div>
           
@@ -50,10 +47,10 @@ export function Footer() {
           <div>
             <h3 className="font-medium text-judicial-gold mb-4">Resources</h3>
             <ul className="space-y-2">
-              <li><a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Documentation</a></li>
-              <li><a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">API Reference</a></li>
-              <li><a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Legal Database</a></li>
-              <li><a href="#" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Case Studies</a></li>
+              <li><a href="/about" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Documentation</a></li>
+              <li><a href="/about" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">API Reference</a></li>
+              <li><a href="/smart-analysis" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Legal Database</a></li>
+              <li><a href="/case-studies" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Case Studies</a></li>
               <li><a href="/blog" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">Blog</a></li>
                
             </ul>
@@ -73,7 +70,7 @@ export function Footer() {
               </li>
               <li className="flex items-center">
                 <Mail className="h-5 w-5 text-judicial-gold mr-2" />
-                <span className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60">info@dastavezai.org</span>
+                <a href="/contact" className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 hover:text-judicial-gold">info@dastavezai.org</a>
               </li>
             </ul>
           </div>
