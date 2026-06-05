@@ -1,6 +1,13 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
 import fileService from '../services/fileService';
+import {
+  buildAnchorCandidates,
+  mergeAnchorCandidateLists,
+  automationInsertCitation,
+  automationJumpToAnchor,
+  automationGetDocumentPlainText,
+} from '../utils/onlyOfficeCitationAutomation';
 
 const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoaded = null, onEditorReady = null }, ref) => {
   const wrapperRef = useRef(null);
@@ -88,46 +95,74 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
     return null;
   };
 
-  const buildAnchorCandidates = (anchorText = '') => {
-    const raw = String(anchorText || '').replace(/\u00a0/g, ' ').trim();
-    if (!raw) return [];
+  const execMethodAsync = (conn, method, args = []) =>
+    new Promise((resolve) => {
+      if (!conn?.executeMethod) {
+        resolve(false);
+        return;
+      }
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(!!value);
+      };
+      try {
+        conn.executeMethod(method, args, (result) => finish(result));
+        setTimeout(() => finish(false), 2500);
+      } catch (err) {
+        console.warn('[CONNECTOR-TRACE] executeMethod failed:', method, err?.message || err);
+        finish(false);
+      }
+    });
 
-    const normalized = raw
-      .replace(/^[\s\u2022•·\-*\d.()]+/, '')
-      .replace(/[“”]/g, '"')
-      .replace(/[‘’]/g, "'")
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const chunks = normalized
-      .split(/(?:\n+|\.|;|:|\?|!|\u2014|\u2013)/)
-      .map((part) => part.replace(/\s+/g, ' ').trim())
-      .filter((part) => part.length >= 8);
-
-    const candidates = [
-      normalized,
-      ...chunks,
-      normalized.substring(0, 220),
-      normalized.substring(0, 160),
-      normalized.substring(0, 120),
-      normalized.substring(0, 80),
-      normalized.substring(0, 60),
-    ]
-      .map((s) => String(s || '').replace(/\s+/g, ' ').trim())
-      .filter((s, idx, arr) => s.length >= 8 && arr.indexOf(s) === idx);
-
-    return candidates;
+  const trySearchAndReplace = async (conn, searchString, replaceString) => {
+    if (!conn?.executeMethod) return false;
+    try {
+      await execMethodAsync(conn, 'SearchAndReplace', [{
+        searchString,
+        replaceString,
+        matchCase: false,
+      }]);
+      return true;
+    } catch (_) {
+      return false;
+    }
   };
 
-  const trySearchAndReplace = (conn, searchString, replaceString) => {
+  const trySearchNext = async (conn, searchString) => {
     if (!conn?.executeMethod) return false;
-    conn.executeMethod('SearchAndReplace', [{
-      searchString,
-      replaceString,
-      isCaseSelected: false,
-      isMatchCase: false,
-    }]);
-    return true;
+    focusOnlyOfficeFrame();
+    const variants = [
+      [{ searchString, matchCase: false }, true],
+      [{ searchString, matchCase: false }],
+    ];
+    for (const args of variants) {
+      const found = await execMethodAsync(conn, 'SearchNext', args);
+      if (found) return true;
+    }
+    return false;
+  };
+
+  const insertAfterAnchor = async (conn, anchorCandidates, text, mode = 'append') => {
+    const cleanedText = String(text || '').trim();
+    if (!cleanedText) return { ok: false, anchorUsed: '' };
+
+    const pastePayload = mode === 'append'
+      ? `\n${cleanedText}`
+      : cleanedText;
+
+    for (const candidate of anchorCandidates) {
+      const found = await trySearchNext(conn, candidate);
+      if (!found) continue;
+
+      focusOnlyOfficeFrame();
+      const pasted = await execMethodAsync(conn, 'PasteText', [pastePayload]);
+      if (pasted !== false) {
+        return { ok: true, anchorUsed: candidate };
+      }
+    }
+    return { ok: false, anchorUsed: '' };
   };
 
   React.useImperativeHandle(ref, () => ({
@@ -143,35 +178,43 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
         return false;
       }
 
-      const doApply = (conn) => {
-        if (!conn || !conn.executeMethod) {
+      const doApply = async (conn) => {
+        if (!conn || (!conn.executeMethod && !conn.callCommand)) {
           console.error('[CONNECTOR-TRACE] invalid connector object');
           return false;
         }
         try {
           const cleanedText = String(text || '').trim();
-          const candidates = buildAnchorCandidates(anchorText);
-          if (candidates.length > 0) {
-            const replaceString = mode === 'append'
-              ? `${candidates[0]}\n${cleanedText}`
-              : cleanedText;
+          if (!cleanedText) return false;
 
-            for (const candidate of candidates) {
-              try {
-                console.log('[CONNECTOR-TRACE] attempting SearchAndReplace for:', candidate.substring(0, 40), { mode });
-                trySearchAndReplace(conn, candidate, mode === 'append' ? `${candidate}\n${cleanedText}` : cleanedText);
-                return true;
-              } catch (_) {
-                // try the next candidate
-              }
+          const candidates = buildAnchorCandidates(anchorText);
+          focusOnlyOfficeFrame();
+
+          if (conn.callCommand && candidates.length > 0) {
+            const auto = await automationInsertCitation(conn, cleanedText, candidates, mode);
+            if (auto.inserted) return true;
+          }
+
+          if (candidates.length > 0 && mode === 'append') {
+            const placed = await insertAfterAnchor(conn, candidates, cleanedText, 'append');
+            if (placed.ok) {
+              console.info('[CONNECTOR-TRACE] inserted after anchor via SearchNext+PasteText', {
+                anchor: placed.anchorUsed.substring(0, 60),
+              });
+              return true;
             }
           }
 
-          if (!candidates.length) {
-            console.log('[CONNECTOR-TRACE] using PasteText at cursor');
-            conn.executeMethod('PasteText', [text]);
+          if (candidates.length > 0 && mode === 'replace') {
+            for (const candidate of candidates) {
+              const replaced = await trySearchAndReplace(conn, candidate, cleanedText);
+              if (replaced) return true;
+            }
           }
-          return true;
+
+          console.log('[CONNECTOR-TRACE] using PasteText at cursor');
+          const pasted = await execMethodAsync(conn, 'PasteText', [cleanedText]);
+          return pasted !== false;
         } catch (err) {
           console.error('[CONNECTOR-TRACE] execution failed:', err);
           return false;
@@ -181,7 +224,7 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
       const conn = await ensureConnector(15000);
       if (conn) {
         console.info('[CONNECTOR-TRACE] link established!');
-        return doApply(conn);
+        return await doApply(conn);
       }
 
       console.warn('[CONNECTOR-TRACE] connector not available; direct insert skipped', {
@@ -219,20 +262,81 @@ const OnlyOfficeEditor = React.forwardRef(({ fileId, refreshKey = 0, onConfigLoa
       if (!ready) return false;
 
       const conn = await ensureConnector(8000);
-      if (!conn?.executeMethod) return false;
+      if (!conn) return false;
 
+      focusOnlyOfficeFrame();
       const candidates = buildAnchorCandidates(anchor);
 
+      if (conn.callCommand) {
+        const jumped = await automationJumpToAnchor(conn, [anchor, ...candidates]);
+        if (jumped) return true;
+      }
+
+      if (!conn.executeMethod) return false;
       for (const candidate of candidates) {
-        try {
-          // SearchAndReplace with identical text acts as a no-op update while nudging caret/view to the hit.
-          trySearchAndReplace(conn, candidate, candidate);
-          return true;
-        } catch (_) {
-          // try shorter candidate
-        }
+        const found = await trySearchNext(conn, candidate);
+        if (found) return true;
       }
       return false;
+    },
+
+    insertCitationAfterAnchor: async (citationText, anchorCandidates = [], mode = 'append') => {
+      const ready = await waitForEditorReady(25000);
+      if (!ready) return { inserted: false, anchorUsed: '', method: 'none', reason: 'editor_not_ready' };
+
+      const conn = await ensureConnector(15000);
+      if (!conn) return { inserted: false, anchorUsed: '', method: 'none', reason: 'no_connector' };
+
+      const merged = mergeAnchorCandidateLists(
+        anchorCandidates,
+        buildAnchorCandidates(anchorCandidates[0] || '')
+      );
+
+      focusOnlyOfficeFrame();
+
+      if (conn.callCommand) {
+        const auto = await automationInsertCitation(conn, citationText, merged, mode);
+        if (auto.inserted) {
+          console.info('[OO-Automation] citation placed', {
+            anchor: auto.anchorUsed?.substring(0, 80),
+            method: auto.method,
+          });
+          return {
+            inserted: true,
+            anchorUsed: auto.anchorUsed,
+            method: auto.method || 'automation',
+            reason: '',
+          };
+        }
+        console.warn('[OO-Automation] citation not placed', auto.reason);
+      }
+
+      if (conn.executeMethod) {
+        const placed = await insertAfterAnchor(conn, merged, citationText, mode);
+        if (placed.ok) {
+          return {
+            inserted: true,
+            anchorUsed: placed.anchorUsed,
+            method: 'search_next_paste',
+            reason: '',
+          };
+        }
+        const pasted = await execMethodAsync(conn, 'PasteText', [`\n${String(citationText || '').trim()}`]);
+        if (pasted !== false) {
+          return { inserted: true, anchorUsed: '', method: 'paste_at_cursor', reason: '' };
+        }
+      }
+
+      return { inserted: false, anchorUsed: '', method: 'none', reason: 'all_methods_failed' };
+    },
+
+    getDocumentPlainText: async () => {
+      const ready = await waitForEditorReady(12000);
+      if (!ready) return '';
+      const conn = await ensureConnector(8000);
+      if (!conn?.callCommand) return '';
+      focusOnlyOfficeFrame();
+      return automationGetDocumentPlainText(conn);
     },
 
     undoLastAction: async () => {

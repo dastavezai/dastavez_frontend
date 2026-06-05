@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { addRefreshInterceptors } from './axiosWithRefresh.js';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { getApiBaseUrl } from './apiBase.js';
+
+const BASE_URL = getApiBaseUrl();
 const API_URL = `${BASE_URL}/api/subscription`;
 
 const api = axios.create({

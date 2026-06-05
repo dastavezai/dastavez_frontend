@@ -83,6 +83,7 @@ import DocumentConverter from './editor/DocumentConverter.jsx';
 import { buildDocFlow } from './editor/DocFlowEngine.js';
 import { extractPageObjects } from './editor/ObjectLayer.js';
 import OnlyOfficeEditor from './OnlyOfficeEditor';
+import AuditStatementPanel from './editor/AuditStatementPanel';
 import { useAppTheme } from '../context/ThemeContext';
 import DemoLauncher from './DemoMode/DemoLauncher';
 import './FullPageEditor.css';
@@ -3074,7 +3075,7 @@ const FullPageEditor = ({
     }
   };
 
-  const handleExportAuditLog = async (format = 'pdf') => {
+  const handleExportAuditLog = async (format = 'pdf', filters = {}) => {
     const sid = session?._id;
     if (!sid) {
       toast({ title: 'No active session', status: 'warning', duration: 2000 });
@@ -3083,7 +3084,7 @@ const FullPageEditor = ({
     toast({ title: 'Generating Audit Log...', status: 'info', duration: 2000 });
     try {
       // Always fetch HTML — PDF is rendered client-side via browser print (no puppeteer dependency)
-      const data = await fileService.exportAuditLog(sid, 'html');
+      const data = await fileService.exportAuditLog(sid, 'html', filters);
       const htmlContent = typeof data === 'string' ? data : await data.text();
 
       if (format === 'pdf') {
@@ -3387,7 +3388,54 @@ const handleTryAnotherPlacement = useCallback(async () => {
 
   const attemptCitationBridgeInsert = useCallback(async (citationText, anchorCandidates = [], options = {}) => {
   const text = String(citationText || '').trim();
-  if (!text || !onlyOfficeRef.current?.insertText) {
+  if (!text || !onlyOfficeRef.current) {
+    return { inserted: false, anchorUsed: '', jumped: false };
+  }
+
+  const uniqueCandidates = [];
+  for (const candidate of anchorCandidates) {
+    const value = String(candidate || '').trim();
+    if (value.length < 8) continue;
+    if (!uniqueCandidates.includes(value)) uniqueCandidates.push(value);
+  }
+
+  let ooPlain = '';
+  if (onlyOfficeRef.current?.getDocumentPlainText) {
+    try {
+      ooPlain = await onlyOfficeRef.current.getDocumentPlainText();
+    } catch (_) {
+      ooPlain = '';
+    }
+  }
+  if (ooPlain && ooPlain.length > 40) {
+    const ooAnchors = findCitationAnchorCandidates(ooPlain, uniqueCandidates[0] || '');
+    for (const a of ooAnchors) {
+      if (!uniqueCandidates.includes(a)) uniqueCandidates.unshift(a);
+    }
+  }
+
+  if (onlyOfficeRef.current?.insertCitationAfterAnchor && uniqueCandidates.length > 0) {
+    try {
+      const placed = await onlyOfficeRef.current.insertCitationAfterAnchor(
+        text,
+        uniqueCandidates,
+        options?.mode || 'append'
+      );
+      if (placed?.inserted) {
+        return {
+          inserted: true,
+          anchorUsed: placed.anchorUsed || uniqueCandidates[0],
+          jumped: true,
+          method: placed.method || 'automation',
+        };
+      }
+      console.warn('[CITATION] automation insert failed:', placed?.reason);
+    } catch (err) {
+      console.warn('[CITATION] insertCitationAfterAnchor failed:', err?.message || err);
+    }
+  }
+
+  if (!onlyOfficeRef.current?.insertText) {
     return { inserted: false, anchorUsed: '', jumped: false };
   }
 
@@ -3419,13 +3467,6 @@ const handleTryAnotherPlacement = useCallback(async () => {
     }
 
     return { inserted: false, anchorUsed: '', jumped: false };
-  }
-
-  const uniqueCandidates = [];
-  for (const candidate of anchorCandidates) {
-    const value = String(candidate || '').trim();
-    if (value.length < 8) continue;
-    if (!uniqueCandidates.includes(value)) uniqueCandidates.push(value);
   }
 
   let jumped = false;
@@ -4479,19 +4520,30 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                 if (suggestion.type === 'precedence_apply' && !originalParagraph && parsed && parsed.insertAfterParagraph !== undefined) {
                   const insertAfter = parsed.insertAfterParagraph || '';
                   const clauseText = String(parsed.clauseText || revisedParagraph || suggestion.suggestedText || '').trim();
+                  revisedParagraph = clauseText;
+                  anchorText = insertAfter;
+                  action = 'append';
+
+                  if (insertAfter && clauseText && onlyOfficeEditorReady && onlyOfficeRef.current) {
+                    const plainDoc = String(editor.getText() || '');
+                    const anchorCandidates = findCitationAnchorCandidates(plainDoc, insertAfter);
+                    const bridgeResult = await attemptCitationBridgeInsert(clauseText, [insertAfter, ...anchorCandidates]);
+                    if (bridgeResult.inserted) {
+                      applied = true;
+                      toastDesc = 'Case citation inserted in OnlyOffice after the target paragraph';
+                    }
+                  }
+
                   const escaped = clauseText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                   const insertHtml = `<p><mark data-color="${HIGHLIGHT_ADD}" style="background-color:${HIGHLIGHT_ADD};color:#065f46;">${escaped}</mark></p>`;
-                  if (insertAfter) {
-                    anchorText = insertAfter;
-                    action = 'append';
+                  if (!applied && insertAfter) {
                     const range = fuzzyFindRange(insertAfter);
                     if (range) {
                       editor.chain().focus().insertContentAt(range.to + 1, insertHtml).run();
                       editor.commands.setTextSelection({ from: Math.max(1, range.to), to: Math.max(1, range.to) });
                       editor.commands.scrollIntoView();
                       applied = true;
-                      toastDesc = 'Case citation inserted under specific section (highlighted green)';
-                      revisedParagraph = clauseText;
+                      toastDesc = 'Case citation inserted in draft layer (syncing to OnlyOffice…)';
                     }
                   }
                   if (!applied && clauseText) {
@@ -4520,8 +4572,22 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   const sectionLabel = deriveSectionLabel(bestAnchor);
                   const shortAnchor = shortenAnchorPhrase(bestAnchor);
                   let jumped = false;
+                  let bridgeInserted = false;
 
-                  if (bestAnchor.length >= 8 && onlyOfficeRef.current?.jumpToAnchor) {
+                  if (onlyOfficeEditorReady && onlyOfficeRef.current) {
+                    const bridgeResult = await attemptCitationBridgeInsert(
+                      revisedParagraph,
+                      [citationAnchorHint, bestAnchor, ...anchorCandidates]
+                    );
+                    bridgeInserted = !!bridgeResult.inserted;
+                    jumped = bridgeResult.jumped;
+                    if (bridgeInserted) {
+                      applied = true;
+                      toastDesc = 'Case citation inserted in OnlyOffice';
+                    }
+                  }
+
+                  if (!bridgeInserted && bestAnchor.length >= 8 && onlyOfficeRef.current?.jumpToAnchor) {
                     try {
                       jumped = !!(await onlyOfficeRef.current.jumpToAnchor(bestAnchor));
                     } catch (_) {
@@ -4529,6 +4595,9 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                     }
                   }
 
+                  if (bridgeInserted) {
+                    // Citation already in OnlyOffice — skip manual paste wizard.
+                  } else {
                   citationInProgressRef.current.add(idKey);
                   markSuggestionInProgress(suggestion?.suggestionId);
                   setCitationWizardStep(1);
@@ -4549,8 +4618,9 @@ CRITICAL: originalParagraph must be verbatim from the document. If this is a new
                   manualPastePrepared = true;
                   applied = false;
                   toastDesc = jumped
-                    ? 'Cursor moved to the most relevant section. Paste the citation, then click Confirm Paste.'
-                    : 'Could not jump exactly to the target. Use the target hint, paste the citation, then click Confirm Paste.';
+                    ? 'Cursor moved to the target section. Click Add Citation to insert, or paste manually.'
+                    : 'Could not jump to the target. Use Find Target, place the cursor, then Add Citation.';
+                  }
                 } else if (strictPlacementTypes.has(suggestion.type) && revisedParagraph) {
                   const aiAnchor = await findAiAnchorRange([suggestion.title, suggestion.description, suggestion.caseName, suggestion.principle], suggestion.type);
                   if (aiAnchor) {
@@ -4755,10 +4825,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 : [citationAnchorHint].filter((value) => String(value || '').trim().length >= 8);
               let inserted = false;
               if (suggestion?.type === 'precedence_apply') {
-                inserted = (await attemptCitationBridgeInsert(revisedParagraph, citationAnchorCandidates, { preferTokenInsertion: true })).inserted;
-                if (!inserted) {
-                  inserted = (await attemptCitationBridgeInsert(revisedParagraph, citationAnchorCandidates)).inserted;
-                }
+                inserted = (await attemptCitationBridgeInsert(revisedParagraph, citationAnchorCandidates)).inserted;
               } else {
                 inserted = await onlyOfficeRef.current.insertText(
                 revisedParagraph,
@@ -5039,6 +5106,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
   }, [selectedFile?._id, toast]);
 
   const fileName = session?.fileName || selectedFile?.fileName || 'Untitled';
+  const currentOnlyOfficeFileId = selectedFile?._id || session?.fileId || null;
   const plainText = editor?.getText() || '';
   const wordCount = plainText.split(/\s+/).filter(w => w).length;
   const charCount = plainText.length;
@@ -5117,7 +5185,6 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                   aria-label="Toggle dual view"
                 />
               </Tooltip>
-
               <Divider orientation="vertical" h="20px" />
               <HStack spacing={1}>
                 <Button
@@ -5281,7 +5348,7 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                 <TabList px={1} pt={1}>
                   <Tab fontSize="xs"><Icon as={MdDescription} mr={1} /> Analysis</Tab>
                   <Tab fontSize="xs"><Icon as={MdSmartToy} mr={1} /> AI Helper</Tab>
-                  <Tab fontSize="xs"><Icon as={MdHistory} mr={1} /> History</Tab>
+                  <Tab fontSize="xs"><Icon as={MdHistory} mr={1} /> Change log</Tab>
                 </TabList>
                 <TabPanels flex="1" minH="0" overflow="hidden">
                   <TabPanel p={0} h="100%" overflowY="auto">
@@ -5300,75 +5367,12 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       editor={editor}
                     />
                   </TabPanel>
-                  <TabPanel p={2} h="100%" overflowY="auto">
-                    <VStack align="stretch" spacing={2}>
-                      {changeHistory.length === 0 ? (
-                        <Text fontSize="sm" color="gray.500" textAlign="center" py={8}>
-                          No edits yet
-                        </Text>
-                      ) : (
-                        changeHistory.slice().reverse().map((change, revIdx) => {
-                          const idx = changeHistory.length - 1 - revIdx;
-                          const isSuggestion = change.type === 'suggestion';
-                          return (
-                            <Box
-                              key={idx}
-                              p={2}
-                              bg={useColorModeValue(change.reverted ? 'orange.50' : 'gray.50', change.reverted ? 'orange.900' : 'gray.700')}
-                              borderRadius="md"
-                              borderLeft="3px solid"
-                              borderLeftColor={change.reverted ? 'orange.400' : 'green.400'}
-                              opacity={change.reverted ? 0.7 : 1}
-                            >
-                              <HStack justify="space-between" mb={0.5}>
-                                <Badge
-                                  fontSize="2xs"
-                                  colorScheme={isSuggestion ? 'blue' : 'purple'}
-                                  variant="subtle"
-                                >
-                                  {isSuggestion ? 'Suggestion' : 'AI Edit'}
-                                </Badge>
-                                <Text fontSize="2xs" color="gray.400">
-                                  {change.timestamp ? new Date(change.timestamp).toLocaleTimeString() : ''}
-                                </Text>
-                              </HStack>
-                              <Text fontSize="xs" fontWeight="500" noOfLines={2} mb={1}>
-                                {change.instruction || change.summary}
-                              </Text>
-                              {isSuggestion && change.originalText && (
-                                <VStack spacing={1} align="stretch" mt={1}>
-                                  <Box px={1.5} py={0.5} bg={useColorModeValue('red.50', 'red.900')} borderRadius="sm" borderLeft="2px solid" borderLeftColor="red.300">
-                                    <Text fontSize="2xs" color="red.500" fontWeight="bold">Before:</Text>
-                                    <Text fontSize="2xs" noOfLines={2}>{change.originalText}</Text>
-                                  </Box>
-                                  <Box px={1.5} py={0.5} bg={useColorModeValue('green.50', 'green.900')} borderRadius="sm" borderLeft="2px solid" borderLeftColor="green.300">
-                                    <Text fontSize="2xs" color="green.500" fontWeight="bold">After:</Text>
-                                    <Text fontSize="2xs" noOfLines={2}>{change.suggestedText}</Text>
-                                  </Box>
-                                  {!change.reverted && (
-                                    <Button
-                                      size="xs"
-                                      variant="ghost"
-                                      colorScheme="orange"
-                                      fontSize="2xs"
-                                      h="20px"
-                                      onClick={() => handleRevertChange(idx)}
-                                    >
-                                      ↩ Revert
-                                    </Button>
-                                  )}
-                                  {change.reverted && (
-                                    <Badge fontSize="2xs" colorScheme="orange" variant="outline" alignSelf="flex-start">
-                                      Reverted
-                                    </Badge>
-                                  )}
-                                </VStack>
-                              )}
-                            </Box>
-                          );
-                        })
-                      )}
-                    </VStack>
+                  <TabPanel p={2} h="100%" display="flex" flexDirection="column" minH={0} overflow="hidden">
+                    <AuditStatementPanel
+                      changes={changeHistory}
+                      onRevertChange={handleRevertChange}
+                      onExport={(filters) => handleExportAuditLog('html', filters)}
+                    />
                   </TabPanel>
                 </TabPanels>
               </Tabs>
@@ -6342,7 +6346,9 @@ Respond ONLY in JSON: {"insertAfterParagraph":"<exact verbatim paragraph from do
                       </VStack>
                     </Box>
                   )}
-                  <OnlyOfficeEditor ref={onlyOfficeRef} fileId={selectedFile?._id || session?.fileId} refreshKey={onlyOfficeRefreshKey} onConfigLoaded={handleOnlyOfficeConfigLoaded} onEditorReady={handleOnlyOfficeEditorReady} />
+                  <VStack align="stretch" spacing={2}>
+                    <OnlyOfficeEditor ref={onlyOfficeRef} fileId={currentOnlyOfficeFileId} refreshKey={onlyOfficeRefreshKey} onConfigLoaded={handleOnlyOfficeConfigLoaded} onEditorReady={handleOnlyOfficeEditorReady} />
+                  </VStack>
                 </>
               )}
             </Box>

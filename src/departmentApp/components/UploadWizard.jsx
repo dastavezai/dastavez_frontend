@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Modal, ModalOverlay, ModalContent, ModalBody,
   Box, VStack, HStack, Text, Button, Icon, Progress,
@@ -13,7 +14,7 @@ import {
   FaPen, FaSearch, FaBrain, FaShieldAlt, FaBalanceScale,
   FaUpload, FaRobot, FaEdit, FaTrash, FaPlus,
 } from 'react-icons/fa';
-import { MdOutlineDocumentScanner } from 'react-icons/md';
+import { MdOutlineDocumentScanner, MdAutoAwesome } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import fileService from '../services/fileService';
 import AnalysisDashboard from './analysis/AnalysisDashboard';
@@ -131,8 +132,17 @@ const formatBytes = (bytes) => {
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
 };
 
+const counterStudioPath = (fileId) => {
+  const id = encodeURIComponent(fileId);
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/department')) {
+    return `/department/counter_editor?fileId=${id}`;
+  }
+  return `/counter_editor?fileId=${id}`;
+};
+
 const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
   const { token } = useAuth();
+  const navigate = useNavigate();
 
   const [step, setStep] = useState('pick');
   const [dragOver, setDragOver] = useState(false);
@@ -457,6 +467,15 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
     } else {
       proceedToEditor();
     }
+  };
+
+  const handleGenerateCounter = () => {
+    if (!uploadedFileId) {
+      toast({ title: 'Upload a file first', status: 'warning', duration: 2500 });
+      return;
+    }
+    onClose();
+    navigate(counterStudioPath(uploadedFileId));
   };
 
   // Handle user choosing to use AI-detected fields
@@ -985,7 +1004,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
             </HStack>
 
             <Text fontSize="sm" color={textMuted}>
-              Review the AI analysis below, then open your document in the editor.
+              Review the AI analysis below, then open the document in the editor or generate a counter in Counter Studio.
             </Text>
 
             {/* Template match banner */}
@@ -1049,18 +1068,19 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
                 variant="outline"
                 size="sm"
                 colorScheme="blue"
-                onClick={() => setSofExpanded((p) => !p)}
-              >
-                {sofExpanded ? 'Hide SOF' : 'See SOF'}
-              </Button>
-              <Button
-                data-tour="open-editor-btn"
-                colorScheme="blue"
-                size="md"
-                rightIcon={<Icon as={FaArrowRight} />}
                 onClick={handleOpenEditor}
               >
                 Open in Editor
+              </Button>
+              <Button
+                data-tour="generate-counter-btn"
+                colorScheme="purple"
+                size="md"
+                leftIcon={<Icon as={MdAutoAwesome} />}
+                rightIcon={<Icon as={FaArrowRight} />}
+                onClick={handleGenerateCounter}
+              >
+                Generate Counter
               </Button>
             </HStack>
           </VStack>
