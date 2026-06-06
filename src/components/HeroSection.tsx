@@ -76,58 +76,100 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right Hero Mockup Area */}
+          {/* Right Hero Mockup Area - Animated Document Wizard */}
           <div className="lg:col-span-5 relative flex justify-center lg:justify-end">
-            <div className="relative w-full max-w-[440px] aspect-[4/3] sm:aspect-square bg-gray-50 dark:bg-judicial-navy/20 border border-gray-200 dark:border-judicial-gold/10 rounded-2xl p-4 shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden group">
-              {/* Glass shine element */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-
-              {/* Browser control header */}
-              <div className="flex items-center justify-between border-b border-gray-200 dark:border-judicial-gold/10 pb-3 mb-4">
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+            <div className="relative w-full max-w-[440px] aspect-[4/3] sm:aspect-[4/3.5] bg-white dark:bg-judicial-dark border border-gray-200 dark:border-judicial-gold/10 rounded-2xl p-5 shadow-2xl hover:shadow-3xl transition-all duration-500 overflow-hidden group">
+              
+              {/* Modal Header bar */}
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-judicial-gold/15 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-base select-none">📝</span>
+                  <h3 className="font-bold text-sm text-gray-900 dark:text-white leading-tight">Create Document</h3>
                 </div>
-                <div className="text-[10px] text-gray-400 font-mono">Dastavez AI Editor v2.0</div>
-                <div className="w-8"></div>
+                <div className="w-5 h-5 rounded-full bg-gray-100 dark:bg-judicial-navy flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs select-none">✕</div>
               </div>
 
-              {/* simulated workspace */}
-              <div className="space-y-4 font-mono text-[11px] leading-relaxed">
-                <div className="flex items-center justify-between bg-white dark:bg-judicial-dark/60 p-2 border border-gray-200 dark:border-judicial-gold/5 rounded shadow-sm">
-                  <span className="text-gray-400">Target State:</span>
-                  <span className="text-judicial-gold font-semibold">New Delhi, India</span>
-                </div>
+              <div className="text-[10px] text-gray-400 dark:text-gray-500 mb-3">
+                Answer a few questions and we'll create the right document for you
+              </div>
 
-                <div className="space-y-2 p-3 bg-white dark:bg-judicial-navy/40 border border-gray-100 dark:border-judicial-gold/10 rounded-lg shadow-sm">
-                  <div className="flex items-center justify-between text-[10px] text-gray-400 border-b border-gray-100 dark:border-judicial-gold/5 pb-1">
-                    <span>Drafting Document</span>
-                    <span className="text-green-500 animate-pulse">● Active</span>
-                  </div>
-                  <div className="text-gray-800 dark:text-gray-200">
-                    <span className="text-judicial-gold">LEAD PARTY:</span> Richardson Properties Ltd.<br />
-                    <span className="text-judicial-gold">TENANT PARTY:</span> Zenith Analytics Corp.<br />
-                    <span className="text-judicial-gold">TERM:</span> 36 Months Lease Agreement.<br />
-                    <span className="text-judicial-gold">RENT:</span> ₹1,20,000 / Month.
-                  </div>
-                </div>
+              {/* Progress bar animation */}
+              <div className="w-full bg-gray-100 dark:bg-judicial-navy h-1 rounded-full overflow-hidden mb-5">
+                <motion.div 
+                  initial={{ width: "10%" }}
+                  animate={{ width: "35%" }}
+                  transition={{ duration: 1.5, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+                  className="bg-judicial-gold h-full"
+                ></motion.div>
+              </div>
 
-                {/* AI suggestion panel overlay */}
-                <div className="absolute bottom-6 right-6 left-6 p-4 bg-white dark:bg-judicial-dark border border-judicial-gold/30 rounded-xl shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                  <div className="flex items-center gap-1.5 text-xs text-judicial-gold font-semibold mb-1">
-                    <Sparkles className="h-4 w-4 animate-bounce" />
-                    <span>AI Clause Recommendation</span>
+              {/* Question heading */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="bg-judicial-gold/20 text-judicial-gold w-4 h-4 rounded-sm flex items-center justify-center text-[10px] font-bold">1</span>
+                <span className="text-xs font-bold text-gray-800 dark:text-gray-200">What type of document do you need?</span>
+              </div>
+
+              {/* Category options list */}
+              <div className="space-y-2 max-h-[190px] overflow-y-auto pr-1">
+                {/* Agreements Option */}
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  className="flex items-center justify-between p-2.5 rounded-lg border border-judicial-gold/30 bg-judicial-gold/5 dark:bg-judicial-gold/5 cursor-pointer"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="p-1.5 bg-judicial-gold/10 text-judicial-gold rounded">📄</span>
+                    <div>
+                      <h4 className="text-[11px] font-semibold text-gray-800 dark:text-white leading-none">Agreements & Contracts</h4>
+                      <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Rent, sale, partnership, employment contracts</p>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-gray-600 dark:text-gray-300 leading-normal">
-                    "Insert rent escalation clause: 5% increase annually starting month 13."
-                  </p>
-                  <div className="flex justify-end gap-2 mt-2">
-                    <button className="px-2 py-1 bg-gray-100 dark:bg-judicial-navy text-gray-500 rounded text-[9px] hover:bg-gray-200 transition-colors">Ignore</button>
-                    <button className="px-2.5 py-1 bg-judicial-gold text-judicial-dark font-semibold rounded text-[9px] hover:bg-judicial-lightGold transition-colors">Apply Clause</button>
+                  <div className="w-3.5 h-3.5 rounded-full border border-judicial-gold flex items-center justify-center">
+                    <div className="w-2 h-2 rounded-full bg-judicial-gold"></div>
                   </div>
+                </motion.div>
+
+                {/* Real Estate Option */}
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  className="flex items-center justify-between p-2.5 rounded-lg border border-gray-100 dark:border-judicial-gold/5 bg-transparent hover:border-judicial-gold/20 hover:bg-gray-50 dark:hover:bg-judicial-navy/10 cursor-pointer"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="p-1.5 bg-gray-100 dark:bg-judicial-navy text-gray-600 dark:text-gray-400 rounded">🏠</span>
+                    <div>
+                      <h4 className="text-[11px] font-semibold text-gray-800 dark:text-white leading-none">Property & Real Estate</h4>
+                      <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Sale deed, gift deed, power of attorney</p>
+                    </div>
+                  </div>
+                  <div className="w-3.5 h-3.5 rounded-full border border-gray-300 dark:border-gray-600"></div>
+                </motion.div>
+
+                {/* Personal Option */}
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  className="flex items-center justify-between p-2.5 rounded-lg border border-gray-100 dark:border-judicial-gold/5 bg-transparent hover:border-judicial-gold/20 hover:bg-gray-50 dark:hover:bg-judicial-navy/10 cursor-pointer"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="p-1.5 bg-gray-100 dark:bg-judicial-navy text-gray-600 dark:text-gray-400 rounded">👥</span>
+                    <div>
+                      <h4 className="text-[11px] font-semibold text-gray-800 dark:text-white leading-none">Family & Personal</h4>
+                      <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Adoption deed, affidavit, will</p>
+                    </div>
+                  </div>
+                  <div className="w-3.5 h-3.5 rounded-full border border-gray-300 dark:border-gray-600"></div>
+                </motion.div>
+              </div>
+
+              {/* Modal footer navigation */}
+              <div className="flex items-center justify-between mt-5 pt-3 border-t border-gray-100 dark:border-judicial-gold/15">
+                <span className="text-[10px] text-gray-400 hover:text-gray-600 cursor-pointer">← Back</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 cursor-pointer hover:underline">Cancel</span>
+                  <button className="px-3 py-1.5 bg-judicial-gold/30 dark:bg-judicial-gold/20 text-judicial-gold dark:text-judicial-lightGold hover:bg-judicial-gold hover:text-judicial-dark text-[10px] font-semibold rounded transition-colors flex items-center gap-1">
+                    Next →
+                  </button>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
