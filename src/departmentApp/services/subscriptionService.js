@@ -1,0 +1,124 @@
+import axios from 'axios';
+import { addRefreshInterceptors } from './axiosWithRefresh.js';
+
+import { getApiBaseUrl } from './apiBase.js';
+
+const BASE_URL = getApiBaseUrl();
+const API_URL = `${BASE_URL}/api/subscription`;
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    const csrfToken = localStorage.getItem('csrfToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (csrfToken) {
+      config.headers['x-csrf-token'] = csrfToken;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+addRefreshInterceptors(api);
+
+export const createOrder = async (amount, couponCode) => {
+  try {
+    const response = await api.post(`${API_URL}/order`, { amount, couponCode });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const verifyPayment = async (paymentData) => {
+  try {
+    const response = await api.post(`${API_URL}/verify`, paymentData);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const getSubscriptionStatus = async () => {
+  try {
+    const response = await api.get(`${API_URL}/status`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const validateCoupon = async (code) => {
+  try {
+    const response = await api.post(`${API_URL}/validate-coupon`, { code });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const getSubscriptionPrice = async () => {
+  try {
+    const response = await api.get(`${API_URL}/price`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const updateSubscriptionPrice = async (newPrice) => {
+  try {
+    
+    const response = await api.put(`${API_URL}/price`, { amount: Math.round(newPrice * 100) });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const createCoupon = async (couponData) => {
+  try {
+    const response = await api.post(`${API_URL}/coupons`, couponData);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const getCoupons = async () => {
+  try {
+    const response = await api.get(`${API_URL}/coupons`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const editCoupon = async (id, couponData) => {
+  try {
+    const response = await api.put(`${API_URL}/coupons/${id}`, couponData);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const deleteCoupon = async (id) => {
+  try {
+    const response = await api.delete(`${API_URL}/coupons/${id}`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+}; 
