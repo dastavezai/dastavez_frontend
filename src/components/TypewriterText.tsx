@@ -25,7 +25,7 @@ const TypewriterText = ({words}: {words: string[]}) => {
 }, [subIndex, isDeleting, index, words]);
 
   return (
-    <span className="inline-block text-judicial-gold text-left whitespace-nowrap">
+    <span className="inline-block text-judicial-gold text-left font-bold whitespace-nowrap">
         {words[index].substring(0, subIndex)}
     </span> 
      );

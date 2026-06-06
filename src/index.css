@@ -196,6 +196,14 @@
   }
 
   /* Mobile-first responsive utilities */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   .mobile-only {
     @apply block sm:hidden;
   }

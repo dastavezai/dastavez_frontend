@@ -10,6 +10,25 @@ import { BookDemoForm } from "./BookDemoForm";
 export function HeroSection() {
   const navigate = useNavigate();
 
+  const containerVariants = {
+    hidden: { opacity: 1 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.6,
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, x: -15 },
+    visible: { 
+      opacity: 1, 
+      x: 0,
+      transition: { duration: 0.4, ease: "easeOut" }
+    }
+  };
+
   return (
     <div className="relative pt-20 pb-16 sm:pt-24 sm:pb-20 md:pt-32 md:pb-28 overflow-hidden w-full bg-white dark:bg-transparent transition-colors duration-300">
       {/* Background Glows */}
@@ -38,7 +57,7 @@ export function HeroSection() {
               <br />
               <span className="text-gray-900 dark:text-gray-100">
                 For{" "}
-                <span className="text-judicial-gold font-serif-legal inline-block">
+                <span className="text-judicial-gold font-serif-legal font-bold inline-block">
                   <TypewriterText
                     words={["Contract Creation", "Rent Agreements", "Case Summaries", "Airtight Clauses"]}
                   />
@@ -47,25 +66,30 @@ export function HeroSection() {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 max-w-2xl leading-relaxed">
-              Supercharge your research, automate structural drafting, and identify hidden contractual liabilities in minutes. Built specifically for legal professionals.
+            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 max-w-xl leading-relaxed">
+              Supercharge legal research, automate drafts, and identify liabilities in minutes.
             </p>
 
-            {/* Highlighted Trust points */}
-            <div className="space-y-2.5 pt-2">
-              <div className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+            {/* Highlighted Trust points with stagger animation */}
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="space-y-2.5 pt-1"
+            >
+              <motion.div variants={itemVariants} className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 font-medium">
                 <CheckCircle2 className="h-5 w-5 text-judicial-gold flex-shrink-0" />
-                <span>10x faster document creation with active smart templates</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+                <span>10x faster drafting with active smart templates</span>
+              </motion.div>
+              <motion.div variants={itemVariants} className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 font-medium">
                 <CheckCircle2 className="h-5 w-5 text-judicial-gold flex-shrink-0" />
-                <span>Trained on statutory rules, court guidelines and case law precedents</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+                <span>Trained on active statutes & case precedents</span>
+              </motion.div>
+              <motion.div variants={itemVariants} className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 font-medium">
                 <CheckCircle2 className="h-5 w-5 text-judicial-gold flex-shrink-0" />
-                <span>Confidential data siloed under bank-grade isolated encryption</span>
-              </div>
-            </div>
+                <span>Confidential data secured by isolated encryption</span>
+              </motion.div>
+            </motion.div>
 
             {/* CTA area */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">
