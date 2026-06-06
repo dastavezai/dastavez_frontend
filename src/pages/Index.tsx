@@ -1,6 +1,8 @@
 import { Navbar } from "@/components/Navbar";
 import { HeroSection } from "@/components/HeroSection";
-import { FeatureCards } from "@/components/FeatureCards";
+import { StatsBanner } from "@/components/StatsBanner";
+import { InteractiveFeatureShowcase } from "@/components/InteractiveFeatureShowcase";
+import { SecurityTrustGrid } from "@/components/SecurityTrustGrid";
 import { CaseAnalysis } from "@/components/CaseAnalysis";
 import { TestimonialSection } from "@/components/TestimonialSection";
 import { Footer } from "@/components/Footer";
@@ -10,41 +12,29 @@ import { Link } from "react-router-dom";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
+    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300 font-sans-premium">
       <StarField />
       <Navbar />
       
-      {/* NyayGuru-like Hero with CTA and badges */}
+      {/* Premium Hero Section */}
       <section className="relative">
         <HeroSection />
-        {/* <div className="container mx-auto px-4 -mt-6 md:-mt-10">
-          <div className="mx-auto max-w-3xl text-center bg-judicial-navy/40 dark:bg-judicial-navy/40 light:bg-white/60 border border-judicial-gold/20 rounded-2xl p-4 md:p-6 backdrop-blur">
-            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-300 light:text-judicial-navy/70 mb-3">
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Ask Your Legal Query</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Be Specific</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Ask in Any Language</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Upload PDFs</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Find Case Laws</span>
-              <span className="px-2 py-1 rounded bg-judicial-navy/60 dark:bg-judicial-navy/60 light:bg-judicial-navy/20 border border-judicial-gold/20">Legal Draftings</span>
-              <span className="px-2 py-1 rounded bg-judicial-gold text-judicial-dark font-semibold">It’s Free!</span>
-            </div>
-            <Link to="/chat" className="inline-block px-5 py-3 rounded-lg bg-judicial-gold text-judicial-dark font-semibold hover:bg-judicial-lightGold transition-colors">
-              Start Chatting
-            </Link>
-          </div> */}
-        {/* </div> */}
       </section>
-      
-      <FeatureCards />
+
+      {/* Stats Banner */}
+      <StatsBanner />
+
+      {/* Interactive Features tab explorer */}
+      <InteractiveFeatureShowcase />
       
       {/* Demo Section */}
-      <div className="py-16 bg-judicial-navy/30 dark:bg-judicial-navy/30 light:bg-judicial-navy/10" id="cases">
+      <div className="py-16 bg-gray-50/50 dark:bg-judicial-navy/20 border-y border-gray-200/60 dark:border-judicial-gold/10" id="cases">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            <h2 className="text-3xl md:text-5xl font-bold font-serif-legal mb-4 text-gray-900 dark:text-white">
               See <span className="text-judicial-gold">Dastavez AI</span> in Action
             </h2>
-            <p className="text-gray-400 dark:text-gray-400 light:text-judicial-navy/60 max-w-2xl mx-auto">
+            <p className="text-gray-550 dark:text-gray-400 max-w-2xl mx-auto">
               Experience our powerful legal AI tools through interactive demos of our core features.
             </p>
           </div>
@@ -57,8 +47,11 @@ const Index = () => {
         </div>
       </div>
 
+      {/* Security & Reliability Section */}
+      <SecurityTrustGrid />
+
       {/* Trusted by Legal Professionals Section */}
-      <div className="py-16 md:py-20 relative overflow-hidden bg-white dark:bg-judicial-dark light:bg-white transition-colors duration-300">
+      <div className="py-16 md:py-20 relative overflow-hidden bg-white dark:bg-judicial-dark transition-colors duration-300">
         {/* Background Elements */}
         <div className="absolute inset-0 z-0">
           {/* Dark mode background */}
@@ -72,11 +65,11 @@ const Index = () => {
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              <span className="text-gradient-hero dark:text-judicial-gold light:text-judicial-navy">Trusted by</span>{' '}
-              <span className="text-judicial-gold dark:text-judicial-gold light:text-judicial-navy">Legal Professionals</span>
+            <h2 className="text-3xl md:text-4xl font-bold font-serif-legal mb-4">
+              <span className="text-gray-900 dark:text-white">Trusted by</span>{' '}
+              <span className="text-judicial-gold">Legal Professionals</span>
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 light:text-gray-600 max-w-2xl mx-auto">
+            <p className="text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
               See what attorneys and legal teams are saying about Dastavez AI Oracle's impact on their practice.
             </p>
           </div>
@@ -87,13 +80,13 @@ const Index = () => {
                 <div className="trusted-icon-container">
                   <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
                 </div>
-                <p className="text-gray-700 dark:text-gray-300 light:text-gray-700 mb-6 trusted-text">
+                <p className="text-gray-700 dark:text-gray-300 mb-6 trusted-text">
                   "Dastavez AI has completely transformed our legal research process. We've reduced preparation time by 60% while discovering more relevant precedents for our cases."
                 </p>
                 <div className="trusted-footer">
                   <div className="trusted-author">
-                    <h4 className="font-semibold text-gray-900 dark:text-white light:text-gray-900">Priyanshu Singh</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 light:text-gray-600">Senior Partner, Richardson & Associates</p>
+                    <h4 className="font-semibold text-gray-900 dark:text-white">Priyanshu Singh</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Senior Partner, Richardson & Associates</p>
                   </div>
                   <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
@@ -109,13 +102,13 @@ const Index = () => {
                 <div className="trusted-icon-container">
                   <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
                 </div>
-                <p className="text-gray-700 dark:text-gray-300 light:text-gray-700 mb-6 trusted-text">
+                <p className="text-gray-700 dark:text-gray-300 mb-6 trusted-text">
                   "In high-stakes property and civil matters, documentation quality cannot be compromised. Dastavez AI delivers structured, court-ready drafts that align with procedural standards and significantly reduce turnaround time"
                 </p>
                 <div className="trusted-footer">
                   <div className="trusted-author">
-                    <h4 className="font-semibold text-gray-900 dark:text-white light:text-gray-900">Rishav Prakash</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 light:text-gray-600">Managing Partner, Chen & Associates</p>
+                    <h4 className="font-semibold text-gray-900 dark:text-white">Rishav Prakash</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Managing Partner, Chen & Associates</p>
                   </div>
                   <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
@@ -131,13 +124,13 @@ const Index = () => {
                 <div className="trusted-icon-container">
                   <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
                 </div>
-                <p className="text-gray-700 dark:text-gray-300 light:text-gray-700 mb-6 trusted-text">
+                <p className="text-gray-700 dark:text-gray-300 mb-6 trusted-text">
                   "For lease agreements and commercial property documentation, the platform provides clear clause organization and ready-to-edit drafts. It has improved our firm’s efficiency in handling client documentation."
                 </p>
                 <div className="trusted-footer">
                   <div className="trusted-author">
-                    <h4 className="font-semibold text-gray-900 dark:text-white light:text-gray-900">Fahim Ahmed</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 light:text-gray-600">Legal Director, Rodriguez Law Group</p>
+                    <h4 className="font-semibold text-gray-900 dark:text-white">Fahim Ahmed</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Legal Director, Rodriguez Law Group</p>
                   </div>
                   <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
