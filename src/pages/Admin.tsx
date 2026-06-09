@@ -193,7 +193,8 @@ const Admin = () => {
       const priceOk = priceRes.status === 'fulfilled';
       const statsOk = statsRes.status === 'fulfilled';
       if (freeLimitRes.status === 'fulfilled') {
-        const limitVal = (freeLimitRes as PromiseFulfilledResult<{ limit: number }>).value?.limit;
+        const freeLimitData = (freeLimitRes as PromiseFulfilledResult<any>).value;
+        const limitVal = freeLimitData?.value ?? freeLimitData?.limit;
         if (limitVal != null) setFreeMessageLimit(Number(limitVal));
       } else {
         console.warn('Failed to load free message limit:', (freeLimitRes as PromiseRejectedResult).reason);
@@ -430,13 +431,21 @@ const Admin = () => {
 
         {/* Main Content */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-800/50">
+          <TabsList className="grid w-full grid-cols-5 bg-slate-800/50">
             <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-600">
               <BarChart3 className="w-4 h-4 mr-2" />
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="lawyers" className="data-[state=active]:bg-purple-600">
+            <TabsTrigger value="users" className="data-[state=active]:bg-purple-600">
               <Users className="w-4 h-4 mr-2" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="files" className="data-[state=active]:bg-purple-600">
+              <FileText className="w-4 h-4 mr-2" />
+              Files
+            </TabsTrigger>
+            <TabsTrigger value="lawyers" className="data-[state=active]:bg-purple-600">
+              <Shield className="w-4 h-4 mr-2" />
               Lawyers
             </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-purple-600">
@@ -902,7 +911,7 @@ const Admin = () => {
                       try {
                         setIsSavingFreeLimit(true);
                         const res = await adminAPI.setFreeMessageLimit(Number(freeMessageLimit) || 0);
-                        setFreeMessageLimit(res?.limit ?? freeMessageLimit);
+                        setFreeMessageLimit(res?.value ?? res?.limit ?? freeMessageLimit);
                         toast({ title: 'Saved', description: 'Free message limit updated successfully' });
                       } catch (error) {
                         console.error('Error updating free message limit:', error);
