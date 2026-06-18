@@ -9,6 +9,15 @@ import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 declare global {
   interface Window { google?: any }
 }
+
+declare const process: {
+  env: {
+    NODE_ENV: 'development' | 'production' | 'test' | string;
+  };
+};
+
+const isDevelopment = typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
+
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../lib/api';
 

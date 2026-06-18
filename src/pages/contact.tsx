@@ -4,7 +4,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, Phone, MapPin, Linkedin, Twitter, Facebook, MessageCircle, Clock } from "lucide-react";
+import { Mail, Phone, MapPin, Linkedin, Instagram, MessageCircle, Clock } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { toast } from "sonner";
 
@@ -79,9 +79,8 @@ const Contact = () => {
   ];
 
   const socialLinks = [
-    { icon: Linkedin, href: "https://linkedin.com", label: "LinkedIn" },
-    { icon: Twitter, href: "https://twitter.com", label: "Twitter" },
-    { icon: Facebook, href: "https://facebook.com", label: "Facebook" },
+    { icon: Linkedin, href: "https://www.linkedin.com/company/dastavezai/about/", label: "LinkedIn" },
+    { icon: Instagram, href: "https://instagram.com/dastavezai", label: "Instagram" },
   ];
 
   return (

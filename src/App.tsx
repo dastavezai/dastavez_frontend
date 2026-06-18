@@ -35,6 +35,7 @@ import RequireAuth from "./components/RequireAuth";
 import Blog from "./pages/Blog";
 import Contact from "./pages/contact";
 import DepartmentPortal from "./departmentApp/DepartmentPortal";
+import WorkflowsPage from './chat-advanced/components/workflows/WorkflowPage';
 
 const queryClient = new QueryClient();
 
@@ -188,6 +189,7 @@ const App = () => (
                   </RequireAdmin>
                 }
               />
+              <Route path="/workflows" element={<WorkflowsPage />} />
               {/* Departmental portal — self-contained sub-app at /department/* */}
               <Route path="/department/*" element={<DepartmentPortal />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
