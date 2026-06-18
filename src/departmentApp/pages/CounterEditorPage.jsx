@@ -95,6 +95,8 @@ const CounterEditorPage = () => {
   const [viewMode, setViewMode] = useState('paged');
   const [previewRefreshing, setPreviewRefreshing] = useState(false);
   const [defenceText, setDefenceText] = useState('');
+  const [claimRebuttals, setClaimRebuttals] = useState([]);
+  const [additionalDefence, setAdditionalDefence] = useState('');
   const [petitionSummary, setPetitionSummary] = useState('');
   const [counterMaker, setCounterMaker] = useState('');
   const [wizardStep, setWizardStep] = useState(1);
@@ -255,6 +257,18 @@ const CounterEditorPage = () => {
     if (suggested) setDesignId(suggested);
     const summary = scanData?.scanResults?.summary || scanData?.summary || '';
     if (summary && !petitionSummary) setPetitionSummary(summary);
+    
+    if (scanData?.legalIntelligence?.claimGraph) {
+      const petitionerClaims = scanData.legalIntelligence.claimGraph.filter(c => c.speaker === 'PETITIONER' || c.speaker === 'petitioners');
+      if (petitionerClaims.length > 0 && claimRebuttals.length === 0) {
+        setClaimRebuttals(petitionerClaims.map(c => ({
+          claimId: c.claimId,
+          paraNo: c.sourceTrace?.paragraph || '',
+          claimText: c.claimText,
+          userFact: ''
+        })));
+      }
+    }
   }, [scanData]);
 
   /* ── iframe load handler ───────────────────────── */
@@ -422,12 +436,26 @@ const CounterEditorPage = () => {
       toast({ title: 'Missing file', description: 'Open Counter Studio from an uploaded document.', status: 'warning', duration: 3000 });
       return;
     }
+
+    let compiledDefence = '';
+    claimRebuttals.forEach(cr => {
+      if (cr.userFact.trim()) {
+        compiledDefence += `Claim (Para ${cr.paraNo}): ${cr.claimText}\nOur Factual Rebuttal: ${cr.userFact}\n\n`;
+      }
+    });
+    if (additionalDefence.trim()) {
+      compiledDefence += `Additional Defence Facts:\n${additionalDefence}\n\n`;
+    }
+    if (!compiledDefence.trim() && defenceText.trim()) {
+      compiledDefence = defenceText;
+    }
+
     setLoading(true);
     setResult(null);
     setFormattedPreviewHtml('');
     setGenerateError('');
     try {
-      const res = await fileService.generateCounterAffidavit({ fileId, language, designId: designId || undefined, createEditableDocument: false, simplePreview: false, defenceText, petitionSummary, counterMaker, regenerate: true });
+      const res = await fileService.generateCounterAffidavit({ fileId, language, designId: designId || undefined, createEditableDocument: false, simplePreview: false, defenceText: compiledDefence, petitionSummary, counterMaker, regenerate: true });
       skipPreviewRefreshRef.current = true;
       applyGeneratedView(res);
       toast({ title: '✓ Counter draft ready', description: 'Fill any remaining blanks in the editor panel.', status: 'success', duration: 4000 });
@@ -1037,25 +1065,65 @@ const CounterEditorPage = () => {
 
               {/* Step 3: Defence notes */}
               {wizardStep === 3 && (
-                <Box>
-                  <HStack mb={1.5}>
+                <Box maxH="400px" overflowY="auto" pr={2} css={{ '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { background: 'rgba(128,90,213,0.3)', borderRadius: '2px' } }}>
+                  <HStack mb={1.5} position="sticky" top={0} bg={cardBg} zIndex={2} py={1}>
                     <Icon as={FaBalanceScale} color="teal.400" boxSize={3.5} />
-                    <Text fontSize="sm" fontWeight="600">Defence / counter arguments</Text>
+                    <Text fontSize="sm" fontWeight="600">Claim-by-Claim Rebuttal</Text>
                   </HStack>
-                  <Text fontSize="xs" color={muted} mb={1.5}>
-                    Provide facts, reasoning, or arguments. AI will structure these into numbered paragraphs.
+                  <Text fontSize="xs" color={muted} mb={3}>
+                    Provide specific factual rebuttals for each claim. AI will automatically structure these with relevant legal backing.
                   </Text>
-                  <Textarea
-                    placeholder="e.g., The claims are false because the payment was completed on 12 Jan…"
-                    value={defenceText}
-                    onChange={(e) => setDefenceText(e.target.value)}
-                    minH="200px"
-                    borderRadius="lg"
-                    borderColor={borderColor}
-                    fontSize="sm"
-                    resize="vertical"
-                    _focus={{ borderColor: 'purple.400', boxShadow: '0 0 0 1px var(--chakra-colors-purple-400)' }}
-                  />
+                  
+                  {claimRebuttals.length > 0 ? (
+                    <VStack align="stretch" spacing={4}>
+                      {claimRebuttals.map((cr, idx) => (
+                        <Box key={cr.claimId || idx} p={3} borderWidth="1px" borderColor={borderColor} borderRadius="lg" bg={useColorModeValue('gray.50', 'gray.800')}>
+                          <HStack justify="space-between" mb={1}>
+                            <Badge colorScheme="blue" fontSize="2xs">Para {cr.paraNo}</Badge>
+                          </HStack>
+                          <Text fontSize="xs" fontWeight="500" mb={2} color={useColorModeValue('gray.700', 'gray.300')}>
+                            "{cr.claimText}"
+                          </Text>
+                          <Textarea
+                            placeholder="Enter factual rebuttal for this claim..."
+                            value={cr.userFact}
+                            onChange={(e) => {
+                              const next = [...claimRebuttals];
+                              next[idx].userFact = e.target.value;
+                              setClaimRebuttals(next);
+                            }}
+                            minH="60px"
+                            fontSize="sm"
+                            bg={cardBg}
+                            borderColor={borderColor}
+                            _focus={{ borderColor: 'purple.400', boxShadow: '0 0 0 1px var(--chakra-colors-purple-400)' }}
+                          />
+                        </Box>
+                      ))}
+                      <Box pt={2}>
+                        <Text fontSize="xs" fontWeight="600" mb={1}>Additional Defence Facts (Optional)</Text>
+                        <Textarea
+                          placeholder="Any overall defense arguments..."
+                          value={additionalDefence}
+                          onChange={(e) => setAdditionalDefence(e.target.value)}
+                          minH="80px"
+                          fontSize="sm"
+                        />
+                      </Box>
+                    </VStack>
+                  ) : (
+                    <Textarea
+                      placeholder="e.g., The claims are false because the payment was completed on 12 Jan…"
+                      value={defenceText}
+                      onChange={(e) => setDefenceText(e.target.value)}
+                      minH="200px"
+                      borderRadius="lg"
+                      borderColor={borderColor}
+                      fontSize="sm"
+                      resize="vertical"
+                      _focus={{ borderColor: 'purple.400', boxShadow: '0 0 0 1px var(--chakra-colors-purple-400)' }}
+                    />
+                  )}
                 </Box>
               )}
             </VStack>
