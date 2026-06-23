@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from 'react';
+import { useTheme } from './ThemeProvider';
+import { cn } from '@/lib/utils';
 
 const StarField: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -34,10 +37,11 @@ const StarField: React.FC = () => {
       });
     }
 
+    let animationFrameId: number;
+
     // Animation function
     function animate() {
-      ctx.fillStyle = 'rgba(17, 24, 39, 0.1)'; // Slightly transparent background for trail effect
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx!.clearRect(0, 0, canvas.width, canvas.height);
 
       // Center of the screen
       const centerX = canvas.width / 2;
@@ -67,37 +71,38 @@ const StarField: React.FC = () => {
         const opacity = Math.min(1, 1500 / star.z / 2);
 
         // Draw star trail
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(sx, sy);
-        ctx.strokeStyle = `rgba(234, 179, 8, ${opacity})`; // judicial-gold color
-        ctx.lineWidth = size;
-        ctx.stroke();
+        ctx!.beginPath();
+        ctx!.moveTo(px, py);
+        ctx!.lineTo(sx, sy);
+        ctx!.strokeStyle = `rgba(234, 179, 8, ${opacity})`; // judicial-gold color
+        ctx!.lineWidth = size;
+        ctx!.stroke();
 
         // Draw star point
-        ctx.beginPath();
-        ctx.arc(sx, sy, size/2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(234, 179, 8, ${opacity})`;
-        ctx.fill();
+        ctx!.beginPath();
+        ctx!.arc(sx, sy, size/2, 0, Math.PI * 2);
+        ctx!.fillStyle = `rgba(234, 179, 8, ${opacity})`;
+        ctx!.fill();
       });
 
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
     }
 
     animate();
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
+      cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [theme]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed top-0 left-0 w-full h-full -z-10 bg-judicial-dark"
+      className="fixed top-0 left-0 w-full h-full z-0 pointer-events-none"
       style={{ pointerEvents: 'none' }}
     />
   );
 };
 
-export default StarField; 
+export default StarField;

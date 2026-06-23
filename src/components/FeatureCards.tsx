@@ -12,7 +12,7 @@ interface FeatureCardProps {
 
 function FeatureCard({ icon, title, description, color, iconColorClass }: FeatureCardProps) {
   return (
-    <div className="bg-white dark:bg-judicial-navy/30 backdrop-blur-sm border border-gray-200 dark:border-judicial-gold/10 rounded-xl p-5 sm:p-6 hover:border-judicial-gold/30 hover:shadow-md transition-all group h-full shadow-sm">
+    <div className="bg-white dark:bg-judicial-navy backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-xl p-5 sm:p-6 hover:border-judicial-gold hover:shadow-md transition-all group h-full shadow-sm">
       <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center mb-3 sm:mb-4 ${color}`}>
         <span className={`${iconColorClass} transition-colors duration-300`}>
           {icon}

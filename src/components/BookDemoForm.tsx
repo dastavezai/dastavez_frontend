@@ -404,7 +404,7 @@ Newsletter Opt-in: ${data.newsletter ? 'Yes' : 'No'}
                 For details about how we collect, use, and protect your information, please
                 see our{" "}
                 <a
-                  href="/privacy"
+                  href="/privacy-policy"
                   className="text-orange-600 hover:underline font-semibold"
                 >
                   Privacy Policy

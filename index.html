@@ -13,13 +13,205 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
-    <link rel="icon" href="/favicon.ico" sizes="any" type="image/x-icon">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" type="image/png" href="/logo-gold.png">
+    <style>
+      #loading-screen {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #ffffff;
+        color: #000000;
+        z-index: 99999;
+        font-family: 'Playfair Display', Georgia, serif;
+        transition: opacity 400ms ease, visibility 400ms ease;
+      }
+      html.dark #loading-screen {
+        background-color: #000000;
+        color: #ffffff;
+      }
+      #loading-screen.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        display: none !important;
+      }
+      .error-fallback-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100001;
+        background-color: #0b0f19;
+        color: #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 2rem;
+      }
+      .error-card {
+        background-color: #111827;
+        border: 1px solid rgba(214, 171, 85, 0.3);
+        border-radius: 12px;
+        padding: 2.5rem;
+        max-width: 540px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      }
+      .error-title {
+        color: #ef4444;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-top: 0;
+        margin-bottom: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .error-body {
+        font-size: 0.95rem;
+        line-height: 1.6;
+        color: #d1d5db;
+      }
+      .error-steps {
+        margin-top: 1rem;
+        padding-left: 1.25rem;
+        list-style-type: decimal;
+      }
+      .error-steps li {
+        margin-bottom: 0.5rem;
+      }
+      .error-code {
+        background-color: rgba(214, 171, 85, 0.15);
+        padding: 0.2rem 0.45rem;
+        border-radius: 4px;
+        font-family: monospace;
+        color: #d6ab55;
+        font-weight: 600;
+      }
+      .loading-progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 4px;
+        width: 0%;
+        background: #d6ab55;
+        z-index: 100000;
+        transition: width 2500ms cubic-bezier(0.1, 0.6, 0.4, 1), opacity 320ms ease;
+        box-shadow: 0 0 8px rgba(214, 171, 85, 0.5);
+      }
+      .loading-progress.is-exiting {
+        opacity: 0;
+      }
+      .loading-center {
+        text-align: center;
+      }
+      .loading-slogan {
+        font-size: clamp(1.125rem, 4.6vw, 2.1rem);
+        font-weight: 600;
+        margin: 0;
+        transition: opacity 420ms ease, transform 420ms ease;
+        color: #000000;
+      }
+      html.dark .loading-slogan {
+        color: #ffffff;
+      }
+      .loading-slogan.is-exiting {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+    </style>
   </head>
 
   <body>
+    <div id="loading-screen" class="loading-screen" aria-hidden="false">
+      <div id="loading-progress" class="loading-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Loading progress"></div>
+      <div class="loading-center">
+        <h2 class="loading-slogan">The accuracy you demand, the AI you can trust</h2>
+      </div>
+    </div>
+    <script>
+      // Start the progress bar immediately to show visual activity
+      requestAnimationFrame(function() {
+        var progress = document.getElementById("loading-progress");
+        if (progress) progress.style.width = "100%";
+      });
+    </script>
     <div id="root"></div>
+    
+    <!-- Security / CORS Block & Initialization Error Overlay -->
+    <div id="error-fallback-overlay" class="error-fallback-overlay" style="display: none;">
+      <div class="error-card">
+        <h2 class="error-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ef4444;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          System Initialization Error
+        </h2>
+        <div id="error-msg-content" class="error-body"></div>
+      </div>
+    </div>
+
+    <script>
+      (function() {
+        var overlay = document.getElementById("error-fallback-overlay");
+        var content = document.getElementById("error-msg-content");
+        
+        // 1. File Protocol CORS Protection Warning
+        if (window.location.protocol === "file:") {
+          content.innerHTML = '<p style="margin-bottom: 1rem;"><strong>Browser Security Restrictions Active</strong></p>' +
+            '<p>You opened the website files directly using the <code class="error-code">file://</code> protocol. Modern web browsers block loading React application scripts locally for security reasons, resulting in a blank white page.</p>' +
+            '<p><strong>How to launch the website correctly:</strong></p>' +
+            '<ol class="error-steps">' +
+            '<li>Open your terminal / command prompt in this project folder.</li>' +
+            '<li>Run <code class="error-code">npm run dev</code> to boot up the local development server.</li>' +
+            '<li>Open the local address provided (usually <code class="error-code">http://localhost:5173</code>) in your browser.</li>' +
+            '</ol>';
+          overlay.style.display = "flex";
+          // Disable main loader fallback to prevent overlapping overlays
+          window.__fileProtocolActive = true;
+          return;
+        }
+
+        // 2. React Mount Failsafe Detection (6 seconds)
+        setTimeout(function() {
+          var root = document.getElementById("root");
+          if (root && root.children.length === 0 && overlay.style.display === "none") {
+            content.innerHTML = '<p style="margin-bottom: 1rem;"><strong>React application failed to initialize</strong></p>' +
+              '<p>The preloader finished, but React was unable to mount. This is typically caused by a compilation runtime error, broken cache assets, or a lost developer server connection.</p>' +
+              '<p><strong>How to debug:</strong></p>' +
+              '<ol class="error-steps">' +
+              '<li>Press <kbd style="background:#1f2937;color:#fff;padding:2px 5px;border-radius:4px;border:1px solid #4b5563;font-size:0.85em;box-shadow:0 1px 0 rgba(0,0,0,0.2)">F12</kbd> (or right-click -> Inspect) to open Developer Tools.</li>' +
+              '<li>Navigate to the <strong>Console</strong> tab to view the unhandled JavaScript errors.</li>' +
+              '<li>Try restarting the development server with <code class="error-code">npm run dev</code> in your terminal.</li>' +
+              '</ol>';
+            overlay.style.display = "flex";
+          }
+        }, 6000);
+      })();
+    </script>
+
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      setTimeout(function() {
+        if (window.__fileProtocolActive) return;
+        var loader = document.getElementById("loading-screen");
+        var progress = document.getElementById("loading-progress");
+        var slogan = document.querySelector(".loading-slogan");
+        if (loader && !loader.classList.contains("is-hidden")) {
+          if (slogan) slogan.classList.add("is-exiting");
+          if (progress) {
+            progress.style.width = "100%";
+            progress.classList.add("is-exiting");
+          }
+          setTimeout(function() {
+            loader.classList.add("is-hidden");
+            document.body.style.overflow = "";
+          }, 500);
+        }
+      }, 3200);
+    </script>
   </body>
 </html>

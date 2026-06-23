@@ -13,40 +13,48 @@ const About = () => {
             <Info className="h-7 w-7 text-judicial-gold" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            About <span className="text-judicial-gold">Dastavez AI Oracle</span>
+            <span className="text-black dark:text-white">About</span> <span className="text-judicial-gold">Dastavez AI Oracle</span>
           </h1>
           <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-lg">
             Dastavez AI Oracle is an advanced legal assistant designed to empower legal professionals, students, and the public with instant access to legal knowledge. Our mission is to make legal information more accessible, understandable, and actionable for everyone.
           </p>
         </div>
-        <section className="mb-16">
-          <h2 className="text-2xl font-semibold text-judicial-gold mb-4">Our Vision</h2>
-          <p className="text-gray-700 dark:text-gray-300 max-w-3xl mx-auto">
-            We envision a world where legal expertise is at your fingertips. By leveraging state-of-the-art AI and vast legal databases, we aim to bridge the gap between complex legal language and everyday understanding.
-          </p>
+        <section className="mb-16 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 items-start">
+          <h2 className="text-2xl font-semibold text-judicial-gold md:col-span-1">Our Vision</h2>
+          <div className="md:col-span-2">
+            <p className="text-gray-700 dark:text-gray-300">
+              We envision a world where legal expertise is at your fingertips. By leveraging state-of-the-art AI and vast legal databases, we aim to bridge the gap between complex legal language and everyday understanding.
+            </p>
+          </div>
         </section>
-        <section className="mb-16">
-          <h2 className="text-2xl font-semibold text-judicial-gold mb-4">What We Offer</h2>
-          <ul className="text-gray-700 dark:text-gray-300 max-w-3xl mx-auto list-disc list-inside space-y-2">
-            <li>
-              <span className="font-semibold text-black dark:text-white">Instant Legal Answers:</span> Get quick, reliable responses to your legal questions.
-            </li>
-            <li>
-              <span className="font-semibold text-black dark:text-white">Case Analysis:</span> Analyze legal cases and receive AI-powered insights.
-            </li>
-            <li>
-              <span className="font-semibold text-black dark:text-white">Accessible to All:</span> Whether you are a lawyer, student, or curious citizen, our platform is designed for you.
-            </li>
-            <li>
-              <span className="font-semibold text-black dark:text-white">Secure & Confidential:</span> Your queries and data are handled with utmost privacy and security.
-            </li>
-          </ul>
+
+        <section className="mb-16 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 items-start">
+          <h2 className="text-2xl font-semibold text-judicial-gold md:col-span-1">What We Offer</h2>
+          <div className="md:col-span-2">
+            <ul className="text-gray-700 dark:text-gray-300 space-y-3 list-disc list-outside pl-5">
+              <li>
+                <span className="font-semibold text-black dark:text-white">Instant Legal Answers:</span> Get quick, reliable responses to your legal questions.
+              </li>
+              <li>
+                <span className="font-semibold text-black dark:text-white">Case Analysis:</span> Analyze legal cases and receive AI-powered insights.
+              </li>
+              <li>
+                <span className="font-semibold text-black dark:text-white">Accessible to All:</span> Whether you are a lawyer, student, or curious citizen, our platform is designed for you.
+              </li>
+              <li>
+                <span className="font-semibold text-black dark:text-white">Secure & Confidential:</span> Your queries and data are handled with utmost privacy and security.
+              </li>
+            </ul>
+          </div>
         </section>
-        <section>
-          <h2 className="text-2xl font-semibold text-judicial-gold mb-4">Meet the Teams</h2>
-          <p className="text-gray-700 dark:text-gray-300 max-w-3xl mx-auto mb-2">
-            Dastavez AI Oracle is built by a passionate team of legal experts, AI engineers, and designers committed to transforming the way people interact with the law.
-          </p>
+
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 items-start">
+          <h2 className="text-2xl font-semibold text-judicial-gold md:col-span-1">Meet the Teams</h2>
+          <div className="md:col-span-2">
+            <p className="text-gray-700 dark:text-gray-300">
+              Dastavez AI Oracle is built by a passionate team of legal experts, AI engineers, and designers committed to transforming the way people interact with the law.
+            </p>
+          </div>
         </section>
       </main>
       <Footer />

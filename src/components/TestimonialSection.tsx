@@ -65,7 +65,7 @@ export function TestimonialSection() {
             <div className="absolute inset-0 bg-gradient-to-r from-judicial-gold/20 to-transparent rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
             <Gavel className="h-16 w-16 text-judicial-gold transform group-hover:rotate-6 group-hover:scale-110 transition-all duration-500" />
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-center transform group-hover:translate-y-1 transition-all duration-500">
+          <h2 className="text-3xl md:text-4xl font-bold text-center transform group-hover:translate-y-1 transition-all duration-500 text-black dark:text-white">
             <span className="text-judicial-gold bg-clip-text bg-gradient-to-r from-judicial-gold to-judicial-gold/80">
               AI Powered
             </span>{" "}

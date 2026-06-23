@@ -64,8 +64,7 @@ const Contact = () => {
       title: "Phone",
       description: "Call us during business hours for immediate assistance",
       links: [
-        { label: "+1 (555) 123-4567", href: "tel:+15551234567" },
-        { label: "+1 (555) 987-6543", href: "tel:+15559876543" },
+        { label: "+91 8210607476", href: "tel:+918210607476" },
       ],
     },
     {
@@ -205,7 +204,7 @@ const Contact = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    placeholder="+1 (555) 123-4567"
+                    placeholder="+91 8210607476"
                     className={` w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-judicial-gold ${
                       theme === 'dark'
                         ? 'bg-slate-800 border-slate-700 text-white'

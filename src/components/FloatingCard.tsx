@@ -30,7 +30,7 @@ const FloatingCard = ({ children, className = '' }: FloatingCardProps) => {
       {/* 3D Card Container */}
       <div
          ref={cardRef}
-         className="relative z-10 rounded-xl border border-judicial-gold/50 bg-judicial-navy/60 overflow-hidden"
+         className="relative z-10 rounded-xl border border-judicial-gold/30 dark:border-judicial-gold/50 bg-card overflow-hidden"
          style={{ transformStyle: "preserve-3d" }}
       >
         {/* Inset Border Glow */}

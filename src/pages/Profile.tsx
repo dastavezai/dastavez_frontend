@@ -26,7 +26,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import FloatingCard from '@/components/FloatingCard';
-import GavelAnimation from '@/components/GavelAnimation';
+import JusticeIcon from '@/components/JusticeIcon';
 import { profileAPI, authAPI, isAuthenticated, User as APIUser } from '@/lib/api';
 
 interface UserProfile {
@@ -98,7 +98,7 @@ const Profile = () => {
         firstName: 'John',
         lastName: 'Doe',
         email: 'john.doe@example.com',
-        phone: '+1 (555) 123-4567',
+        phone: '+91 8210607476',
         location: 'New York, NY',
         joinDate: '2024-01-15',
         lastLogin: '2024-12-19T10:30:00Z',
@@ -167,7 +167,7 @@ const Profile = () => {
     return (
       <div className="min-h-screen bg-white dark:bg-judicial-dark flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
-          <GavelAnimation />
+          <JusticeIcon className="w-[128px] h-[128px] mx-auto" />
           <p className="text-judicial-gold mt-4">Loading profile...</p>
         </div>
       </div>
@@ -234,10 +234,10 @@ const Profile = () => {
                 <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-br from-judicial-gold to-judicial-lightGold flex items-center justify-center">
                   <User className="h-12 w-12 text-judicial-dark" />
                 </div>
-                <h2 className="text-xl font-bold text-white mb-2">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                   {profile.firstName} {profile.lastName}
                 </h2>
-                <p className="text-judicial-lightGold mb-4">{profile.email}</p>
+                <p className="text-gray-600 dark:text-judicial-lightGold mb-4">{profile.email}</p>
 
                 <div className="space-y-2 mb-6">
                   <Badge
@@ -282,7 +282,7 @@ const Profile = () => {
                   <CardHeader>
                     <div className="flex justify-between items-center">
                       <div>
-                        <CardTitle className="text-white">Personal Information</CardTitle>
+                        <CardTitle className="text-gray-900 dark:text-white">Personal Information</CardTitle>
                         <CardDescription className="text-gray-600 dark:text-gray-400">
                           Update your personal details and contact information
                         </CardDescription>
@@ -307,7 +307,7 @@ const Profile = () => {
                           value={formData.firstName}
                           onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                           disabled={!isEditing}
-                          className="bg-judicial-navy/50 border-judicial-gold/30 text-white"
+                          className="bg-white border-gray-300 text-gray-900 dark:bg-judicial-dark dark:border-border dark:text-white"
                         />
                       </div>
                       <div>
@@ -317,7 +317,7 @@ const Profile = () => {
                           value={formData.lastName}
                           onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                           disabled={!isEditing}
-                          className="bg-judicial-navy/50 border-judicial-gold/30 text-white"
+                          className="bg-white border-gray-300 text-gray-900 dark:bg-judicial-dark dark:border-border dark:text-white"
                         />
                       </div>
                     </div>
@@ -328,7 +328,7 @@ const Profile = () => {
                         id="email"
                         value={formData.email}
                         disabled
-                        className="bg-judicial-navy/50 border-judicial-gold/30 text-gray-500 dark:text-gray-400"
+                        className="bg-white border-gray-300 text-gray-500 dark:bg-judicial-dark dark:border-border dark:text-gray-400"
                       />
                     </div>
 
@@ -347,7 +347,7 @@ const Profile = () => {
               <TabsContent value="security" className="mt-6">
                 <FloatingCard>
                   <CardHeader>
-                    <CardTitle className="text-white">Security Settings</CardTitle>
+                    <CardTitle className="text-gray-900 dark:text-white">Security Settings</CardTitle>
                     <CardDescription className="text-gray-600 dark:text-gray-400">
                       Manage your password and security preferences
                     </CardDescription>
@@ -361,7 +361,7 @@ const Profile = () => {
                           type={showPassword ? "text" : "password"}
                           value={formData.currentPassword}
                           onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                          className="bg-judicial-navy/50 border-judicial-gold/30 text-white pr-10"
+                          className="bg-white border-gray-300 text-gray-900 dark:bg-judicial-dark dark:border-border dark:text-white pr-10"
                         />
                         <Button
                           type="button"
@@ -382,7 +382,7 @@ const Profile = () => {
                         type="password"
                         value={formData.newPassword}
                         onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                        className="bg-judicial-navy/50 border-judicial-gold/30 text-white"
+                        className="bg-white border-gray-300 text-gray-900 dark:bg-judicial-dark dark:border-border dark:text-white"
                       />
                     </div>
 
@@ -393,7 +393,7 @@ const Profile = () => {
                         type="password"
                         value={formData.confirmPassword}
                         onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                        className="bg-judicial-navy/50 border-judicial-gold/30 text-white"
+                        className="bg-white border-gray-300 text-gray-900 dark:bg-judicial-dark dark:border-border dark:text-white"
                       />
                       {errors.confirmPassword && (
                         <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
@@ -414,21 +414,21 @@ const Profile = () => {
               <TabsContent value="preferences" className="mt-6">
                 <FloatingCard>
                   <CardHeader>
-                    <CardTitle className="text-white">Preferences</CardTitle>
+                    <CardTitle className="text-gray-900 dark:text-white">Preferences</CardTitle>
                     <CardDescription className="text-gray-600 dark:text-gray-400">
                       Customize your experience and notification settings
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div>
-                      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                         <Globe className="h-5 w-5 text-judicial-gold" />
                         Language & Region
                       </h3>
                       <div className="space-y-3">
                         <div>
                           <Label className="text-judicial-gold">Language</Label>
-                          <select className="w-full mt-1 p-2 bg-judicial-navy/50 border border-judicial-gold/30 text-white rounded">
+                          <select className="w-full mt-1 p-2 bg-white border border-gray-300 text-gray-900 dark:bg-judicial-dark dark:border-border dark:text-white rounded">
                             <option>English</option>
                             <option>Spanish</option>
                             <option>French</option>
@@ -436,7 +436,7 @@ const Profile = () => {
                         </div>
                         <div>
                           <Label className="text-judicial-gold">Time Zone</Label>
-                          <select className="w-full mt-1 p-2 bg-judicial-navy/50 border border-judicial-gold/30 text-white rounded">
+                          <select className="w-full mt-1 p-2 bg-white border border-gray-300 text-gray-900 dark:bg-judicial-dark dark:border-border dark:text-white rounded">
                             <option>UTC-5 (Eastern Time)</option>
                             <option>UTC-8 (Pacific Time)</option>
                             <option>UTC+0 (GMT)</option>

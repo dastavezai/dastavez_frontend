@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import StarField from "@/components/StarField";
 import { ArrowLeft, Calendar, Clock, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -90,7 +89,6 @@ const BlogPost = () => {
   if (!post) {
     return (
       <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
-        <StarField />
         <Navbar />
         <div className="container mx-auto px-4 py-24">
           <motion.div
@@ -136,10 +134,9 @@ const BlogPost = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
-      <StarField />
       <Navbar />
 
-      <article className="pt-24 pb-16">
+      <article className="pt-16 pb-16">
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Back Button */}
           <motion.div

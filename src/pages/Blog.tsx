@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import StarField from "@/components/StarField";
 import FloatingCard from '@/components/FloatingCard';
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,8 +10,9 @@ import { Button } from "@/components/ui/button";
 const Blog = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const navigate = useNavigate();
+  const isLoggedIn = !!localStorage.getItem('jwt');
 
-  const categories = ['All', 'Legal Tech', 'AI & Analytics', 'Compliance', 'Digital Law', 'Case Studies'];
+  const categories = ['All', 'Legal Tech', 'AI & Analytics', 'Compliance', 'Digital Law'];
 
   const posts = [
     {
@@ -86,6 +86,38 @@ const Blog = () => {
       excerpt: "Best practices for presenting digital evidence in court and maintaining chain of custody in the digital age.",
       category: "Digital Law",
       featured: false
+    },
+    {
+      id: 10,
+      title: "The Future of Legal Tech: Generative AI",
+      date: "Nov 15, 2025",
+      excerpt: "Analyzing how large language models are transforming drafting, search, and due diligence.",
+      category: "Legal Tech",
+      featured: false
+    },
+    {
+      id: 11,
+      title: "Data Privacy Compliance in the Cloud",
+      date: "Nov 10, 2025",
+      excerpt: "Best practices for law firms securing client data in cloud-based legal practice management tools.",
+      category: "Compliance",
+      featured: false
+    },
+    {
+      id: 12,
+      title: "AI in Intellectual Property Law",
+      date: "Nov 05, 2025",
+      excerpt: "Understanding the challenges and opportunities of using AI for patent search and trademark filing.",
+      category: "AI & Analytics",
+      featured: false
+    },
+    {
+      id: 13,
+      title: "Smart Contracts and Decentralized Oracles",
+      date: "Oct 28, 2025",
+      excerpt: "How real-world legal agreements are bridged with blockchain smart contracts via trusted oracles.",
+      category: "Digital Law",
+      featured: false
     }
   ];
 
@@ -94,13 +126,14 @@ const Blog = () => {
     : posts.filter(post => post.category === selectedCategory);
 
   const featuredPost = posts.find(post => post.featured) || posts[0];
+  const regularPosts = filteredPosts.filter(post => !post.featured);
+  const visiblePosts = isLoggedIn ? regularPosts : regularPosts.slice(0, 8);
 
   return (
     <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
-      <StarField />
       <Navbar />
 
-      <main className="pt-24 pb-16">
+      <main className="pt-16 pb-16">
         <div className="container mx-auto px-4">
           {/* Hero Section */}
           <section className="text-center mb-16">
@@ -165,10 +198,10 @@ const Blog = () => {
                     <div className="flex items-center gap-4 text-sm">
                       <span className="bg-judicial-gold/20 text-judicial-gold px-3 py-1 rounded-full font-medium">{featuredPost.category}</span>
                     </div>
-                    <h2 className="text-3xl lg:text-4xl font-bold text- dark:text-white leading-tight">{featuredPost.title}</h2>
+                    <h2 className="text-3xl lg:text-4xl font-bold text-black dark:text-white leading-tight">{featuredPost.title}</h2>
                     <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed">{featuredPost.excerpt}</p>
                     <div className="flex items-center justify-between pt-4">
-                      <span className="text-judicial-gold/60 text-sm">{featuredPost.date}</span>
+                      <span className="text-black dark:text-white text-sm">{featuredPost.date}</span>
                       <button 
                         onClick={() => navigate(`/blog/${featuredPost.id}`)}
                         className="px-6 py-2 bg-judicial-gold text-judicial-dark font-semibold rounded-lg hover:bg-judicial-lightGold transition-all duration-300"
@@ -185,7 +218,7 @@ const Blog = () => {
           {/* Blog Posts Grid */}
           <section className="mb-16">
             <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {filteredPosts.filter(post => !post.featured).map((post, index) => (
+              {visiblePosts.map((post, index) => (
                 <motion.div
                   key={post.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -211,8 +244,8 @@ const Blog = () => {
 
                       {/* Footer */}
                       <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/20">
-                        <span className="text-judicial-gold/60 text-sm">{post.date}</span>
-                        <span className="text-judicial-gold/40 text-sm font-medium cursor-default">Read More</span>
+                        <span className="text-black dark:text-white text-sm">{post.date}</span>
+                        <span className="text-black dark:text-white text-sm font-medium cursor-default">Read More</span>
                       </div>
                     </div>
                     </div>
@@ -229,19 +262,25 @@ const Blog = () => {
               transition={{ duration: 0.8, delay: 0.8 }}
               className="text-center"
             >
-              <h2 className="text-2xl font-bold mb-6">Want to Learn More?</h2>
+              <h2 className="text-2xl font-bold mb-6 text-black dark:text-white">Want to Learn More?</h2>
               <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
                 Explore all our articles and stay updated with the latest insights on legal technology and AI.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" className="bg-judicial-gold hover:bg-judicial-lightGold text-judicial-dark font-semibold">
-                  Load More Articles
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button size="lg" variant="outline" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10">
-                  Subscribe to Updates
-                </Button>
-              </div>
+              {!isLoggedIn && (
+                <div className="flex justify-center">
+                  <Button 
+                    size="lg" 
+                    className="bg-judicial-gold hover:bg-judicial-lightGold text-judicial-dark font-semibold"
+                    onClick={() => {
+                      sessionStorage.setItem('redirectAfterLogin', '/blog');
+                      navigate('/auth');
+                    }}
+                  >
+                    Load More Articles
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </div>
+              )}
             </motion.div>
           </section>
         </div>

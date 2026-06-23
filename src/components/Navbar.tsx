@@ -75,12 +75,17 @@ export function Navbar() {
 
   // Search options
   const searchOptions = [
+    { label: "Use Cases", value: "use-cases", path: "/use-cases" },
     { label: "Features", value: "features", path: "/features" },
     { label: "Case Studies", value: "case-studies", path: "/case-studies" },
     { label: "Smart Analysis", value: "smart-analysis", path: "/smart-analysis" },
     { label: "About", value: "about", path: "/about" },
     { label: "Contact", value: "contact", path: "/contact" },
     { label: "Blog", value: "blog", path: "/blog" },
+    { label: "Terms & Conditions", value: "terms-and-conditions", path: "/terms-and-conditions" },
+    { label: "Privacy Policy", value: "privacy-policy", path: "/privacy-policy" },
+    { label: "Disclaimer", value: "disclaimer", path: "/disclaimer" },
+    { label: "Cookie Policy", value: "cookie-policy", path: "/cookie-policy" },
   ];
 
   const handleSelect = (value) => {
@@ -99,76 +104,80 @@ export function Navbar() {
   return (
     <nav
       className={cn(
-        "fixed top-0 w-full z-50 transition-all duration-300",
-        scrolled
-          ? "bg-white/90 dark:bg-slate-950/95 backdrop-blur-md py-2 shadow-md border-b border-gray-200 dark:border-judicial-gold/10 text-slate-900 dark:text-white"
-          : "bg-transparent py-4 text-slate-900 dark:text-white"
+        "fixed top-0 w-full z-50 transition-all duration-300 dastavez-header-nav",
+        scrolled ? "is-sticky py-1" : "py-2"
       )}>
       <div className="container mx-auto px-4 flex justify-between items-center">
         {/* Logo */}
-        <Link to="/" className="flex items-center space-x-2 sm:space-x-4">
-          <div className="relative">
-            <JusticeIcon />
+        <Link to="/" className="flex items-center space-x-2 sm:space-x-4 logo-link">
+          <div className="relative flex items-center justify-center overflow-visible">
+            <JusticeIcon className="w-[42px] h-[42px] md:w-[48px] md:h-[48px] lg:w-[56px] lg:h-[56px]" />
           </div>
           <div className="hidden sm:block">
-            <span className="text-xl sm:text-2xl font-bold tracking-tight">
-              <span className="text-judicial-gold">Dastavez</span>{" "}
-              <span className="text-slate-900 dark:text-white">AI</span>
-              <span className="block text-xs sm:text-sm font-normal text-slate-500 dark:text-gray-400">Powered Legal Intelligence</span>
+            <span 
+              className="text-xl sm:text-2xl font-bold tracking-tight font-display-premium"
+              style={{ color: theme === 'dark' ? '#ffffff' : '#1f242e' }}
+            >
+              Dastavez AI
+              <span className="block text-[10px] font-normal text-[var(--text-muted)] font-body-premium">Powered Legal Intelligence</span>
             </span>
           </div>
           <div className="sm:hidden">
-            <span className="text-lg font-bold tracking-tight">
-              <span className="text-judicial-gold">Dastavez</span>{" "}
-              <span className="text-slate-900 dark:text-white">AI</span>
+            <span 
+              className="text-lg font-bold tracking-tight font-display-premium"
+              style={{ color: theme === 'dark' ? '#ffffff' : '#1f242e' }}
+            >
+              Dastavez AI
             </span>
           </div>
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden lg:flex items-center space-x-6 xl:space-x-8">
-          <Link to="/features" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Features</Link>
+        <div className="hidden lg:flex items-center space-x-3 xl:space-x-4 font-body-premium">
+          <Link to="/use-cases" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Use Cases</Link>
+          <Link to="/features" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Features</Link>
           {location.pathname !== '/chat' ? (
             <div className="relative flex flex-col items-center">
-              <Link to="/case-studies" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Case Studies</Link>
+              <Link to="/case-studies" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Case Studies</Link>
               {/* Icon/highlight here, only if not on /chat */}
               <span className="absolute top-6 left-1/2 -translate-x-1/2">
                 {/* If you have a custom icon/highlight, put it here. If not, remove this span. */}
               </span>
             </div>
           ) : (
-            <Link to="/case-studies" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Case Studies</Link>
+            <Link to="/case-studies" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Case Studies</Link>
           )}
-          <Link to="/smart-analysis" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Smart Analysis</Link>
+          <Link to="/smart-analysis" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Smart Analysis</Link>
 
-          <Link to="/about" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">About</Link>
-          <Link to="/contact" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Contact</Link>
-          <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Blog</Link>
+          <Link to="/about" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">About</Link>
+          <Link to="/contact" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Contact</Link>
+          <Link to="/blog" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Blog</Link>
 
           {/* Department Login */}
           <Link
             to="/department"
-            className="px-3 py-1.5 rounded-md text-sm font-semibold bg-judicial-gold text-judicial-dark border border-judicial-gold hover:bg-judicial-lightGold transition-all duration-200"
+            className="px-3 py-1.5 rounded-md text-sm font-semibold bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 transition-all duration-200 btn-nav-cta font-body-premium"
           >
             Dept Login
           </Link>
 
-          <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10" onClick={() => setSearchOpen(true)}>
+          <Button variant="outline" size="sm" className="border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 font-body-premium" onClick={() => setSearchOpen(true)}>
             <Search className="h-4 w-4 mr-2" />
             <span className="hidden xl:inline">Search</span>
           </Button>
 
           {/* Theme Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={toggleTheme}
-            className="h-9 w-9 rounded-lg border border-judicial-gold/30 dark:border-judicial-gold/20 bg-transparent dark:bg-judicial-navy/50 light:bg-white/50 hover:bg-judicial-gold/10 hover:border-judicial-gold/50 transition-all duration-300"
+            className="theme-toggle-btn"
+            aria-label="Toggle theme"
           >
-            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-judicial-gold" />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-judicial-gold"/>
-            <span className="sr-only">Toggle theme</span>
-          </Button>
+            {theme === "light" ? (
+              <Sun className="sun-icon text-[var(--accent-primary)]" />
+            ) : (
+              <Moon className="moon-icon text-[var(--accent-primary)]" />
+            )}
+          </button>
           
 
           {isLoggedIn ? (
@@ -177,7 +186,7 @@ export function Navbar() {
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/profile')}
-                className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10"
+                className="border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 font-body-premium"
               >
                 <User className="h-4 w-4 mr-2" />
                 <span className="hidden xl:inline">Profile</span>
@@ -186,7 +195,7 @@ export function Navbar() {
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className="text-judicial-gold hover:bg-red-500/10"
+                className="text-[var(--accent-primary)] hover:bg-red-500/10 font-body-premium"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -198,45 +207,47 @@ export function Navbar() {
 
         {/* Tablet Navigation - Simplified */}
         <div className="hidden md:flex lg:hidden items-center space-x-4">
-          <div className="flex items-center space-x-3 text-sm font-medium">
-            <Link to="/features" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Features</Link>
-            <Link to="/case-studies" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Case Studies</Link>
-            <Link to="/smart-analysis" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Smart Analysis</Link>
-            <Link to="/about" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">About</Link>
-            <Link to="/contact" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Contact</Link>
-            <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors">Blog</Link>
+          <div className="flex items-center space-x-3 text-sm font-medium font-body-premium">
+            <Link to="/use-cases" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Use Cases</Link>
+            <Link to="/features" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Features</Link>
+            <Link to="/case-studies" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Case Studies</Link>
+            <Link to="/smart-analysis" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Smart Analysis</Link>
+            <Link to="/about" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">About</Link>
+            <Link to="/contact" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Contact</Link>
+            <Link to="/blog" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors nav-link">Blog</Link>
           </div>
 
           {/* Department Login (tablet) */}
           <Link
             to="/department"
-            className="px-3 py-1.5 rounded-md text-sm font-semibold bg-judicial-gold text-judicial-dark hover:bg-judicial-lightGold transition-all duration-200 whitespace-nowrap"
+            className="px-3 py-1.5 rounded-md text-sm font-semibold bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 transition-all duration-200 btn-nav-cta font-body-premium"
           >
             Dept Login
           </Link>
 
-          <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10" onClick={() => setSearchOpen(true)}>
+          <Button variant="outline" size="sm" className="border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 font-body-premium" onClick={() => setSearchOpen(true)}>
             <Search className="h-4 w-4" />
           </Button>
 
           {/* Theme Toggle */}
-          <Button
-            variant="ghost"
+          <button
             onClick={toggleTheme}
-            className="h-9 w-9 rounded-lg border border-judicial-gold/20 bg-judicial-navy/50 hover:bg-judicial-gold/10 hover:border-judicial-gold/40 transition-all duration-300"
+            className="theme-toggle-btn"
+            aria-label="Toggle theme"
           >
-            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-judicial-gold" />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-judicial-gold" />
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-          
+            {theme === "light" ? (
+              <Sun className="sun-icon text-[var(--accent-primary)]" />
+            ) : (
+              <Moon className="moon-icon text-[var(--accent-primary)]" />
+            )}
+          </button>
 
           {isLoggedIn ? (
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate('/profile')}
-              className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10"
+              className="border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 font-body-premium"
             >
               <User className="h-4 w-4" />
             </Button>
@@ -252,47 +263,49 @@ export function Navbar() {
           className="md:hidden"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
-          {isMenuOpen ? <X className="h-6 w-6 text-black dark:text-judicial-gold" /> : <Menu className="h-6 w-6 text-black dark:text-judicial-gold" />}
+          {isMenuOpen ? <X className="h-6 w-6 text-[var(--text-primary)]" /> : <Menu className="h-6 w-6 text-[var(--text-primary)]" />}
         </Button>
       </div>
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-judicial-navy border-t border-judicial-gold/20 w-full overflow-hidden">
+        <div className="md:hidden bg-[var(--bg-secondary)] border-t border-[var(--border-color)] w-full overflow-hidden">
           <div className="container mx-auto px-4 flex flex-col space-y-3 pb-4">
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              <Link to="/features" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10 text-sm">Features</Link>
-              <Link to="/case-studies" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10 text-sm">Case Studies</Link>
-              <Link to="/smart-analysis" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10 text-sm">Smart Analysis</Link>
-              <Link to="/about" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10 text-sm">About</Link>
-              <Link to="/contact" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10 text-sm">Contact</Link>
-              <Link to="/blog" className="text-slate-900 dark:text-white hover:text-judicial-gold transition-colors py-2 px-3 rounded-lg hover:bg-judicial-gold/10 text-sm">Blog</Link>
+            <div className="grid grid-cols-2 gap-2 pt-2 font-body-premium">
+              <Link to="/use-cases" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors py-2 px-3 rounded-lg hover:bg-[var(--accent-primary)]/10 text-sm">Use Cases</Link>
+              <Link to="/features" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors py-2 px-3 rounded-lg hover:bg-[var(--accent-primary)]/10 text-sm">Features</Link>
+              <Link to="/case-studies" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors py-2 px-3 rounded-lg hover:bg-[var(--accent-primary)]/10 text-sm">Case Studies</Link>
+              <Link to="/smart-analysis" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors py-2 px-3 rounded-lg hover:bg-[var(--accent-primary)]/10 text-sm">Smart Analysis</Link>
+              <Link to="/about" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors py-2 px-3 rounded-lg hover:bg-[var(--accent-primary)]/10 text-sm">About</Link>
+              <Link to="/contact" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors py-2 px-3 rounded-lg hover:bg-[var(--accent-primary)]/10 text-sm">Contact</Link>
+              <Link to="/blog" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors py-2 px-3 rounded-lg hover:bg-[var(--accent-primary)]/10 text-sm">Blog</Link>
               {/* Department Login (mobile) */}
               <Link
                 to="/department"
-                className="col-span-2 text-center py-2 px-3 rounded-lg bg-judicial-gold text-judicial-dark font-semibold hover:bg-judicial-lightGold transition-all duration-200 text-sm"
+                className="col-span-2 text-center py-2 px-3 rounded-lg bg-[var(--text-primary)] text-[var(--bg-primary)] font-semibold hover:opacity-90 transition-all duration-200 text-sm btn-nav-cta"
               >
                 🏛️ Department Login
               </Link>
             </div>
             
-            <div className="flex items-center justify-between pt-4 border-t border-judicial-gold/10 dark:border-judicial-gold/10 light:border-judicial-navy/20">
-              <Button variant="outline" size="sm" className="border-judicial-gold text-judicial-gold hover:bg-judicial-gold/10" onClick={() => setSearchOpen(true)}>
+            <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
+              <Button variant="outline" size="sm" className="border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 font-body-premium" onClick={() => setSearchOpen(true)}>
                 <Search className="h-4 w-4 mr-2" />
                 Search
               </Button>
 
               {/* Theme Toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
+              <button
                 onClick={toggleTheme}
-                className="h-9 w-9 rounded-lg border border-judicial-gold/30 dark:border-judicial-gold/20 bg-transparent dark:bg-judicial-navy/50 light:bg-white/50 hover:bg-judicial-gold/10 hover:border-judicial-gold/50 transition-all duration-300"
+                className="theme-toggle-btn"
+                aria-label="Toggle theme"
               >
-                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-judicial-gold" />
-                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-judicial-gold" />
-                <span className="sr-only">Toggle theme</span>
-              </Button>
+                {theme === "light" ? (
+                  <Sun className="sun-icon text-[var(--accent-primary)]" />
+                ) : (
+                  <Moon className="moon-icon text-[var(--accent-primary)]" />
+                )}
+              </button>
             </div>
             
             {isLoggedIn ? (

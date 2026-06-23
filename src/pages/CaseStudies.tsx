@@ -2,8 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import StarField from "@/components/StarField";
-
 const CaseStudies = () => {
   const caseStudies = [
     {
@@ -46,7 +44,6 @@ const CaseStudies = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-judicial-dark relative overflow-hidden transition-colors duration-300">
-      <StarField />
       <Navbar />
       
       <div className="relative z-10 py-12 px-4 sm:px-6 lg:px-8">
@@ -111,30 +108,21 @@ const CaseStudies = () => {
                   type: "spring",
                   stiffness: 100
                 }}
-                whileHover={{ 
-                  scale: 1.05,
-                  y: -5,
-                  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.2), 0 0 30px rgba(255, 215, 0, 0.2)"
-                }}
-                className="bg-judicial-navy/70 backdrop-blur-md rounded-lg p-6 border border-judicial-gold/20 hover:border-judicial-gold/50 transition-all duration-300"
+                className="bg-white dark:bg-judicial-navy backdrop-blur-md rounded-lg p-6 border border-gray-200 dark:border-white/10 hover:border-judicial-gold hover:shadow-[0_0_25px_rgba(234,179,8,0.25)] transition-all duration-300 hover:duration-0 cursor-pointer hover-card-group"
               >
                 <div className="flex items-start justify-between">
-                  <motion.div 
-                    className="text-4xl mb-4"
-                    whileHover={{ scale: 1.2, rotate: 5 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
+                  <div className="hover-card-icon text-4xl mb-4 w-fit">
                     {study.icon}
-                  </motion.div>
-                  <span className="text-sm text-judicial-gold bg-judicial-gold/10 px-3 py-1 rounded-full">
+                  </div>
+                  <span className="text-sm text-judicial-gold bg-amber-500/10 px-3 py-1 rounded-full">
                     {study.industry}
                   </span>
                 </div>
                 
-                <h3 className="text-xl font-semibold text-black dark:text-white mb-2">
+                <h3 className="text-xl font-bold text-black dark:text-white mb-2 font-serif-legal">
                   {study.title}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                   {study.description}
                 </p>
               </motion.div>

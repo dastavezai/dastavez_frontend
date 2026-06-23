@@ -1,191 +1,242 @@
 import React, { useState, useEffect } from "react";
-import { MessageSquare, FileText, Search, ShieldAlert, Sparkles, HelpCircle, FileCheck, ArrowRight } from "lucide-react";
+import { ArrowRight, Shield, Home, Briefcase, Info, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
-export function InteractiveFeatureShowcase() {
-  const [activeTab, setActiveTab] = useState<"draft" | "search" | "analyze">("draft");
-  const [typingText, setTypingText] = useState("");
+interface Finding {
+  type: "success" | "warning" | "danger" | "info";
+  title: string;
+  description: string;
+}
 
-  const draftText = `WHEREAS, the Partners desire to associate themselves as partners in business...
-1. NAME OF THE PARTNERSHIP: The firm name shall be Dastavez Partners.
-2. PLACE OF BUSINESS: Principal office at New Delhi, India.
-3. DURATION: The partnership shall commence on June 6, 2026.`;
+interface Preset {
+  segment: string;
+  rating: string;
+  ratingType: "low" | "medium" | "high";
+  findings: Finding[];
+}
+
+const presets: Record<"constitutional" | "rent" | "noncompete", Preset> = {
+  constitutional: {
+    segment: "The Petitioner claims that unequal municipal fund distribution for heritage zones violates Article 14 due to arbitrary classification.",
+    rating: "Strong Rebuttal",
+    ratingType: "low",
+    findings: [
+      {
+        type: "success",
+        title: "Reasonable Classification Met",
+        description: "Heritage conservation has a rational nexus to cultural preservation objectives."
+      },
+      {
+        type: "success",
+        title: "Intelligible Differentia Sustained",
+        description: "Regional financial allocations are valid if based on public interest objectives."
+      }
+    ]
+  },
+  rent: {
+    segment: "The Tenant sublet premises without consent. The Landlord claims repossession and penal rent as liquidated damages.",
+    rating: "Modest Rebuttal",
+    ratingType: "medium",
+    findings: [
+      {
+        type: "danger",
+        title: "No Forfeiture Notice Served",
+        description: "Under Sec 111(g) Transfer of Property Act, a formal quit notice is mandatory."
+      },
+      {
+        type: "warning",
+        title: "Liquidated Damages Contested",
+        description: "Arbitrary penal rent without proof of actual loss violates Contract Act Section 74."
+      }
+    ]
+  },
+  noncompete: {
+    segment: "The Employer seeks an injunction to enforce a 12-month post-employment non-compete clause against the employee.",
+    rating: "Complete Defeat (Void)",
+    ratingType: "high",
+    findings: [
+      {
+        type: "danger",
+        title: "Restraint of Trade (Section 27 Void)",
+        description: "Post-employment non-competes are void in India under Contract Act Section 27."
+      },
+      {
+        type: "success",
+        title: "Severability Defense Valid",
+        description: "The invalid non-compete covenant can be isolated from the rest of the agreement."
+      }
+    ]
+  }
+};
+
+export function InteractiveFeatureShowcase() {
+  const [activeTab, setActiveTab] = useState<"constitutional" | "rent" | "noncompete">("constitutional");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (activeTab !== "draft") return;
-    setTypingText("");
-    let idx = 0;
-    const interval = setInterval(() => {
-      setTypingText((prev) => prev + draftText.charAt(idx));
-      idx++;
-      if (idx >= draftText.length) {
-        clearInterval(interval);
-      }
-    }, 25);
-    return () => clearInterval(interval);
+    setIsLoading(true);
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 450);
+    return () => clearTimeout(timer);
   }, [activeTab]);
 
+  const getRatingBadgeClass = (ratingType: "low" | "medium" | "high") => {
+    switch (ratingType) {
+      case "low":
+        return "bg-[rgba(214,171,85,0.12)] text-[#d6ab55] border border-[#d6ab55]/20 dark:bg-[#d6ab55]/10 dark:text-[#d6ab55] dark:border-[#d6ab55]/20";
+      case "medium":
+        return "bg-yellow-500/10 text-yellow-600 border border-yellow-500/20 dark:text-yellow-400 dark:border-yellow-500/30";
+      case "high":
+        return "bg-red-500/10 text-red-600 border border-red-500/20 dark:text-red-400 dark:border-red-500/30";
+    }
+  };
+
+  const getFindingStyles = (type: "success" | "warning" | "danger" | "info") => {
+    switch (type) {
+      case "success":
+        return {
+          card: "bg-green-50/70 border-l-green-500 text-green-900 hover:bg-green-100/70 dark:bg-[#0b1c11] dark:border-l-[#22c55e] dark:text-[#22c55e] dark:hover:bg-[#0d2a1d]/90",
+          icon: "text-green-600 dark:text-[#22c55e]"
+        };
+      case "warning":
+        return {
+          card: "bg-yellow-50/70 border-l-yellow-500 text-yellow-900 hover:bg-yellow-100/70 dark:bg-[#20150b] dark:border-l-[#eab308] dark:text-[#eab308] dark:hover:bg-[#2b1f13]/90",
+          icon: "text-yellow-600 dark:text-[#eab308]"
+        };
+      case "danger":
+        return {
+          card: "bg-red-50/70 border-l-red-500 text-red-900 hover:bg-red-100/70 dark:bg-[#200b0b] dark:border-l-[#ef4444] dark:text-[#ef4444] dark:hover:bg-[#2d1212]/90",
+          icon: "text-red-600 dark:text-[#ef4444]"
+        };
+      case "info":
+      default:
+        return {
+          card: "bg-blue-50/70 border-l-blue-500 text-blue-900 hover:bg-blue-100/70 dark:bg-slate-900/40 dark:border-l-blue-600 dark:text-blue-100 dark:hover:bg-slate-900/60",
+          icon: "text-blue-600 dark:text-blue-400"
+        };
+    }
+  };
+
   return (
-    <section className="py-20 bg-white dark:bg-transparent transition-colors duration-300" id="interactive-features">
-      <div className="container mx-auto px-4">
+    <section className="py-20 bg-[var(--bg-primary)] transition-colors duration-300" id="interactive-features">
+      <div className="container mx-auto px-4 font-body-premium">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-5xl font-bold font-serif-legal mb-4 text-gray-900 dark:text-white">
-            Everything in <span className="text-judicial-gold">One Platform</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent-primary)] bg-[var(--accent-primary)]/10 px-3 py-1.5 rounded-full mb-3 inline-block">
+            Interactive Rebuttal Sandbox
+          </span>
+          <h2 className="text-3xl md:text-5xl font-bold font-serif-legal mb-4 text-[var(--text-primary)]">
+            Dastavez <span className="text-[var(--accent-primary)]">Counter Studio</span>
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-base">
-            Why navigate multiple tools? Dastavez AI unites precise drafting, semantic research, and contract analysis in a single workspace.
+          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-base">
+            Experience our powerful legal AI tools through interactive demos. Click any of the three topics below to automatically run our precedent-mapping algorithms and view outlines.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-6xl mx-auto items-stretch">
-          {/* Tabs Navigation (Left) */}
           <div className="lg:col-span-5 flex flex-col justify-center space-y-4">
             <button
-              onClick={() => setActiveTab("draft")}
-              className={`p-6 text-left rounded-xl border transition-all duration-300 ${
-                activeTab === "draft"
-                  ? "bg-judicial-gold/5 border-judicial-gold/50 shadow-md translate-x-1"
-                  : "bg-transparent border-gray-200 dark:border-judicial-gold/10 hover:border-judicial-gold/30 hover:bg-gray-50/50 dark:hover:bg-judicial-navy/10"
+              onClick={() => setActiveTab("constitutional")}
+              className={`w-full p-4 text-left rounded-xl border-t border-r border-b border-l-[6px] transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-3.5 ${
+                activeTab === "constitutional"
+                  ? "bg-green-100 border-l-green-600 border-t-slate-200 border-r-slate-200 border-b-slate-200 text-green-900 shadow-md dark:bg-[#0d2a1d] dark:border-l-[#22c55e] dark:border-t-transparent dark:border-r-transparent dark:border-b-transparent dark:text-[#22c55e]"
+                  : "bg-green-50/50 border-l-green-500 border-t-slate-200 border-r-slate-200 border-b-slate-200 text-green-900/90 hover:bg-green-100/70 dark:bg-[#061c12] dark:border-l-[#22c55e]/70 dark:border-t-transparent dark:border-r-transparent dark:border-b-transparent dark:text-[#22c55e]/90"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${activeTab === "draft" ? "bg-judicial-gold text-judicial-dark" : "bg-gray-100 dark:bg-judicial-navy/30 text-gray-700 dark:text-judicial-gold"}`}>
-                  <FileText className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Drafting Suite</h3>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                Generate airtight contracts, affidavits, and deeds tailored to your specifications using real-time templates.
+              <Shield className="h-5 w-5 flex-shrink-0" />
+              <p className="text-xs sm:text-sm font-medium leading-snug">
+                <strong className="font-bold">Constitutional Law</strong> – Scan state Article 14 challenges.
               </p>
             </button>
 
             <button
-              onClick={() => setActiveTab("search")}
-              className={`p-6 text-left rounded-xl border transition-all duration-300 ${
-                activeTab === "search"
-                  ? "bg-judicial-gold/5 border-judicial-gold/50 shadow-md translate-x-1"
-                  : "bg-transparent border-gray-200 dark:border-judicial-gold/10 hover:border-judicial-gold/30 hover:bg-gray-50/50 dark:hover:bg-judicial-navy/10"
+              onClick={() => setActiveTab("rent")}
+              className={`w-full p-4 text-left rounded-xl border-t border-r border-b border-l-[6px] transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-3.5 ${
+                activeTab === "rent"
+                  ? "bg-yellow-100 border-l-yellow-600 border-t-slate-200 border-r-slate-200 border-b-slate-200 text-yellow-900 shadow-md dark:bg-[#221a0f] dark:border-l-[#eab308] dark:border-t-transparent dark:border-r-transparent dark:border-b-transparent dark:text-[#eab308]"
+                  : "bg-yellow-50/50 border-l-yellow-500 border-t-slate-200 border-r-slate-200 border-b-slate-200 text-yellow-900/90 hover:bg-yellow-100/70 dark:bg-[#131008] dark:border-l-[#eab308]/70 dark:border-t-transparent dark:border-r-transparent dark:border-b-transparent dark:text-[#eab308]/90"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${activeTab === "search" ? "bg-judicial-gold text-judicial-dark" : "bg-gray-100 dark:bg-judicial-navy/30 text-gray-700 dark:text-judicial-gold"}`}>
-                  <Search className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Smart Research</h3>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                Query thousands of Indian and international legal precedents with semantic search. No exact matching required.
+              <Home className="h-5 w-5 flex-shrink-0" />
+              <p className="text-xs sm:text-sm font-medium leading-snug">
+                <strong className="font-bold">Rent Breach</strong> – Audit notices & repossession forfeiture.
               </p>
             </button>
 
             <button
-              onClick={() => setActiveTab("analyze")}
-              className={`p-6 text-left rounded-xl border transition-all duration-300 ${
-                activeTab === "analyze"
-                  ? "bg-judicial-gold/5 border-judicial-gold/50 shadow-md translate-x-1"
-                  : "bg-transparent border-gray-200 dark:border-judicial-gold/10 hover:border-judicial-gold/30 hover:bg-gray-50/50 dark:hover:bg-judicial-navy/10"
+              onClick={() => setActiveTab("noncompete")}
+              className={`w-full p-4 text-left rounded-xl border-t border-r border-b border-l-[6px] transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-3.5 ${
+                activeTab === "noncompete"
+                  ? "bg-red-100 border-l-red-600 border-t-slate-200 border-r-slate-200 border-b-slate-200 text-red-900 shadow-md dark:bg-[#2c1212] dark:border-l-[#ef4444] dark:border-t-transparent dark:border-r-transparent dark:border-b-transparent dark:text-[#ef4444]"
+                  : "bg-red-50/50 border-l-red-500 border-t-slate-200 border-r-slate-200 border-b-slate-200 text-red-900/90 hover:bg-red-100/70 dark:bg-[#180b0b] dark:border-l-[#ef4444]/70 dark:border-t-transparent dark:border-r-transparent dark:border-b-transparent dark:text-[#ef4444]/90"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${activeTab === "analyze" ? "bg-judicial-gold text-judicial-dark" : "bg-gray-100 dark:bg-judicial-navy/30 text-gray-700 dark:text-judicial-gold"}`}>
-                  <ShieldAlert className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Document Analysis</h3>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                Upload existing contracts to scan for hidden liabilities, missed clauses, and compliance warning flags.
+              <Briefcase className="h-5 w-5 flex-shrink-0" />
+              <p className="text-xs sm:text-sm font-medium leading-snug">
+                <strong className="font-bold">Non-Compete</strong> – Audit restraint covenants under Section 27.
               </p>
             </button>
           </div>
 
-          {/* Dynamic Mockup View (Right) */}
-          <div className="lg:col-span-7 flex flex-col bg-gray-50 dark:bg-judicial-navy/20 border border-gray-200 dark:border-judicial-gold/10 rounded-2xl overflow-hidden min-h-[350px] shadow-inner relative">
-            {/* Mockup Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-judicial-dark/60 border-b border-gray-200 dark:border-judicial-gold/10">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                <div className="w-3 h-3 rounded-full bg-green-400"></div>
+          <div className="lg:col-span-7 flex flex-col bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl overflow-hidden h-[440px] shadow-lg relative">
+            <div className="flex items-center justify-between px-5 py-4 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]">
+              <div className="flex items-center gap-2.5 text-sm font-semibold text-[var(--text-primary)]">
+                <CheckCircle2 className="h-4.5 w-4.5 text-[var(--accent-primary)] dark:text-slate-350 flex-shrink-0" />
+                <span>AI Rebuttal Outline & Citations (Auto-Generated)</span>
               </div>
-              <div className="text-xs text-gray-400 font-mono select-none">dastavez-workspace.ai</div>
-              <div className="w-10"></div>
-            </div>
-
-            {/* Mockup Content */}
-            <div className="flex-1 p-5 font-mono text-sm leading-relaxed overflow-y-auto max-h-[400px]">
-              {activeTab === "draft" && (
-                <div className="h-full flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-xs text-judicial-gold border-b border-judicial-gold/15 pb-2">
-                      <Sparkles className="h-4 w-4 animate-pulse" />
-                      <span>AI DRAFT GENERATOR: Partnership Deed</span>
-                    </div>
-                    <div className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
-                      {typingText}
-                      <span className="inline-block w-1.5 h-4 bg-judicial-gold animate-pulse ml-0.5" />
-                    </div>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <span className="text-xs px-2.5 py-1 bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/20 rounded">✓ Compliant</span>
-                    <span className="text-xs px-2.5 py-1 bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/20 rounded">★ Clause Approved</span>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "search" && (
-                <div className="space-y-4">
-                  <div className="bg-white dark:bg-judicial-dark/80 border border-gray-200 dark:border-judicial-gold/25 p-3.5 rounded-lg shadow-sm flex items-center gap-3">
-                    <HelpCircle className="h-5 w-5 text-judicial-gold flex-shrink-0" />
-                    <div className="text-gray-700 dark:text-gray-300 text-xs sm:text-sm">
-                      "What is the liability threshold under the Indian Contract Act for service breach?"
-                    </div>
-                  </div>
-                  <div className="bg-judicial-gold/5 border border-judicial-gold/20 p-4 rounded-lg space-y-3">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-judicial-gold">
-                      <Sparkles className="h-4 w-4" />
-                      <span>AI ORACLE RESPONSE</span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-normal">
-                      Under Section 73 of the Indian Contract Act 1872, compensation is due for any loss which naturally arose in the usual course. Remote and indirect loss is excluded.
-                    </p>
-                    <div className="border-t border-judicial-gold/10 pt-2 text-[11px] text-gray-500 flex flex-wrap gap-2">
-                      <span className="bg-white dark:bg-judicial-dark px-2 py-0.5 rounded border dark:border-judicial-gold/10">Supreme Court Citations [2]</span>
-                      <span className="bg-white dark:bg-judicial-dark px-2 py-0.5 rounded border dark:border-judicial-gold/10">Hadley v. Baxendale</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "analyze" && (
-                <div className="space-y-4">
-                  <div className="border-2 border-dashed border-gray-300 dark:border-judicial-gold/25 p-6 rounded-lg text-center bg-white dark:bg-judicial-dark/30">
-                    <FileText className="h-8 w-8 text-judicial-gold mx-auto mb-2 opacity-80" />
-                    <p className="text-xs text-gray-600 dark:text-gray-400">NDA_Draft_v2.pdf uploaded successfully</p>
-                  </div>
-                  <div className="space-y-2.5">
-                    <div className="text-xs font-semibold text-gray-600 dark:text-gray-300">CRITICAL FINDINGS (2)</div>
-                    <div className="flex items-start gap-2.5 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/20 rounded-lg">
-                      <ShieldAlert className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
-                      <div className="text-xs text-red-700 dark:text-red-300">
-                        <strong>Indemnity Cap Missing:</strong> Mutual liability limits are undefined. Recommend inserting a standard liability cap.
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/20 rounded-lg">
-                      <FileCheck className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                      <div className="text-xs text-yellow-700 dark:text-yellow-300">
-                        <strong>Jurisdiction Clash:</strong> Governing law references two conflicting states. Recommend unifying under Delhi Jurisdiction.
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {isLoading && (
+                <div className="w-4 h-4 border-2 border-[var(--accent-primary)]/20 border-t-[var(--accent-primary)] rounded-full animate-spin"></div>
               )}
             </div>
 
-            {/* Bottom Floating Action */}
-            <div className="p-4 bg-white dark:bg-judicial-dark/60 border-t border-gray-200 dark:border-judicial-gold/10 flex justify-end">
+            <div className="flex-1 p-6 flex flex-col gap-5 overflow-y-auto">
+              {isLoading ? (
+                <div className="flex-1 flex flex-col items-center justify-center py-16 text-[var(--text-muted)]">
+                  <div className="w-8 h-8 border-3 border-[var(--accent-primary)]/20 border-t-[var(--accent-primary)] rounded-full animate-spin mb-3"></div>
+                  <p className="text-xs font-mono">Running precedent-mapping algorithms...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-[var(--bg-secondary)] border-l-4 border-[var(--accent-primary)] rounded-r-lg p-4 shadow-sm dark:bg-slate-900/40 dark:border-l-[#d6ab55]">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                      Document Segment Under Review
+                    </span>
+                    <div className="text-xs sm:text-sm italic text-[var(--text-secondary)] leading-relaxed">
+                      "{presets[activeTab].segment}"
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-[var(--bg-secondary)] p-3 px-4 rounded-lg border border-[var(--border-color)]">
+                    <span className="text-xs sm:text-sm font-medium text-[var(--text-primary)]">Rebuttal Strength Rating</span>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${getRatingBadgeClass(presets[activeTab].ratingType)}`}>
+                      {presets[activeTab].rating}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    {presets[activeTab].findings.map((finding, idx) => {
+                      const styles = getFindingStyles(finding.type);
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 transition-all duration-300 transform hover:scale-[1.02] ${styles.card}`}
+                        >
+                          <Info className={`h-4.5 w-4.5 mt-0.5 flex-shrink-0 ${styles.icon}`} />
+                          <div className="text-xs leading-relaxed">
+                            <strong className="font-bold">{finding.title}</strong> – {finding.description}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-4 bg-[var(--bg-tertiary)] border-t border-[var(--border-color)] flex justify-end">
               <Link to="/chat">
-                <Button size="sm" className="bg-judicial-gold hover:bg-judicial-gold/90 text-judicial-dark gap-1 text-xs">
+                <Button size="sm" className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white gap-1 text-xs">
                   Open Workspace <ArrowRight className="h-3.5 w-3.5" />
                 </Button>
               </Link>

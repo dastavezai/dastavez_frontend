@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import ScalesAnimation from '../components/ScalesAnimation';
-import GavelAnimation from '../components/GavelAnimation';
+import JusticeIcon from '../components/JusticeIcon';
 import FloatingCard from '../components/FloatingCard';
 import LoginIcon from '../components/LoginIcon';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
@@ -48,12 +48,11 @@ const inputClasses = `
   placeholder-gray-400 shadow-sm
 
   /* Dark mode styles */
-  dark:bg-gradient-to-br dark:from-judicial-blue/30 dark:to-judicial-blue/10
-  dark:text-gray-900
-  dark:border-judicial-gold/30
+  dark:bg-judicial-dark
+  dark:text-white
+  dark:border-border
   dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]
-  dark:backdrop-blur-lg
-  dark:placeholder-judicial-lightGold/50
+  dark:placeholder-gray-500
 `;
 
 const buttonClasses = `
@@ -87,6 +86,16 @@ const Auth = () => {
   const navigate = useNavigate();
   const [googleReady, setGoogleReady] = useState(false);
 
+  const performRedirect = (defaultPath: string) => {
+    if (defaultPath === '/admin') {
+      window.location.href = '/admin';
+      return;
+    }
+    const redirectUrl = sessionStorage.getItem('redirectAfterLogin') || defaultPath;
+    sessionStorage.removeItem('redirectAfterLogin');
+    window.location.href = redirectUrl;
+  };
+
   useEffect(() => {
     // Load Google Identity script if not present
     if (!window.google) {
@@ -113,7 +122,7 @@ const Auth = () => {
           const data: any = await authAPI.googleAuth(resp.credential);
           if (data?.token) {
             localStorage.setItem('jwt', data.token);
-            window.location.href = '/chat';
+            performRedirect('/chat');
           }
         } catch (err: any) {
           alert(err?.message || 'Google login failed');
@@ -269,7 +278,7 @@ const Auth = () => {
         // If backend directly signals admin access with boolean/success flags
         const responseTrue = (data === true) || (data?.success === true) || (data?.allowed === true) || (data?.isAdmin === true);
         if (responseTrue) {
-          window.location.href = '/admin';
+          performRedirect('/admin');
           return;
         }
 
@@ -290,13 +299,13 @@ const Auth = () => {
           );
 
           if (isAdmin && isVerified) {
-            window.location.href = '/admin';
+            performRedirect('/admin');
           } else {
-            window.location.href = '/chat';
+            performRedirect('/chat');
           }
         } catch {
           // Fallback if user fetch fails
-          window.location.href = '/chat';
+          performRedirect('/chat');
         }
       } else {
         setErrors({ ...errors, password: data?.message || 'Login failed' });
@@ -331,7 +340,7 @@ const Auth = () => {
 
       if (data.token) {
         localStorage.setItem('jwt', data.token);
-        window.location.href = '/chat';
+        performRedirect('/chat');
       } else {
         setErrors({ ...errors, otp: data.message || 'Registration failed' });
       }
@@ -343,89 +352,16 @@ const Auth = () => {
     }
   };
 
-  // Add floating particles effect
-  useEffect(() => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
 
-    canvas.style.position = 'fixed';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.zIndex = '1';
-    canvas.style.pointerEvents = 'none';
-    document.body.appendChild(canvas);
-
-    let particles: Array<{
-      x: number;
-      y: number;
-      size: number;
-      speedX: number;
-      speedY: number;
-      opacity: number;
-    }> = [];
-
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-
-    const createParticle = () => {
-      return {
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 2 + 1,
-        speedX: (Math.random() - 0.5) * 0.5,
-        speedY: (Math.random() - 0.5) * 0.5,
-        opacity: Math.random() * 0.5 + 0.2,
-      };
-    };
-
-    const initParticles = () => {
-      particles = Array.from({ length: 50 }, createParticle);
-    };
-
-    const drawParticles = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      particles.forEach((particle) => {
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(214, 171, 85, ${particle.opacity})`;
-        ctx.fill();
-
-        particle.x += particle.speedX;
-        particle.y += particle.speedY;
-
-        if (particle.x < 0 || particle.x > canvas.width) particle.speedX *= -1;
-        if (particle.y < 0 || particle.y > canvas.height) particle.speedY *= -1;
-      });
-
-      requestAnimationFrame(drawParticles);
-    };
-
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-    initParticles();
-    drawParticles();
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      document.body.removeChild(canvas);
-    };
-  }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden pb-20">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden pb-20 bg-white dark:bg-judicial-dark transition-colors duration-300">
       {/* Removed <LoginIcon /> from login page */}
       {/* Background Image with Overlay */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.05] dark:opacity-[0.15] mix-blend-overlay"
         style={{
           backgroundImage: `url('/courthouse.jpg')`,
-          filter: 'brightness(0.3)'
         }}
       />
 
@@ -433,20 +369,22 @@ const Auth = () => {
       <div className="absolute inset-0 pointer-events-none">
         <div className="hidden dark:block absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-judicial-dark to-transparent" />
         <div className="hidden dark:block absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-judicial-dark to-transparent" />
-        <div className="dark:hidden absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-gray-200/50 to-transparent" />
+        <div className="dark:hidden absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-gray-100/30 to-transparent" />
       </div>
 
       {/* Content */}
-      <div className="relative z-10 w-full max-w-md px-6 -mt-20">
+      <div className="relative z-10 w-full max-w-md px-6 mt-6">
         {/* Logo/Brand */}
-        <div className="mb-8 text-center">
-          <div className="mb-6 transform hover:scale-105 transition-transform duration-300">
-            <GavelAnimation />
+        <div className="mb-8 text-center flex flex-col items-center">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <div className="transform hover:scale-105 transition-transform duration-300">
+              <JusticeIcon className="w-[110px] h-[110px]" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-judicial-gold to-judicial-lightGold bg-clip-text text-transparent">
+              Dastavez AI
+            </h1>
           </div>
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-judicial-gold to-judicial-lightGold bg-clip-text text-transparent">
-            Dastavez AI
-          </h1>
-          <p className="text-judicial-blue/80 dark:text-judicial-lightGold/80 text-lg font-medium">
+          <p className="text-black dark:text-white text-lg font-medium">
             Legal Intelligence Platform
           </p>
         </div>
@@ -458,7 +396,7 @@ const Auth = () => {
               {state.step === 'email' ? 'Welcome' :
                 state.step === 'login' ? 'Login' : 'Create Account'}
             </h2>
-            <p className="text-judicial-lightGold/80">
+            <p className="text-gray-600 dark:text-judicial-lightGold/80">
               {state.step === 'email' ? 'Enter your email to continue' :
                 state.step === 'login' ? 'Enter your password to login' :
                   'Complete your registration'}
@@ -544,7 +482,7 @@ const Auth = () => {
                     onClick={() => {
                       navigate('/forgot-password', { state: { email: state.email } });
                     }}
-                    className="text-judicial-lightGold/80 hover:text-judicial-gold text-sm transition-all duration-300 hover:scale-105"
+                    className="text-gray-500 hover:text-judicial-gold dark:text-judicial-lightGold/80 dark:hover:text-judicial-gold text-sm transition-all duration-300 hover:scale-105"
                   >
                     Forgot password
                   </button>

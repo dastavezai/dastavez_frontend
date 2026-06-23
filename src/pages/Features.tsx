@@ -2,7 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import StarField from "@/components/StarField";
 import AIAssistant3D from "@/components/AIAssistant3D";
 
 const Features = () => {
@@ -41,7 +40,6 @@ const Features = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-judicial-dark relative overflow-hidden transition-colors duration-300">
-      <StarField />
       <Navbar />
       <div className="relative z-10 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -71,20 +69,15 @@ const Features = () => {
                   type: "spring",
                   stiffness: 100
                 }}
-                whileHover={{ 
-                  scale: 1.01,
-                  y: -2,
-                  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3), 0 0 30px rgba(255, 215, 0, 0.1)"
-                }}
-                className="bg-judicial-navy/70 backdrop-blur-md rounded-lg p-6 border border-judicial-gold/20 hover:border-judicial-gold/50 transition-all duration-300"
+                className="bg-judicial-navy/70 backdrop-blur-md rounded-lg p-6 border border-judicial-gold/20 hover:border-judicial-gold/80 hover:shadow-[0_0_25px_rgba(234,179,8,0.25)] transition-all duration-300 hover:duration-0 cursor-pointer hover-card-group"
               >
-                <div className="text-4xl mb-4">
+                <div className="hover-card-icon text-4xl mb-4 w-fit">
                   {feature.icon}
                 </div>
-                <h3 className="text-xl font-semibold text-black dark:text-white mb-2">
+                <h3 className="text-xl font-bold text-black dark:text-white mb-2 font-serif-legal">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                   {feature.description}
                 </p>
               </motion.div>

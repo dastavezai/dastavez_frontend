@@ -7,13 +7,11 @@ import { CaseAnalysis } from "@/components/CaseAnalysis";
 import { TestimonialSection } from "@/components/TestimonialSection";
 import { Footer } from "@/components/Footer";
 import { Quote, Star } from "lucide-react";
-import StarField from "@/components/StarField";
 import { Link } from "react-router-dom";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300 font-sans-premium">
-      <StarField />
       <Navbar />
       
       {/* Premium Hero Section */}
@@ -34,7 +32,7 @@ const Index = () => {
             <h2 className="text-3xl md:text-5xl font-bold font-serif-legal mb-4 text-gray-900 dark:text-white">
               See <span className="text-judicial-gold">Dastavez AI</span> in Action
             </h2>
-            <p className="text-gray-550 dark:text-gray-400 max-w-2xl mx-auto">
+            <p className="text-gray-550 dark:text-white max-w-2xl mx-auto">
               Experience our powerful legal AI tools through interactive demos of our core features.
             </p>
           </div>
@@ -77,16 +75,20 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="trusted-card" style={{ animationDelay: '0.2s' }}>
               <div className="trusted-content">
-                <div className="trusted-icon-container">
-                  <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
-                </div>
-                <p className="text-gray-700 dark:text-gray-300 mb-6 trusted-text">
+                <p className="text-gray-700 dark:text-gray-300 mb-4 trusted-text">
                   "Dastavez AI has completely transformed our legal research process. We've reduced preparation time by 60% while discovering more relevant precedents for our cases."
                 </p>
                 <div className="trusted-footer">
-                  <div className="trusted-author">
-                    <h4 className="font-semibold text-gray-900 dark:text-white">Priyanshu Singh</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Senior Partner, Richardson & Associates</p>
+                  <div className="trusted-author flex items-center gap-3">
+                    <img 
+                      src="/avatar.png" 
+                      className="w-10 h-10 rounded-full border border-judicial-gold/20 object-cover shadow-sm flex-shrink-0" 
+                      alt="Priyanshu Singh" 
+                    />
+                    <div>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">Priyanshu Singh</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Senior Partner, Richardson & Associates</p>
+                    </div>
                   </div>
                   <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
@@ -99,16 +101,20 @@ const Index = () => {
 
             <div className="trusted-card" style={{ animationDelay: '0.4s' }}>
               <div className="trusted-content">
-                <div className="trusted-icon-container">
-                  <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
-                </div>
-                <p className="text-gray-700 dark:text-gray-300 mb-6 trusted-text">
+                <p className="text-gray-700 dark:text-gray-300 mb-4 trusted-text">
                   "In high-stakes property and civil matters, documentation quality cannot be compromised. Dastavez AI delivers structured, court-ready drafts that align with procedural standards and significantly reduce turnaround time"
                 </p>
                 <div className="trusted-footer">
-                  <div className="trusted-author">
-                    <h4 className="font-semibold text-gray-900 dark:text-white">Rishav Prakash</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Managing Partner, Chen & Associates</p>
+                  <div className="trusted-author flex items-center gap-3">
+                    <img 
+                      src="/avatar.png" 
+                      className="w-10 h-10 rounded-full border border-judicial-gold/20 object-cover shadow-sm flex-shrink-0" 
+                      alt="Rishav Prakash" 
+                    />
+                    <div>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">Rishav Prakash</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Managing Partner, Chen & Associates</p>
+                    </div>
                   </div>
                   <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
@@ -121,16 +127,20 @@ const Index = () => {
 
             <div className="trusted-card" style={{ animationDelay: '0.6s' }}>
               <div className="trusted-content">
-                <div className="trusted-icon-container">
-                  <Quote className="h-8 w-8 text-judicial-gold trusted-icon" />
-                </div>
-                <p className="text-gray-700 dark:text-gray-300 mb-6 trusted-text">
+                <p className="text-gray-700 dark:text-gray-300 mb-4 trusted-text">
                   "For lease agreements and commercial property documentation, the platform provides clear clause organization and ready-to-edit drafts. It has improved our firm’s efficiency in handling client documentation."
                 </p>
                 <div className="trusted-footer">
-                  <div className="trusted-author">
-                    <h4 className="font-semibold text-gray-900 dark:text-white">Fahim Ahmed</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Legal Director, Rodriguez Law Group</p>
+                  <div className="trusted-author flex items-center gap-3">
+                    <img 
+                      src="/avatar.png" 
+                      className="w-10 h-10 rounded-full border border-judicial-gold/20 object-cover shadow-sm flex-shrink-0" 
+                      alt="Anmol Bharti" 
+                    />
+                    <div>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">Anmol Bharti</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Legal Director, Rodriguez Law Group</p>
+                    </div>
                   </div>
                   <div className="trusted-stars">
                     {[...Array(5)].map((_, i) => (
@@ -149,7 +159,7 @@ const Index = () => {
               background: rgba(30, 41, 59, 0.7);
               backdrop-filter: blur(8px);
               border-radius: 1.5rem;
-              padding: 2rem;
+              padding: 1.5rem;
               position: relative;
               overflow: hidden;
               transform-style: preserve-3d;
@@ -337,6 +347,13 @@ const Index = () => {
       </div>
       
       <TestimonialSection />
+      
+      {/* Massive elegant website branding watermark */}
+      <div className="w-full py-12 md:py-16 text-center overflow-hidden bg-white dark:bg-judicial-dark border-t border-gray-100 dark:border-judicial-navy/40 transition-colors duration-300">
+        <h2 className="text-[16vw] sm:text-[18vw] md:text-[19.2vw] lg:text-[19.5vw] font-serif-legal font-bold tracking-tighter leading-none select-none text-black dark:text-judicial-gold transition-colors duration-300">
+          Dastavez
+        </h2>
+      </div>
       
       <Footer />
     </div>
