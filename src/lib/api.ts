@@ -11,8 +11,12 @@ export interface User {
   profileImage?: string;
   isVerified: boolean;
   isAdmin: boolean;
-  subscriptionStatus: 'free' | 'premium';
+  subscriptionStatus: 'free' | 'basic' | 'pro' | 'premium' | 'standard' | 'departmental';
+  userTier?: 'free' | 'basic' | 'pro' | 'premium' | 'standard' | 'departmental';
   remainingMessages?: number;
+  companyName?: string | null;
+  sector?: string | null;
+  companySlug?: string | null;
   createdAt: string;
   lastLogin: string;
 }
@@ -251,6 +255,11 @@ export const chatAPI = {
     return apiFetch('/chat/history');
   },
 
+  // Get all chat sessions (slugs)
+  getSessions: async (): Promise<{ slug: string; preview: string; updatedAt: string; feature: string }[]> => {
+    return apiFetch('/chat/sessions');
+  },
+
   // Clear chat history
   clearHistory: async () => {
     return apiFetch('/chat/clear?soft=true', {
@@ -383,6 +392,14 @@ export const profileAPI = {
     });
   },
 
+  // Setup company onboarding details
+  setupCompany: async (companyName: string, sector: string): Promise<{ success: boolean; user: User }> => {
+    return apiFetch('/profile/company-setup', {
+      method: 'PUT',
+      body: JSON.stringify({ companyName, sector })
+    });
+  },
+
   // Upload profile image
   uploadImage: async (image: File) => {
     const formData = new FormData();
@@ -446,6 +463,13 @@ export const adminAPI = {
   // Get all users
   getAllUsers: async () => {
     return apiFetch('/admin/users');
+  },
+  // Update user subscription tier
+  updateUserTier: async (id: string, tier: string): Promise<{ success: boolean; user: any }> => {
+    return apiFetch(`/admin/users/${id}/tier`, {
+      method: 'PUT',
+      body: JSON.stringify({ tier })
+    });
   },
   //GET financial stats
   getStats: async () => {

@@ -59,7 +59,8 @@ interface User {
   lastName: string;
   email: string;
   isAdmin: boolean;
-  subscriptionStatus: 'free' | 'premium';
+  subscriptionStatus: 'free' | 'basic' | 'pro' | 'premium' | 'standard' | 'departmental';
+  userTier?: 'free' | 'basic' | 'pro' | 'premium' | 'standard' | 'departmental';
   createdAt: string;
   lastLogin: string;
   profileImage?: string;
@@ -301,6 +302,23 @@ const Admin = () => {
       title: "Action completed",
       description: `${action} performed on user ${userId}`,
     });
+  };
+
+  const handleUpdateUserTier = async (userId: string, newTier: string) => {
+    try {
+      await adminAPI.updateUserTier(userId, newTier);
+      toast({
+        title: "Tier Updated",
+        description: `Successfully updated user tier to ${newTier}`,
+      });
+      loadDashboardData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user tier",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSystemAction = (action: string) => {
@@ -712,9 +730,20 @@ const Admin = () => {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge variant={user.subscriptionStatus === 'premium' ? 'default' : 'secondary'}>
-                              {user.subscriptionStatus}
-                            </Badge>
+                            <Select
+                              value={user.userTier || user.subscriptionStatus || 'free'}
+                              onValueChange={(val) => handleUpdateUserTier(user._id, val)}
+                            >
+                              <SelectTrigger className="w-36 bg-slate-700 border-slate-600 text-white">
+                                <SelectValue placeholder="Select Tier" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-slate-800 text-white border-slate-700">
+                                <SelectItem value="free">Free</SelectItem>
+                                <SelectItem value="standard">Standard</SelectItem>
+                                <SelectItem value="pro">Pro</SelectItem>
+                                <SelectItem value="departmental">Departmental</SelectItem>
+                              </SelectContent>
+                            </Select>
                             {user.isAdmin && <Badge variant="outline">Admin</Badge>}
                             <div className="flex items-center space-x-1">
                               <Button size="sm" variant="ghost" onClick={() => handleUserAction('View', user._id)}>

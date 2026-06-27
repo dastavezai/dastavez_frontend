@@ -141,7 +141,7 @@ const Login = () => {
       return;
     }
 
-    if (user.isAdmin) navigate('/department/admin/dashboard', { state: { ...state, openWizard }, replace: true });
+    if (user.isAdmin) navigate('/admin', { state: { ...state, openWizard }, replace: true });
     else navigate('/department', { state: { ...state, openWizard }, replace: true });
   }, [user, navigate, location?.state]);
 
@@ -201,7 +201,7 @@ const Login = () => {
         const openWizard = Boolean(state?.openWizard);
 
         if (result.isAdmin) {
-          navigate(from || '/department/admin/dashboard', { state: { ...state, openWizard }, replace: true });
+          navigate(from || '/admin', { state: { ...state, openWizard }, replace: true });
         } else {
           navigate(from || '/department', { state: { ...state, openWizard }, replace: true });
         }
@@ -248,7 +248,7 @@ const Login = () => {
       const openWizard = Boolean(state?.openWizard);
 
       if (user?.isAdmin) {
-        navigate(from || '/department/admin/dashboard', { state: { ...state, openWizard }, replace: true });
+        navigate(from || '/admin', { state: { ...state, openWizard }, replace: true });
       } else {
         navigate(from || '/department', { state: { ...state, openWizard }, replace: true });
       }

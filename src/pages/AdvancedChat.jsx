@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import {
   Box,
   Container,
@@ -41,15 +41,17 @@ import {
   Show,
   Hide,
   Progress,
+  Select,
 } from '@chakra-ui/react';
 import { SunIcon, MoonIcon, DeleteIcon, AttachmentIcon, ViewIcon, ViewOffIcon, AddIcon } from '@chakra-ui/icons';
 import { RiSendPlaneFill } from 'react-icons/ri';
-import { FiMaximize2, FiFileText, FiMic, FiMicOff, FiGlobe, FiRefreshCw, FiEdit, FiZap } from 'react-icons/fi';
+import { FiMaximize2, FiFileText, FiMic, FiMicOff, FiGlobe, FiRefreshCw, FiEdit, FiZap, FiGrid, FiMessageSquare, FiCpu, FiLayers, FiClock, FiSettings } from 'react-icons/fi';
 import { MdDocumentScanner } from 'react-icons/md';
 import axios from 'axios';
 import ChatMessage from '../chat-advanced/components/ChatMessage';
 import { useAuth } from '../chat-advanced/AuthBridge';
-import { Link } from 'react-router-dom';
+import { profileAPI } from '../lib/api';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import fileService from '../chat-advanced/services/fileService';
 import { FaFile, FaTimes, FaPaperclip, FaEdit, FaDownload, FaRobot } from 'react-icons/fa';
 const FullPageEditor = lazy(() => import('../chat-advanced/components/FullPageEditor'));
@@ -65,10 +67,34 @@ import { API_BASE_URL as BASE_URL } from '../chat-advanced/constants';
 
 
 const ChatPage = () => {
+  const { slug } = useParams();
+  const navigate = useNavigate();
   const { colorMode, toggleColorMode } = useColorMode();
-  const { token, logout, user } = useAuth();
+  const { token, logout, user, loading, checkUser } = useAuth();
   const toast = useToast();
 
+  useEffect(() => {
+    if (user && !loading) {
+      if (user.companySlug) {
+        if (!slug || slug !== user.companySlug) {
+          navigate(`/c/${user.companySlug}`, { replace: true });
+        }
+      }
+    }
+  }, [slug, user, loading, navigate]);
+
+  useEffect(() => {
+    if (slug) {
+      axios.defaults.headers.common['x-chat-slug'] = slug;
+    } else {
+      delete axios.defaults.headers.common['x-chat-slug'];
+    }
+    return () => {
+      delete axios.defaults.headers.common['x-chat-slug'];
+    };
+  }, [slug]);
+
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -80,6 +106,35 @@ const ChatPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [analyzingFile, setAnalyzingFile] = useState(false);
+
+  // Company Onboarding Modal States
+  const [onboardCompanyName, setOnboardCompanyName] = useState('');
+  const [onboardSector, setOnboardSector] = useState('');
+  const [isOnboardingSubmitLoading, setIsOnboardingSubmitLoading] = useState(false);
+  const [onboardError, setOnboardError] = useState('');
+
+  const handleOnboardSubmit = async (e) => {
+    e.preventDefault();
+    if (!onboardCompanyName.trim() || !onboardSector.trim()) {
+      setOnboardError('Please fill in all fields.');
+      return;
+    }
+    setIsOnboardingSubmitLoading(true);
+    setOnboardError('');
+    try {
+      const response = await profileAPI.setupCompany(onboardCompanyName, onboardSector);
+      if (response && response.user) {
+        await checkUser();
+        // Redirect to new company slug
+        navigate(`/c/${response.user.companySlug}`, { replace: true });
+      }
+    } catch (err) {
+      console.error('Onboarding failed:', err);
+      setOnboardError(err.message || 'Onboarding failed. Please try again.');
+    } finally {
+      setIsOnboardingSubmitLoading(false);
+    }
+  };
 
   // Clear chat modal state
   const [clearPassword, setClearPassword] = useState('');
@@ -178,6 +233,15 @@ const ChatPage = () => {
     });
   };
 
+  useEffect(() => {
+    if (user) {
+      setSubscriptionStatus(user.subscriptionStatus || 'free');
+      if (user.remainingMessages !== undefined) {
+        setRemainingMessages(user.remainingMessages);
+      }
+    }
+  }, [user]);
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -242,7 +306,7 @@ const ChatPage = () => {
     if (token) {
       loadInitialMessage();
     }
-  }, [token, toast]);
+  }, [token, toast, slug]);
 
   // Update welcome message when language changes - but ONLY if it's the initial welcome message
   // IMPORTANT: Only runs when language changes, NOT on every message update
@@ -2903,211 +2967,375 @@ const ChatPage = () => {
     }
   };
 
-  return (
-    <Box minH="100vh" bg={bgMain}>
-      <Flex
-        as="header"
-        position="fixed"
-        w="full"
-        px={4}
-        height="60px"
-        alignItems="center"
-        justifyContent="space-between"
-        bg={headerBg}
-        borderBottom="1px"
-        borderColor={borderColor}
-        zIndex="sticky"
-      >
-        <HStack spacing={4}>
-          <Link to="/">
-            <Heading size="md" color={textColor} cursor="pointer" _hover={{ textDecoration: 'none', opacity: 0.8 }}>Dastavez AI</Heading>
-          </Link>
-          {subscriptionStatus === 'premium' ? (
-            <Badge colorScheme="green" fontSize="sm">Premium</Badge>
-          ) : (
-            <Tooltip label="Upgrade to premium for unlimited messages">
-              <Badge colorScheme="blue" fontSize="sm">
-                {remainingMessages !== null ? `${remainingMessages} messages left today` : 'Free Plan'}
-              </Badge>
-            </Tooltip>
-          )}
-        </HStack>
-        <HStack spacing={4}>
-          <Link to="/profile">
-            <Avatar
-              size="sm"
-              name={user?.firstName}
-              src={user?.profileImage}
-              cursor="pointer"
-              _hover={{ boxShadow: 'outline', border: '2px solid #3182ce' }}
-            />
-          </Link>
+  const [sessionsList, setSessionsList] = useState([]);
+  const [sessionsListLoading, setSessionsListLoading] = useState(false);
 
-          {/* Smart Scanner Button */}
-          <Tooltip
-            label={
-              !selectedFile
-                ? (language === 'hi' ? 'पहले फ़ाइल अपलोड करें' : 'Upload a file first')
-                : scanStatus === 'scanning'
-                  ? (language === 'hi' ? 'स्कैन हो रहा है...' : 'Scanning...')
-                  : scanStatus === 'scanned'
-                    ? (language === 'hi' ? 'स्कैन पूरा ✓' : 'Scan complete ✓')
-                    : (language === 'hi' ? 'स्मार्ट स्कैनर' : 'Smart Scanner')
-            }
-            placement="bottom"
-          >
+  const fetchSessions = async () => {
+    setSessionsListLoading(true);
+    try {
+      const list = await chatAPI.getSessions();
+      setSessionsList(list || []);
+    } catch (err) {
+      console.error('Error loading sessions:', err);
+    } finally {
+      setSessionsListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchSessions();
+    }
+  }, [activeTab, user, slug]);
+
+  const renderSubSidebarContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return (
+          <VStack spacing={4} align="stretch">
+            <Box p={4} borderRadius="lg" bg={useColorModeValue('white', 'gray.900')} border="1px solid" borderColor={borderColor}>
+              <Text fontSize="sm" fontWeight="bold">Balance Summary</Text>
+              <Text fontSize="2xl" fontWeight="black" mt={2} color="judicial.gold">
+                {remainingMessages !== null ? `${remainingMessages} Left` : 'Unlimited'}
+              </Text>
+              <Text fontSize="xs" color="gray.500" mt={1}>Remaining messages today</Text>
+            </Box>
+            <Box p={4} borderRadius="lg" bg={useColorModeValue('white', 'gray.900')} border="1px solid" borderColor={borderColor}>
+              <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase">Workspace Details</Text>
+              <VStack align="stretch" mt={3} spacing={2} fontSize="sm">
+                <HStack justify="space-between">
+                  <Text color="gray.500">Company:</Text>
+                  <Text fontWeight="semibold">{user?.companyName || 'N/A'}</Text>
+                </HStack>
+                <HStack justify="space-between">
+                  <Text color="gray.500">Sector:</Text>
+                  <Text fontWeight="semibold" textTransform="capitalize">{user?.sector || 'N/A'}</Text>
+                </HStack>
+                <HStack justify="space-between">
+                  <Text color="gray.500">Slug:</Text>
+                  <Badge colorScheme="blue">{user?.companySlug || 'N/A'}</Badge>
+                </HStack>
+              </VStack>
+            </Box>
+          </VStack>
+        );
+
+      case 'history':
+        return (
+          <VStack spacing={2} align="stretch">
             <Button
               size="sm"
-              variant={scanStatus === 'scanned' ? 'solid' : 'outline'}
-              colorScheme={scanStatus === 'scanned' ? 'green' : scanStatus === 'scanning' ? 'blue' : selectedFile ? 'red' : 'gray'}
-              leftIcon={scanStatus === 'scanning' ? <Spinner size="xs" /> : <Icon as={MdDocumentScanner} />}
-              onClick={handleSmartScan}
-              isDisabled={!selectedFile || scanStatus === 'scanning'}
-              isLoading={scanStatus === 'scanning'}
-              loadingText={language === 'hi' ? 'स्कैन...' : 'Scanning'}
+              colorScheme="blue"
+              leftIcon={<AddIcon />}
+              onClick={() => {
+                const newSlug = Math.random().toString(36).substring(2, 15);
+                navigate(`/c/${newSlug}`);
+              }}
+              w="full"
+              mb={2}
             >
-              {scanStatus === 'scanned'
-                ? (language === 'hi' ? 'स्कैन ✓' : 'Scanned ✓')
-                : (language === 'hi' ? 'स्कैन' : 'Scan')
-              }
+              New Chat Session
             </Button>
-          </Tooltip>
+            {sessionsListLoading ? (
+              <Center py={6}><Spinner size="sm" /></Center>
+            ) : sessionsList.length === 0 ? (
+              <Text fontSize="xs" color="gray.500" textAlign="center">No conversation history yet.</Text>
+            ) : (
+              sessionsList.map(session => {
+                const isActive = slug === session.slug;
+                return (
+                  <Box
+                    key={session.slug}
+                    p={3}
+                    borderRadius="md"
+                    bg={isActive ? useColorModeValue('blue.50', 'gray.900') : 'transparent'}
+                    border={isActive ? '1px solid' : 'none'}
+                    borderColor={isActive ? 'blue.200' : 'transparent'}
+                    cursor="pointer"
+                    onClick={() => navigate(`/c/${session.slug}`)}
+                    _hover={{ bg: useColorModeValue('gray.100', 'gray.850') }}
+                  >
+                    <HStack justify="space-between">
+                      <Badge size="xs" colorScheme={
+                        session.feature === 'document_ready' ? 'purple' :
+                        session.feature === 'legal_analysis' ? 'green' : 'blue'
+                      }>
+                        {session.feature.replace('_', ' ')}
+                      </Badge>
+                      <Text fontSize="2xs" color="gray.400">
+                        {new Date(session.updatedAt).toLocaleDateString()}
+                      </Text>
+                    </HStack>
+                    <Text fontSize="xs" noOfLines={2} mt={1} color={isActive ? textColor : 'gray.500'}>
+                      {session.preview}
+                    </Text>
+                  </Box>
+                );
+              })
+            )}
+          </VStack>
+        );
 
-          {/* Edit Document Button */}
-          <Tooltip
-            label={
-              !selectedFile
-                ? (language === 'hi' ? 'पहले फ़ाइल अपलोड करें' : 'Upload a file first')
-                : (language === 'hi' ? 'दस्तावेज़ संपादित करें' : 'Open document editor')
-            }
-            placement="bottom"
-          >
+      case 'research':
+        return (
+          <VStack spacing={4} align="stretch">
+            <Text fontSize="sm" color="gray.500">
+              Upload a legal case file or contract to perform automated compliance analysis and deep legal context searches.
+            </Text>
+            <Box
+              border="2px dashed"
+              borderColor={borderColor}
+              borderRadius="lg"
+              p={4}
+              textAlign="center"
+              cursor="pointer"
+              _hover={{ borderColor: 'blue.500' }}
+              onClick={() => document.getElementById('file-upload')?.click()}
+            >
+              <Icon as={FaPaperclip} w={6} h={6} color="blue.500" mb={2} />
+              <Text fontSize="xs" fontWeight="bold">Click to Upload File</Text>
+              <Text fontSize="2xs" color="gray.400" mt={1}>PDF, Word, TXT, images</Text>
+            </Box>
+            {selectedFile && (
+              <Box p={3} bg="blue.50" _dark={{ bg: 'blue.900' }} borderRadius="md">
+                <Text fontSize="xs" fontWeight="semibold" isTruncated>{selectedFile.fileName}</Text>
+                <Progress value={uploadProgress} size="xs" colorScheme="blue" mt={2} borderRadius="full" />
+              </Box>
+            )}
+          </VStack>
+        );
+
+      case 'review':
+        return (
+          <VStack spacing={4} align="stretch">
+            <Text fontSize="sm" color="gray.500">
+              Parallel Review: Upload multiple legal briefs, contracts, or court transcripts to compare clause compliance and verify cross-document alignments.
+            </Text>
+            <Box
+              border="2px dashed"
+              borderColor={borderColor}
+              borderRadius="lg"
+              p={4}
+              textAlign="center"
+              cursor="pointer"
+              _hover={{ borderColor: 'purple.500' }}
+              onClick={() => document.getElementById('file-upload')?.click()}
+            >
+              <Icon as={FiLayers} w={6} h={6} color="purple.500" mb={2} />
+              <Text fontSize="xs" fontWeight="bold">Upload Multiple Files</Text>
+              <Text fontSize="2xs" color="gray.400" mt={1}>Upload up to 10 files in parallel</Text>
+            </Box>
+          </VStack>
+        );
+
+      case 'chronology':
+        return (
+          <VStack spacing={4} align="stretch">
+            <Text fontSize="sm" color="gray.500">
+              Analyze a list of events, legal summons, or case history text/files to compile a structured chronological order timeline of events automatically.
+            </Text>
+            <Box
+              border="2px dashed"
+              borderColor={borderColor}
+              borderRadius="lg"
+              p={4}
+              textAlign="center"
+              cursor="pointer"
+              _hover={{ borderColor: 'green.500' }}
+              onClick={() => document.getElementById('file-upload')?.click()}
+            >
+              <Icon as={FiClock} w={6} h={6} color="green.500" mb={2} />
+              <Text fontSize="xs" fontWeight="bold">Upload Chronology File</Text>
+              <Text fontSize="2xs" color="gray.400" mt={1}>Analyze timeline sources</Text>
+            </Box>
+          </VStack>
+        );
+
+      case 'drafting':
+        return (
+          <VStack spacing={4} align="stretch">
+            <Text fontSize="sm" color="gray.500">
+              Select or design templates to draft custom affidavits, compliance notices, complaints, and general agreements.
+            </Text>
+            <Button
+              size="sm"
+              colorScheme="purple"
+              leftIcon={<Icon as={FiFileText} />}
+              onClick={() => handleSuggestedActionClick({ type: 'CREATE_DOCUMENT', text: 'Draft a dynamic template document' })}
+              w="full"
+            >
+              Browse Template Categories
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              colorScheme="teal"
+              leftIcon={<Icon as={FiZap} />}
+              onClick={() => handleSuggestedActionClick({ type: 'PRECEDENCE_ANALYSIS', text: 'Analyze court precedents' })}
+              w="full"
+            >
+              Precedence Analysis
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              colorScheme="orange"
+              leftIcon={<Icon as={FiEdit} />}
+              onClick={() => handleSuggestedActionClick({ type: 'COUNTER_AFFIDAVIT', text: 'Create a counter affidavit response' })}
+              w="full"
+            >
+              Counter Maker
+            </Button>
             <Button
               size="sm"
               variant="outline"
               colorScheme="blue"
-              leftIcon={<Icon as={FiEdit} />}
-              onClick={handleOpenEditor}
-              isDisabled={!selectedFile}
-            >
-              {language === 'hi' ? 'संपादित करें' : 'Edit'}
-            </Button>
-          </Tooltip>
-          {/* Language Toggle Button */}
-          <Tooltip label={language === 'en' ? 'Switch to Hindi' : 'Switch to English'} placement="bottom">
-            <Button
-              size="sm"
-              variant="outline"
-              colorScheme={language === 'hi' ? 'orange' : 'blue'}
               leftIcon={<Icon as={FiGlobe} />}
-              onClick={toggleLanguage}
-              fontWeight="bold"
-              minW="70px"
+              onClick={() => handleSuggestedActionClick({ type: 'TRANSLATE_DOCUMENT', text: 'Translate a document file' })}
+              w="full"
             >
-              {language === 'en' ? 'EN' : 'हिं'}
+              Document Translator
             </Button>
-          </Tooltip>
-          <IconButton
-            icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
-            onClick={toggleColorMode}
-            variant="ghost"
-            aria-label="Toggle color mode"
-          />
-          <IconButton
-            icon={<DeleteIcon />}
-            onClick={handleClearChat}
-            variant="ghost"
-            aria-label="Clear chat"
-          />
-          <Button
-            onClick={logout}
-            variant="ghost"
-            colorScheme="red"
-          >
-            Logout
-          </Button>
-        </HStack>
-      </Flex>
+          </VStack>
+        );
 
-      <Container maxW="container.lg" h="calc(100vh - 100px)" pt="80px">
-        <VStack h="full" spacing={4}>
-          <Box
-            flex="1"
-            w="full"
-            overflowY="auto"
-            borderRadius="xl"
-            p={4}
-            bg={bgColor}
-            borderWidth={1}
-            borderColor={borderColor}
-            boxShadow="xl"
-            position="relative"
-            css={{
-              '&::-webkit-scrollbar': {
-                width: '4px',
-              },
-              '&::-webkit-scrollbar-track': {
-                width: '6px',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                background: borderColor,
-                borderRadius: '24px',
-              },
-            }}
-          >
-            {isInitialLoad ? (
-              <Center h="full">
-                <Spinner size="lg" color="blue.500" />
-              </Center>
-            ) : messages.length === 0 ? (
-              <Center h="full">
-                <Text color={textColor}>No messages yet. Start a conversation!</Text>
-              </Center>
-            ) : (
-              messages.map((msg, index) => (
-                <ChatMessage
-                  key={index}
-                  message={msg}
-                  role={msg.role}
-                  onSuggestedActionClick={handleSuggestedActionClick}
-                  onDownload={handleDownloadFile}
-                  language={language}
-                />
-              ))
-            )}
+      case 'profile':
+        return (
+          <VStack spacing={4} align="stretch">
+            <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase">Configure Permanent Slug</Text>
+            <form onSubmit={handleOnboardSubmit}>
+              <VStack spacing={3}>
+                <FormControl size="sm">
+                  <FormLabel fontSize="xs">Company Name</FormLabel>
+                  <Input
+                    size="sm"
+                    value={onboardCompanyName}
+                    onChange={(e) => setOnboardCompanyName(e.target.value)}
+                  />
+                </FormControl>
+                <FormControl size="sm">
+                  <FormLabel fontSize="xs">Sector</FormLabel>
+                  <Select
+                    size="sm"
+                    value={onboardSector}
+                    onChange={(e) => setOnboardSector(e.target.value)}
+                  >
+                    <option value="legal">Legal & Compliance</option>
+                    <option value="finance">Finance & Banking</option>
+                    <option value="tech">Technology & IT</option>
+                    <option value="healthcare">Healthcare & Pharma</option>
+                    <option value="realestate">Real Estate & Construction</option>
+                    <option value="retail">Retail & E-commerce</option>
+                    <option value="other">Other / General</option>
+                  </Select>
+                </FormControl>
+                <Button
+                  size="sm"
+                  w="full"
+                  colorScheme="blue"
+                  type="submit"
+                  isLoading={isOnboardingSubmitLoading}
+                >
+                  Update Company Settings
+                </Button>
+              </VStack>
+            </form>
+          </VStack>
+        );
 
-            {/* Post-download options are now inline with suggestedActions in the message */}
-            {/* Keeping this hidden - use inline buttons instead */}
+      case 'settings':
+        return (
+          <VStack spacing={4} align="stretch">
+            <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase">App Preferences</Text>
+            <FormControl>
+              <FormLabel fontSize="xs">System Language</FormLabel>
+              <Select size="sm" value={language} onChange={(e) => setLanguage(e.target.value)}>
+                <option value="en">English (EN)</option>
+                <option value="hi">हिंदी (HI)</option>
+              </Select>
+            </FormControl>
+            <FormControl>
+              <FormLabel fontSize="xs">Theme Mode</FormLabel>
+              <Select size="sm" value={colorMode} onChange={(e) => { toggleColorMode(); }}>
+                <option value="light">Light Mode</option>
+                <option value="dark">Dark Mode</option>
+              </Select>
+            </FormControl>
+          </VStack>
+        );
+      default:
+        return null;
+    }
+  };
 
-            <div ref={messagesEndRef} />
-          </Box>
-        </VStack>
-
+  const renderWorkingWindowBody = () => {
+    return (
+      <Flex w="full" h="full" direction="column" overflow="hidden" p={4}>
+        {/* Messages scroll area */}
         <Box
-          position="fixed"
-          bottom={0}
-          left={0}
-          right={0}
-          bg={bgColor}
+          flex="1"
+          w="full"
+          overflowY="auto"
+          borderRadius="xl"
           p={4}
-          boxShadow="lg"
-          borderTop="1px"
+          bg={bgColor}
+          borderWidth={1}
           borderColor={borderColor}
+          boxShadow="sm"
+          position="relative"
+          css={{
+            '&::-webkit-scrollbar': { width: '4px' },
+            '&::-webkit-scrollbar-thumb': { background: borderColor, borderRadius: '24px' }
+          }}
         >
-          <VStack spacing={4} maxW="1200px" mx="auto">
+          {isInitialLoad ? (
+            <Center h="full">
+              <Spinner size="lg" color="blue.500" />
+            </Center>
+          ) : messages.length === 0 ? (
+            <Center h="full">
+              <VStack spacing={2}>
+                <Text color={textColor} fontWeight="bold">Welcome to Dastavez AI</Text>
+                <Text color="gray.500" fontSize="sm" textAlign="center">
+                  Select a tab from the left sidebar to upload files, load drafting templates, or ask legal questions.
+                </Text>
+              </VStack>
+            </Center>
+          ) : (
+            messages.map((msg, index) => (
+              <ChatMessage
+                key={index}
+                message={msg}
+                role={msg.role}
+                onSuggestedActionClick={handleSuggestedActionClick}
+                onDownload={handleDownloadFile}
+                language={language}
+              />
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </Box>
 
-            {/* Selected File Display */}
+        {/* User Input Prompt controls */}
+        <Box pt={4} w="full">
+          <VStack spacing={2} w="full">
+            {/* Selected File Display inline inside Chat */}
             {selectedFile && (
               <HStack
                 bg={useColorModeValue('blue.50', 'blue.900')}
-                p={3}
+                p={2}
+                px={3}
                 borderRadius="md"
                 w="100%"
                 justify="space-between"
+                borderWidth={1}
+                borderColor="blue.100"
               >
                 <HStack spacing={2}>
                   <Icon as={FaFile} color="blue.500" />
-                  <Text color={textColor} fontSize="sm">{selectedFile.fileName}</Text>
+                  <Text color={textColor} fontSize="xs" fontWeight="semibold" isTruncated maxW="200px">
+                    {selectedFile.fileName}
+                  </Text>
                   {scanStatus === 'scanned' && (
                     <Badge colorScheme="green" fontSize="2xs">Scanned</Badge>
                   )}
@@ -3117,13 +3345,13 @@ const ChatPage = () => {
                 </HStack>
                 <HStack spacing={1}>
                   {editSessionActive && (
-                    <Button size="xs" variant="ghost" colorScheme="gray" onClick={handleExitEditMode}>
+                    <Button size="2xs" variant="ghost" colorScheme="gray" onClick={handleExitEditMode}>
                       Exit Edit
                     </Button>
                   )}
                   <IconButton
                     icon={<FaTimes />}
-                    size="sm"
+                    size="xs"
                     variant="ghost"
                     colorScheme="blue"
                     onClick={() => {
@@ -3135,6 +3363,7 @@ const ChatPage = () => {
                 </HStack>
               </HStack>
             )}
+
             <HStack w="100%" spacing={2}>
               {/* Intent Menu "+" Button */}
               <Menu>
@@ -3143,72 +3372,31 @@ const ChatPage = () => {
                     as={IconButton}
                     icon={<AddIcon />}
                     aria-label="Select intent"
-                    size="lg"
+                    size="md"
                     variant={intentOverride ? 'solid' : 'ghost'}
                     colorScheme={intentOverride ? 'purple' : 'blue'}
                   />
                 </Tooltip>
                 <MenuList>
-                  <MenuItem
-                    onClick={() => { setIntentOverride(null); setIntentLabel(null); }}
-                    fontWeight={!intentOverride ? 'bold' : 'normal'}
-                  >
+                  <MenuItem onClick={() => { setIntentOverride(null); setIntentLabel(null); }}>
                     💬 Auto-detect (Default)
                   </MenuItem>
-                  <MenuItem
-                    onClick={() => { setIntentOverride('CONVERSATIONAL'); setIntentLabel('Chat'); }}
-                    fontWeight={intentOverride === 'CONVERSATIONAL' ? 'bold' : 'normal'}
-                  >
+                  <MenuItem onClick={() => { setIntentOverride('CONVERSATIONAL'); setIntentLabel('Chat'); }}>
                     🗣️ Conversational Chat
                   </MenuItem>
-                  <MenuItem
-                    onClick={() => { setIntentOverride('LEGAL_INFORMATION'); setIntentLabel('Legal Query'); }}
-                    fontWeight={intentOverride === 'LEGAL_INFORMATION' ? 'bold' : 'normal'}
-                  >
+                  <MenuItem onClick={() => { setIntentOverride('LEGAL_INFORMATION'); setIntentLabel('Legal Query'); }}>
                     ⚖️ Legal Information
                   </MenuItem>
-                  <MenuItem
-                    onClick={() => { setIntentOverride('DOCUMENT_REQUEST'); setIntentLabel('Draft'); }}
-                    fontWeight={intentOverride === 'DOCUMENT_REQUEST' ? 'bold' : 'normal'}
-                  >
+                  <MenuItem onClick={() => { setIntentOverride('DOCUMENT_REQUEST'); setIntentLabel('Draft'); }}>
                     📝 Draft Document
                   </MenuItem>
                 </MenuList>
               </Menu>
 
-              {/* Show selected intent badge - clickable to clear */}
               {intentLabel && (
-                <HStack spacing={1}>
-                  <Tooltip label={language === 'hi' ? 'मोड रीसेट करें' : 'Click to reset to auto-detect'} placement="top">
-                    <Badge
-                      colorScheme="purple"
-                      variant="solid"
-                      fontSize="xs"
-                      px={2}
-                      py={1}
-                      borderRadius="full"
-                      cursor="pointer"
-                      _hover={{ opacity: 0.8 }}
-                      onClick={() => { setIntentOverride(null); setIntentLabel(null); handleHardReset(); }}
-                    >
-                      {intentLabel} ✕
-                    </Badge>
-                  </Tooltip>
-                </HStack>
-              )}
-
-              {/* Hard Reset button when intent is active */}
-              {(intentOverride || showPostDownloadOptions) && (
-                <Tooltip label={language === 'hi' ? 'AI स्वचालित मोड पर वापस जाएं' : 'Return to AI auto-detect mode'} placement="top">
-                  <IconButton
-                    icon={<Icon as={FiRefreshCw} />}
-                    size="sm"
-                    colorScheme="gray"
-                    variant="ghost"
-                    aria-label="Reset to auto-detect"
-                    onClick={handleHardReset}
-                  />
-                </Tooltip>
+                <Badge colorScheme="purple" variant="solid" fontSize="xs" px={2} py={1} borderRadius="full">
+                  {intentLabel} ✕
+                </Badge>
               )}
 
               <Input
@@ -3216,103 +3404,244 @@ const ChatPage = () => {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={
                   isPendingUserChoice
-                    ? (language === 'hi' ? '👆 कृपया ऊपर दिए गए विकल्पों का उपयोग करें' : '👆 Please use the suggested actions above')
+                    ? 'Please use the suggested actions above'
                     : isListening
-                      ? "🎤 Listening... speak now"
+                      ? "Listening... speak now"
                       : isEditMode
                         ? "Describe the edit you want to make..."
-                        : (intentLabel ? `Type your ${intentLabel.toLowerCase()} request...` : "Type your message...")
+                        : "Type your message..."
                 }
-                size="lg"
+                size="md"
                 bg={isListening ? useColorModeValue('red.50', 'red.900') : inputBg}
                 color={textColor}
-                opacity={isPendingUserChoice ? 0.6 : 1}
-                cursor={isPendingUserChoice ? 'not-allowed' : 'text'}
                 isDisabled={isPendingUserChoice || isLoading || analyzingFile}
-                _placeholder={{ color: isPendingUserChoice ? 'orange.500' : (isListening ? 'red.400' : placeholderColor) }}
-                _hover={{ borderColor: isPendingUserChoice ? 'orange.300' : (isListening ? 'red.300' : 'blue.300') }}
-                _focus={{ borderColor: isPendingUserChoice ? 'orange.500' : (isListening ? 'red.500' : 'blue.500'), boxShadow: 'none' }}
                 onKeyPress={handleKeyPress}
                 flex={1}
-                borderColor={isPendingUserChoice ? 'orange.300' : (isListening ? 'red.300' : undefined)}
-                borderWidth={isPendingUserChoice ? '2px' : (isListening ? '2px' : undefined)}
               />
-              <Input
-                type="file"
-                accept=".pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
-                onChange={handleFileUpload}
-                display="none"
-                id="file-upload"
-              />
-              <Tooltip label="Attach file" placement="top">
-                <label htmlFor="file-upload">
-                  <IconButton
-                    as="span"
-                    icon={<FaPaperclip />}
-                    aria-label="Attach file"
-                    size="lg"
-                    colorScheme="blue"
-                    variant="ghost"
-                    isLoading={uploading}
-                  />
-                </label>
-              </Tooltip>
-              {/* Voice Input Button */}
-              <Tooltip
-                label={
-                  !speechSupported
-                    ? "Voice input not supported in your browser"
-                    : isListening
-                      ? "Stop listening"
-                      : "Voice input (click to speak)"
-                }
-                placement="top"
-              >
+              
+              <Tooltip label="Voice input" placement="top">
                 <IconButton
                   icon={isListening ? <FiMicOff /> : <FiMic />}
-                  aria-label={isListening ? "Stop voice input" : "Start voice input"}
-                  size="lg"
-                  colorScheme={isListening ? "red" : "blue"}
-                  variant={isListening ? "solid" : "ghost"}
                   onClick={toggleListening}
+                  size="md"
+                  colorScheme={isListening ? 'red' : 'blue'}
                   isDisabled={!speechSupported}
-                  animation={isListening ? "pulse 1.5s infinite" : undefined}
-                  sx={isListening ? {
-                    '@keyframes pulse': {
-                      '0%': { boxShadow: '0 0 0 0 rgba(229, 62, 62, 0.7)' },
-                      '70%': { boxShadow: '0 0 0 10px rgba(229, 62, 62, 0)' },
-                      '100%': { boxShadow: '0 0 0 0 rgba(229, 62, 62, 0)' },
-                    }
-                  } : {}}
+                  aria-label="Voice input"
                 />
               </Tooltip>
-              <Button
+
+              <IconButton
+                icon={<Icon as={RiSendPlaneFill} />}
+                onClick={() => handleSendMessage()}
+                size="md"
                 colorScheme="blue"
-                size="lg"
-                onClick={handleSendMessage}
-                isLoading={isLoading || analyzingFile}
-                loadingText={analyzingFile ? "Analyzing..." : "Sending..."}
-              >
-                Send
-              </Button>
+                isDisabled={!input.trim() || isLoading}
+                aria-label="Send message"
+              />
             </HStack>
-            {uploadProgress > 0 && uploadProgress < 100 && (
-              <Box w="100%" mt={2}>
-                <Progress
-                  value={uploadProgress}
-                  size="sm"
-                  colorScheme="blue"
-                  hasStripe
-                  isAnimated
-                />
-                <Text fontSize="sm" color="gray.500" mt={1} textAlign="center">
-                  Uploading: {uploadProgress}%
-                </Text>
-              </Box>
-            )}
           </VStack>
         </Box>
-      </Container>
+      </Flex>
+    );
+  };
+
+  return (
+    <>
+      <Flex h="100vh" w="100vw" overflow="hidden" bg={bgMain}>
+      {/* 1. Left-most Icon Sidebar */}
+      <VStack
+        w="70px"
+        bg={useColorModeValue('white', 'gray.900')}
+        borderRight="1px solid"
+        borderColor={borderColor}
+        py={4}
+        spacing={6}
+        align="center"
+        justify="space-between"
+        zIndex={10}
+        boxShadow="sm"
+      >
+        <VStack spacing={6} align="center" w="full">
+          <Link to="/">
+            <Icon as={FiZap} w={6} h={6} color="judicial.gold" cursor="pointer" />
+          </Link>
+          
+          <VStack spacing={4} w="full">
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: FiGrid },
+              { id: 'history', label: 'History', icon: FiMessageSquare },
+              { id: 'research', label: 'Deep Research', icon: FiCpu },
+              { id: 'review', label: 'Parallel Review', icon: FiLayers },
+              { id: 'chronology', label: 'Time Chronology', icon: FiClock },
+              { id: 'drafting', label: 'Drafting', icon: FiFileText },
+              { id: 'profile', label: 'Company Profile', icon: FiGlobe },
+              { id: 'settings', label: 'Settings', icon: FiSettings }
+            ].map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <Tooltip key={tab.id} label={tab.label} placement="right">
+                  <IconButton
+                    icon={<Icon as={tab.icon} w={5} h={5} />}
+                    onClick={() => setActiveTab(tab.id)}
+                    variant={isActive ? 'solid' : 'ghost'}
+                    colorScheme={isActive ? 'blue' : 'gray'}
+                    bg={isActive ? 'blue.500' : 'transparent'}
+                    color={isActive ? 'white' : useColorModeValue('gray.600', 'gray.400')}
+                    _hover={{
+                      bg: isActive ? 'blue.600' : useColorModeValue('gray.100', 'gray.800'),
+                      color: isActive ? 'white' : 'blue.500'
+                    }}
+                    borderRadius="lg"
+                    aria-label={tab.label}
+                  />
+                </Tooltip>
+              );
+            })}
+          </VStack>
+        </VStack>
+
+        <VStack spacing={4} align="center">
+          <Link to="/profile">
+            <Avatar
+              size="sm"
+              name={user?.firstName}
+              src={user?.profileImage}
+              cursor="pointer"
+              _hover={{ boxShadow: 'outline', border: '2px solid #3182ce' }}
+            />
+          </Link>
+          <IconButton
+            icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
+            onClick={toggleColorMode}
+            variant="ghost"
+            size="sm"
+            aria-label="Toggle color mode"
+          />
+          <IconButton
+            icon={<Icon as={FiRefreshCw} />}
+            onClick={logout}
+            variant="ghost"
+            colorScheme="red"
+            size="sm"
+            aria-label="Logout"
+          />
+        </VStack>
+      </VStack>
+
+      {/* 2. Sub-sidebar */}
+      <Box
+        w="280px"
+        bg={useColorModeValue('gray.50', 'gray.950')}
+        borderRight="1px solid"
+        borderColor={borderColor}
+        display="flex"
+        flexDirection="column"
+        overflow="hidden"
+      >
+        <Box p={4} borderBottom="1px solid" borderColor={borderColor}>
+          <Heading size="xs" textTransform="uppercase" letterSpacing="wider" color="gray.500">
+            {activeTab.replace('-', ' ')}
+          </Heading>
+        </Box>
+        
+        <Box flex="1" overflowY="auto" p={4}>
+          {renderSubSidebarContent()}
+        </Box>
+      </Box>
+
+      {/* 3. Main Working Window */}
+      <Flex flex="1" direction="column" overflow="hidden" position="relative" bg={bgMain}>
+        <Flex
+          h="60px"
+          align="center"
+          justify="space-between"
+          px={6}
+          borderBottom="1px solid"
+          borderColor={borderColor}
+          bg={useColorModeValue('white', 'gray.900')}
+        >
+          <HStack spacing={4}>
+            <Heading size="md" color={textColor}>
+              {activeTab === 'dashboard' ? 'Workspace Dashboard' :
+               activeTab === 'history' ? 'Conversation Explorer' :
+               activeTab === 'research' ? 'Deep Research Assistant' :
+               activeTab === 'review' ? 'Parallel Document Review' :
+               activeTab === 'chronology' ? 'Timeline Chronology Parser' :
+               activeTab === 'drafting' ? 'Legal Drafting Workspace' :
+               activeTab === 'profile' ? 'Company Metadata Setup' :
+               'System Preferences'}
+            </Heading>
+            {subscriptionStatus === 'departmental' ? (
+              <Badge colorScheme="purple" fontSize="sm">Departmental</Badge>
+            ) : (subscriptionStatus === 'pro' || subscriptionStatus === 'premium') ? (
+              <Badge colorScheme="green" fontSize="sm">Pro</Badge>
+            ) : (subscriptionStatus === 'standard' || subscriptionStatus === 'basic') ? (
+              <Badge colorScheme="blue" fontSize="sm">Standard</Badge>
+            ) : (
+              <Tooltip label="Upgrade to Standard/Pro for more features">
+                <Badge colorScheme="yellow" fontSize="sm">
+                  {remainingMessages !== null ? `${remainingMessages} messages left today` : 'Free Plan'}
+                </Badge>
+              </Tooltip>
+            )}
+          </HStack>
+
+          <HStack spacing={2}>
+            {selectedFile && (
+              <>
+                <Button
+                  size="sm"
+                  colorScheme="green"
+                  variant={scanStatus === 'scanned' ? 'solid' : 'outline'}
+                  leftIcon={scanStatus === 'scanning' ? <Spinner size="xs" /> : <Icon as={MdDocumentScanner} />}
+                  onClick={handleSmartScan}
+                  isDisabled={scanStatus === 'scanning'}
+                >
+                  {scanStatus === 'scanned' ? 'Scanned ✓' : 'Smart Scan'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  colorScheme="blue"
+                  leftIcon={<Icon as={FiEdit} />}
+                  onClick={handleOpenEditor}
+                >
+                  Edit
+                </Button>
+              </>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              colorScheme={language === 'hi' ? 'orange' : 'blue'}
+              onClick={toggleLanguage}
+            >
+              {language === 'en' ? 'EN' : 'हिं'}
+            </Button>
+            <IconButton
+              icon={<DeleteIcon />}
+              onClick={handleClearChat}
+              variant="ghost"
+              size="sm"
+              aria-label="Clear chat"
+            />
+          </HStack>
+        </Flex>
+
+        {/* Hidden input for uploader */}
+        <Input
+          type="file"
+          accept=".pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+          onChange={handleFileUpload}
+          display="none"
+          id="file-upload"
+        />
+
+        <Flex flex="1" overflow="hidden" position="relative">
+          {renderWorkingWindowBody()}
+        </Flex>
+      </Flex>
+    </Flex>
 
       {/* Clear Chat Password Confirmation Modal */}
       <Modal isOpen={isClearModalOpen} onClose={onClearModalClose} isCentered>
@@ -3564,7 +3893,75 @@ const ChatPage = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
-    </Box>
+
+      {/* Onboarding Spatial Card Modal */}
+      <Modal isOpen={user && !user.companySlug} closeOnOverlayClick={false} closeOnEsc={false} isCentered>
+        <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(10px)" />
+        <ModalContent bg={headerBg} borderColor={borderColor} borderWidth={1} p={6} m={4}>
+          <ModalHeader>
+            <VStack spacing={2} align="center">
+              <Icon as={FiGlobe} w={12} h={12} color="judicial.gold" />
+              <Heading size="md" textAlign="center" color={textColor}>Setup Your Workspace</Heading>
+              <Text fontSize="sm" color="gray.500" textAlign="center">
+                Configure your permanent dashboard page URL.
+              </Text>
+            </VStack>
+          </ModalHeader>
+          <ModalBody>
+            <form onSubmit={handleOnboardSubmit}>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel color={textColor}>Company Name</FormLabel>
+                  <Input
+                    placeholder="e.g. Acme Corp"
+                    value={onboardCompanyName}
+                    onChange={(e) => setOnboardCompanyName(e.target.value)}
+                    borderColor={borderColor}
+                    _focus={{ borderColor: 'judicial.gold' }}
+                  />
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel color={textColor}>Sector / Industry</FormLabel>
+                  <Select
+                    placeholder="Select Sector"
+                    value={onboardSector}
+                    onChange={(e) => setOnboardSector(e.target.value)}
+                    borderColor={borderColor}
+                    _focus={{ borderColor: 'judicial.gold' }}
+                    color={textColor}
+                  >
+                    <option value="legal">Legal & Compliance</option>
+                    <option value="finance">Finance & Banking</option>
+                    <option value="tech">Technology & IT</option>
+                    <option value="healthcare">Healthcare & Pharma</option>
+                    <option value="realestate">Real Estate & Construction</option>
+                    <option value="retail">Retail & E-commerce</option>
+                    <option value="other">Other / General</option>
+                  </Select>
+                </FormControl>
+                {onboardError && (
+                  <Text color="red.500" fontSize="sm" alignSelf="start">
+                    {onboardError}
+                  </Text>
+                )}
+                <Button
+                  type="submit"
+                  colorScheme="blue"
+                  bg="judicial.gold"
+                  color="judicial.dark"
+                  _hover={{ bg: 'judicial.lightGold' }}
+                  w="full"
+                  isLoading={isOnboardingSubmitLoading}
+                  mt={2}
+                >
+                  Create Permanent Dashboard
+                </Button>
+              </VStack>
+            </form>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+    </>
   );
 };
 

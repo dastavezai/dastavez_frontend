@@ -157,6 +157,14 @@ const AppContent = () => {
             </RequireAuth>
           }
         />
+        <Route
+          path="/c/:slug"
+          element={
+            <RequireAuth>
+              <Chat />
+            </RequireAuth>
+          }
+        />
         <Route path="/features" element={<Features />} />
         <Route
           path="/use-cases"
