@@ -6,51 +6,29 @@ import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
-import { Progress } from '../components/ui/progress';
-import { Switch } from '../components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Textarea } from '../components/ui/textarea';
-import { 
-  Users, 
-  BarChart3, 
-  Settings, 
-  Shield, 
-  FileText, 
-  MessageSquare, 
-  Activity, 
-  TrendingUp,
+import {
+  Users,
+  BarChart3,
+  Settings,
+  Shield,
+  FileText,
+  Activity,
   UserPlus,
   Search,
-  Filter,
-  MoreHorizontal,
   Edit,
   Trash2,
   Eye,
-  Download,
   Upload,
   Bell,
-  Calendar,
-  Mail,
-  Phone,
-  MapPin,
-  Globe,
-  Database,
-  Server,
-  Cpu,
-  HardDrive,
-  Network,
-  Zap,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Star,
   IndianRupee,
-  Tag,
   FileDown,
-  Plus
+  MessageSquare,
+  Mail,
+  CheckCircle,
 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
-import { adminAPI, fileAPI, User as APIUser, FileUpload, lawyerAPI, Lawyer, profileAPI, authAPI, AdminCoupon, subscriptionAPI } from '../lib/api';
+import { adminAPI, fileAPI, User as APIUser, FileUpload, lawyerAPI, Lawyer, profileAPI, authAPI, AdminCoupon, subscriptionAPI, contactSubmissionsAPI, ContactSubmission } from '../lib/api';
 import { ScrollArea } from '../components/ui/scroll-area';
 
 interface User {
@@ -110,6 +88,11 @@ const Admin = () => {
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
   const [freeMessageLimit, setFreeMessageLimit] = useState<number>(0);
   const [isSavingFreeLimit, setIsSavingFreeLimit] = useState<boolean>(false);
+  const [tierConfigs, setTierConfigs] = useState<any[]>([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [userTierFilter, setUserTierFilter] = useState('all');
+  const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
+  const [submissionTypeFilter, setSubmissionTypeFilter] = useState<'all'|'contact'|'demo'>('all');
 
   const normalizeCurrency = (value: any): number => {
     const n = Number(value);
@@ -121,13 +104,7 @@ const Admin = () => {
     }
     return n;
   };
-  const [couponForm, setCouponForm] = useState<CouponForm>({
-    code: '',
-    discountPercentage: 20,
-    maxUses: 100,
-    validFrom: new Date().toISOString().split('T')[0],
-    validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  });
+  // couponForm kept for legacy compatibility
   const { toast } = useToast();
 
   // Load data on component mount
@@ -144,22 +121,31 @@ const Admin = () => {
       const lawyersPromise = lawyerAPI.list();
       const mePromise = authAPI.getCurrentUser();
       const couponsPromise = adminAPI.listCoupons();
-      const pricePromise = subscriptionAPI.getPrice();
+      const pricePromise = subscriptionAPI.getPrices();
       const freeLimitPromise = adminAPI.getFreeMessageLimit();
+      const submissionsPromise = contactSubmissionsAPI.list();
 
-      const [usersRes, filesRes, statsRes, lawyersRes, meRes, couponsRes, priceRes, freeLimitRes] = await Promise.allSettled([
+      const [usersRes, filesRes, statsRes, lawyersRes, meRes, couponsRes, priceRes, freeLimitRes, submissionsRes] = await Promise.allSettled([
         usersPromise,
         filesPromise,
-	statsPromise,
+        statsPromise,
         lawyersPromise,
         mePromise,
         couponsPromise,
         pricePromise,
         freeLimitPromise,
+        submissionsPromise,
       ]);
 
+      if (submissionsRes.status === 'fulfilled') {
+        setSubmissions(submissionsRes.value);
+      }
+
       if (usersRes.status === 'fulfilled') {
-        setUsers(usersRes.value);
+        // API returns { success, data: User[], pagination } — unwrap the data array
+        const raw = usersRes.value as any;
+        const userList = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+        setUsers(userList);
       } else {
         console.warn('Failed to load users:', usersRes.reason);
       }
@@ -202,17 +188,27 @@ const Admin = () => {
       }
       if (statsOk || priceOk) {
         const statsData = statsOk ? (statsRes as PromiseFulfilledResult<any>).value : ({} as any);
-        const usersData = usersRes.status === 'fulfilled' ? usersRes.value : [];
+        const usersRaw = usersRes.status === 'fulfilled' ? usersRes.value : [];
+        const usersData = Array.isArray((usersRaw as any)?.data) ? (usersRaw as any).data : (Array.isArray(usersRaw) ? usersRaw : []);
         const filesData = filesRes.status === 'fulfilled' ? filesRes.value : [];
         const priceData = priceOk ? (priceRes as PromiseFulfilledResult<any>).value : undefined;
-        if (priceData?.price != null) {
-          setSubscriptionPrice(Number(priceData.price));
+        let premPrice = 0;
+        if (priceData?.prices && Array.isArray(priceData.prices)) {
+          setTierConfigs(priceData.prices);
+          const premiumTier = priceData.prices.find((p: any) => p.tier === 'premium' || p.tier === 'pro');
+          if (premiumTier) {
+            premPrice = premiumTier.amount;
+            setSubscriptionPrice(premPrice);
+          }
+        } else if (priceData?.price != null) {
+          premPrice = Number(priceData.price);
+          setSubscriptionPrice(premPrice);
         }
         const premiumCount = (statsData.activeUsers && Number.isFinite(statsData.activeUsers))
           ? Number(statsData.activeUsers)
           : usersData.filter((u: any) => u.subscriptionStatus === 'premium').length;
 
-        const priceRupees = normalizeCurrency(priceData?.price ?? 0);
+        const priceRupees = normalizeCurrency(premPrice || 0);
         let totalRevenue = premiumCount * priceRupees;
         let monthlyRevenue = premiumCount * priceRupees;
 
@@ -233,7 +229,8 @@ const Admin = () => {
           growth: statsData.growth || 0,
         });
       } else {
-        const usersData = usersRes.status === 'fulfilled' ? usersRes.value : [];
+        const usersRaw = usersRes.status === 'fulfilled' ? usersRes.value : [];
+        const usersData = Array.isArray((usersRaw as any)?.data) ? (usersRaw as any).data : (Array.isArray(usersRaw) ? usersRaw : []);
         const filesData = filesRes.status === 'fulfilled' ? filesRes.value : [];
         setAnalyticsData({
           totalUsers: usersData.length,
@@ -328,19 +325,27 @@ const Admin = () => {
     });
   };
 
-  const handleUpdateSubscriptionPrice = async () => {
+  const handleUpdateTierConfig = async (tier: string, amountInRupees: number, messageLimit: number) => {
     try {
-      // backend expects paise; assume current input is rupees
-      await adminAPI.updateSubscriptionPrice(Math.round(subscriptionPrice * 100));
+      const amountInPaise = Math.round(amountInRupees * 100);
+      await adminAPI.updateSubscriptionPrice(tier, amountInPaise, messageLimit);
+      
+      // Update local state
+      setTierConfigs(prev => prev.map(c => c.tier === tier ? { ...c, amount: amountInPaise, messageLimit } : c));
+      
+      if (tier === 'premium' || tier === 'pro') {
+        setSubscriptionPrice(amountInPaise);
+      }
+
       toast({
         title: "Success",
-        description: "Subscription price updated successfully",
+        description: `${tier.toUpperCase()} configuration updated successfully`,
       });
-    } catch (error) {
-      console.error('Error updating subscription price:', error);
+    } catch (error: any) {
+      console.error(`Error updating ${tier} config:`, error);
       toast({
         title: "Error",
-        description: "Failed to update subscription price",
+        description: error?.message || `Failed to update ${tier} config`,
         variant: "destructive"
       });
     }
@@ -449,7 +454,7 @@ const Admin = () => {
 
         {/* Main Content */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-slate-800/50">
+          <TabsList className="grid w-full grid-cols-6 bg-slate-800/50">
             <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-600">
               <BarChart3 className="w-4 h-4 mr-2" />
               Dashboard
@@ -469,6 +474,15 @@ const Admin = () => {
             <TabsTrigger value="settings" className="data-[state=active]:bg-purple-600">
               <Settings className="w-4 h-4 mr-2" />
               Settings
+            </TabsTrigger>
+            <TabsTrigger value="inquiries" className="data-[state=active]:bg-purple-600">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Inquiries
+              {submissions.filter(s => !s.isRead).length > 0 && (
+                <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">
+                  {submissions.filter(s => !s.isRead).length}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -545,7 +559,7 @@ const Admin = () => {
                               <div className="flex items-center space-x-3">
                                 <Avatar>
                                   <AvatarImage src={user.profileImage} />
-                                  <AvatarFallback>{user.firstName[0]}{user.lastName[0]}</AvatarFallback>
+                                  <AvatarFallback>{(user.firstName || '?')[0]}{(user.lastName || '')[0]}</AvatarFallback>
                                 </Avatar>
                                 <div>
                                   <p className="text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
@@ -700,66 +714,96 @@ const Admin = () => {
                     <div className="flex items-center space-x-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
-                        <Input placeholder="Search users..." className="pl-8 bg-slate-700 border-slate-600" />
+                        <Input
+                          placeholder="Search by name or email..."
+                          className="pl-8 bg-slate-700 border-slate-600 text-white"
+                          value={userSearch}
+                          onChange={(e) => setUserSearch(e.target.value)}
+                        />
                       </div>
-                      <Select>
-                        <SelectTrigger className="w-32 bg-slate-700 border-slate-600">
+                      <Select value={userTierFilter} onValueChange={setUserTierFilter}>
+                        <SelectTrigger className="w-36 bg-slate-700 border-slate-600 text-white">
                           <SelectValue placeholder="Filter" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All</SelectItem>
-                          <SelectItem value="premium">Premium</SelectItem>
+                        <SelectContent className="bg-slate-800 text-white border-slate-700">
+                          <SelectItem value="all">All Tiers</SelectItem>
                           <SelectItem value="free">Free</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="standard">Standard</SelectItem>
+                          <SelectItem value="pro">Pro</SelectItem>
+                          <SelectItem value="departmental">Departmental</SelectItem>
+                          <SelectItem value="premium">Premium</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-
-                    <div className="space-y-3">
-                      {users.map((user) => (
-                        <div key={user._id} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
-                          <div className="flex items-center space-x-4">
-                            <Avatar>
-                              <AvatarImage src={user.profileImage} />
-                              <AvatarFallback>{user.firstName[0]}{user.lastName[0]}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
-                              <p className="text-xs text-slate-400">{user.email}</p>
-                              <p className="text-xs text-slate-400">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
-                            </div>
+                    {/* Filtered list */}
+                    {(() => {
+                      const q = userSearch.toLowerCase();
+                      const filtered = users.filter(u => {
+                        const matchSearch = !q ||
+                          `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+                          u.email.toLowerCase().includes(q);
+                        const matchTier = userTierFilter === 'all' ||
+                          (u.userTier || u.subscriptionStatus) === userTierFilter;
+                        return matchSearch && matchTier;
+                      });
+                      return (
+                        <>
+                          <p className="text-xs text-slate-400 mb-2">
+                            Showing {filtered.length} of {users.length} users
+                          </p>
+                          <div className="space-y-3">
+                            {filtered.map((user) => (
+                              <div key={user._id} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
+                                <div className="flex items-center space-x-4">
+                                  <Avatar>
+                                    <AvatarImage src={user.profileImage} />
+                                    <AvatarFallback>{(user.firstName || '?')[0]}{(user.lastName || '')[0]}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
+                                    <p className="text-xs text-slate-400">{user.email}</p>
+                                    <p className="text-xs text-slate-400">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Select
+                                    value={user.userTier || user.subscriptionStatus || 'free'}
+                                    onValueChange={(val) => handleUpdateUserTier(user._id, val)}
+                                  >
+                                    <SelectTrigger className="w-36 bg-slate-700 border-slate-600 text-white">
+                                      <SelectValue placeholder="Select Tier" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-800 text-white border-slate-700">
+                                      <SelectItem value="free">Free</SelectItem>
+                                      <SelectItem value="standard">Standard</SelectItem>
+                                      <SelectItem value="pro">Pro</SelectItem>
+                                      <SelectItem value="departmental">Departmental</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {user.isAdmin && <Badge variant="outline">Admin</Badge>}
+                                  <div className="flex items-center space-x-1">
+                                    <Button size="sm" variant="ghost" onClick={() => handleUserAction('View', user._id)}>
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleUserAction('Edit', user._id)}>
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleUserAction('Delete', user._id)}>
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {filtered.length === 0 && (
+                              <div className="text-sm text-slate-400 py-6 text-center">
+                                No users match your search.
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Select
-                              value={user.userTier || user.subscriptionStatus || 'free'}
-                              onValueChange={(val) => handleUpdateUserTier(user._id, val)}
-                            >
-                              <SelectTrigger className="w-36 bg-slate-700 border-slate-600 text-white">
-                                <SelectValue placeholder="Select Tier" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-slate-800 text-white border-slate-700">
-                                <SelectItem value="free">Free</SelectItem>
-                                <SelectItem value="standard">Standard</SelectItem>
-                                <SelectItem value="pro">Pro</SelectItem>
-                                <SelectItem value="departmental">Departmental</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            {user.isAdmin && <Badge variant="outline">Admin</Badge>}
-                            <div className="flex items-center space-x-1">
-                              <Button size="sm" variant="ghost" onClick={() => handleUserAction('View', user._id)}>
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleUserAction('Edit', user._id)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleUserAction('Delete', user._id)}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </CardContent>
@@ -816,7 +860,7 @@ const Admin = () => {
                             <div>
                               <p className="text-sm font-medium text-white">{file.fileName}</p>
                               <p className="text-xs text-slate-400">{file.fileType} • {(file.fileSize / 1024 / 1024).toFixed(2)} MB</p>
-                              <p className="text-xs text-slate-400">Uploaded by {file.uploadedBy.firstName} {file.uploadedBy.lastName}</p>
+                              <p className="text-xs text-slate-400">Uploaded by {(file.uploadedBy as any)?.firstName || ''} {(file.uploadedBy as any)?.lastName || ''}</p>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -893,66 +937,81 @@ const Admin = () => {
               </CardContent>
             </Card>
 
-            {/* Subscription Price Management */}
+            {/* Subscription Price & Limit Management */}
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader>
-                <CardTitle className="text-white">Subscription Price Management</CardTitle>
-                <CardDescription className="text-slate-400">Update subscription pricing</CardDescription>
+                <CardTitle className="text-white">Subscription Tiers & Limits Management</CardTitle>
+                <CardDescription className="text-slate-400">Manage monthly pricing and daily message limits for each subscription tier.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-1">
-                     <Label htmlFor="subscription-price" className="text-white">Subscription Price (₹)</Label>
-                    <Input
-                      id="subscription-price"
-                      type="number"
-                      value={subscriptionPrice}
-                      onChange={(e) => setSubscriptionPrice(Number(e.target.value))}
-                      className="bg-slate-700 border-slate-600 text-white"
-                       placeholder="399"
-                    />
-                     <p className="text-xs text-slate-400 mt-1">Current price: ₹{Number(subscriptionPrice || 0).toFixed(2)}</p>
-                  </div>
-                  <Button onClick={handleUpdateSubscriptionPrice} className="mt-6">
-                    <IndianRupee className="w-4 h-4 mr-2" />
-                    Update Price
-                  </Button>
-                </div>
-
-                {/* Free Daily Message Limit */}
-                <div className="flex items-center space-x-4 pt-4 border-t border-slate-700">
-                  <div className="flex-1">
-                    <Label htmlFor="free-message-limit" className="text-white">Free Daily Message Limit</Label>
-                    <Input
-                      id="free-message-limit"
-                      type="number"
-		      min={0}
-                      value={freeMessageLimit}
-                      onChange={(e) => setFreeMessageLimit(Number(e.target.value))}
-                      className="bg-slate-700 border-slate-600 text-white"
-                      placeholder="e.g. 10"
-                    />
-                    <p className="text-xs text-slate-400 mt-1">Number of free messages allowed per day for non-subscribed users.</p>
-                  </div>
-                  <Button
-                    disabled={isSavingFreeLimit}
-                    onClick={async () => {
-                      try {
-                        setIsSavingFreeLimit(true);
-                        const res = await adminAPI.setFreeMessageLimit(Number(freeMessageLimit) || 0);
-                        setFreeMessageLimit(res?.value ?? res?.limit ?? freeMessageLimit);
-                        toast({ title: 'Saved', description: 'Free message limit updated successfully' });
-                      } catch (error) {
-                        console.error('Error updating free message limit:', error);
-                        toast({ title: 'Error', description: 'Failed to update limit', variant: 'destructive' });
-                      } finally {
-                        setIsSavingFreeLimit(false);
-                      }
-                    }}
-                    className="mt-6"
-                  >
-                    {isSavingFreeLimit ? 'Saving...' : 'Save Limit'}
-                  </Button>
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full text-sm text-left text-slate-300">
+                    <thead>
+                      <tr className="text-slate-400 border-b border-slate-700">
+                        <th className="p-2">Tier</th>
+                        <th className="p-2">Price (₹/month)</th>
+                        <th className="p-2">Daily Message Limit</th>
+                        <th className="p-2 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tierConfigs.map((config) => {
+                        const displayPrice = config.amount / 100;
+                        const isFree = config.tier === 'free';
+                        return (
+                          <tr key={config.tier} className="border-b border-slate-700/50 hover:bg-slate-800/20">
+                            <td className="p-2 font-medium capitalize text-white">{config.tier}</td>
+                            <td className="p-2">
+                              {isFree ? (
+                                <span className="text-slate-400">Free</span>
+                              ) : (
+                                <div className="flex items-center space-x-1">
+                                  <span>₹</span>
+                                  <Input
+                                    type="number"
+                                    value={displayPrice}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setTierConfigs(prev => prev.map(c => c.tier === config.tier ? { ...c, amount: Math.round(val * 100) } : c));
+                                    }}
+                                    className="bg-slate-700 border-slate-600 text-white w-24 h-8"
+                                  />
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-2">
+                              <div className="flex items-center space-x-2">
+                                <Input
+                                  type="number"
+                                  value={config.messageLimit}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    setTierConfigs(prev => prev.map(c => c.tier === config.tier ? { ...c, messageLimit: isNaN(val) ? -1 : val } : c));
+                                  }}
+                                  className="bg-slate-700 border-slate-600 text-white w-24 h-8"
+                                  placeholder="-1"
+                                />
+                                <span className="text-xs text-slate-400">(-1 for unlimited)</span>
+                              </div>
+                            </td>
+                            <td className="p-2 text-right">
+                              <Button
+                                size="sm"
+                                onClick={() => handleUpdateTierConfig(config.tier, displayPrice, config.messageLimit)}
+                              >
+                                Save
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {tierConfigs.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="p-4 text-center text-slate-500">No subscription configurations loaded.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </CardContent>
             </Card>
@@ -1089,6 +1148,106 @@ const Admin = () => {
                 </div>
               </div>
             )}
+          </TabsContent>
+
+          {/* Inquiries Tab — Contact & Demo Submissions */}
+          <TabsContent value="inquiries" className="space-y-6">
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-white">Contact & Demo Inquiries</CardTitle>
+                    <CardDescription className="text-slate-400">
+                      Form submissions from the contact and book-a-demo pages
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5"
+                      value={submissionTypeFilter}
+                      onChange={(e) => setSubmissionTypeFilter(e.target.value as any)}
+                    >
+                      <option value="all">All Types</option>
+                      <option value="contact">Contact Only</option>
+                      <option value="demo">Demo Requests</option>
+                    </select>
+                    <Button variant="outline" size="sm" onClick={loadDashboardData}>
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[600px] pr-2">
+                  <div className="space-y-3">
+                    {submissions
+                      .filter(s => submissionTypeFilter === 'all' || s.type === submissionTypeFilter)
+                      .map(s => (
+                        <div key={s._id} className={`p-4 rounded-lg border ${s.isRead ? 'border-slate-700 bg-slate-800/30' : 'border-purple-600/40 bg-purple-900/10'}`}>
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.type === 'demo' ? 'bg-blue-900 text-blue-300' : 'bg-slate-700 text-slate-300'}`}>
+                                  {s.type === 'demo' ? '📅 Demo Request' : '✉️ Contact'}
+                                </span>
+                                {!s.isRead && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-900 text-red-300 font-medium">NEW</span>
+                                )}
+                                <span className="text-xs text-slate-500">
+                                  {new Date(s.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-white font-medium">{s.name} <span className="text-slate-400 font-normal text-sm">— {s.email}</span></p>
+                              {s.phone && <p className="text-xs text-slate-400">📞 {s.phone}</p>}
+                              {s.company && <p className="text-xs text-slate-400">🏢 {s.company} {s.role ? `· ${s.role}` : ''} {s.teamSize ? `· Team: ${s.teamSize}` : ''}</p>}
+                              <p className="text-sm text-slate-300 mt-1"><span className="text-slate-400">Subject:</span> {s.subject}</p>
+                              <p className="text-sm text-slate-400 mt-1 whitespace-pre-wrap break-words">{s.message}</p>
+                            </div>
+                            <div className="flex flex-col gap-2 shrink-0">
+                              {!s.isRead && (
+                                <Button size="sm" variant="ghost" className="text-green-400 hover:text-green-300"
+                                  onClick={async () => {
+                                    try {
+                                      await contactSubmissionsAPI.markRead(s._id);
+                                      setSubmissions(prev => prev.map(x => x._id === s._id ? { ...x, isRead: true } : x));
+                                    } catch (e) {
+                                      toast({ title: 'Error', description: 'Failed to mark as read', variant: 'destructive' });
+                                    }
+                                  }}>
+                                  <CheckCircle className="w-4 h-4 mr-1" /> Read
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white"
+                                onClick={() => window.open(`mailto:${s.email}?subject=Re: ${encodeURIComponent(s.subject)}`)}>
+                                <Mail className="w-4 h-4 mr-1" /> Reply
+                              </Button>
+                              <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300"
+                                onClick={async () => {
+                                  try {
+                                    await contactSubmissionsAPI.delete(s._id);
+                                    setSubmissions(prev => prev.filter(x => x._id !== s._id));
+                                    toast({ title: 'Deleted', description: 'Submission removed' });
+                                  } catch (e) {
+                                    toast({ title: 'Error', description: 'Failed to delete', variant: 'destructive' });
+                                  }
+                                }}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    {submissions.filter(s => submissionTypeFilter === 'all' || s.type === submissionTypeFilter).length === 0 && (
+                      <div className="text-center py-12 text-slate-400">
+                        <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p>No submissions found.</p>
+                        <p className="text-xs mt-1">New contact/demo form submissions will appear here.</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

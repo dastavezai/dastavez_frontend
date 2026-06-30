@@ -1,1 +1,7 @@
 node_modules/
+dist/
+
+# Temporary and debugging scripts
+*.cjs
+*.py
+*.txt

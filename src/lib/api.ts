@@ -116,6 +116,16 @@ export async function apiFetch(url: string, options: RequestInit = {}, retried =
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+        localStorage.removeItem('jwt');
+        localStorage.removeItem('token');
+        localStorage.removeItem('csrfToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        window.location.href = '/auth';
+      }
+    }
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
   }
@@ -317,32 +327,18 @@ export const fileAPI = {
   }
 };
 
+export interface TierConfig {
+  tier: string;
+  amount: number; // in paise
+  messageLimit: number;
+  updatedAt?: string;
+}
+
 // Subscription & Payments API
 export const subscriptionAPI = {
-  // Get subscription price
-  getPrice: async (): Promise<{ price: number }> => {
-    // Try multiple endpoints and normalize response shape
-    const tryEndpoints = [
-      '/subscription/price',
-    ];
-
-    let lastError: unknown = undefined;
-    for (const endpoint of tryEndpoints) {
-      try {
-        const data = await apiFetch(endpoint);
-        const priceRaw = (data && typeof data === 'object')
-          ? ((data as any).price ?? (data as any).amount ?? (data as any).value)
-          : data;
-        const priceNum = Number(priceRaw);
-        if (!Number.isNaN(priceNum)) {
-          return { price: priceNum };
-        }
-      } catch (err) {
-        lastError = err;
-      }
-    }
-    if (lastError) throw lastError;
-    return { price: 0 };
+  // Get all subscription prices and limits
+  getPrices: async (): Promise<{ success: boolean; prices: TierConfig[] }> => {
+    return apiFetch('/subscription/price');
   },
 
   // Create payment order
@@ -462,7 +458,7 @@ export const contactAPI = {
 export const adminAPI = {
   // Get all users
   getAllUsers: async () => {
-    return apiFetch('/admin/users');
+    return apiFetch('/admin/users?limit=1000&page=1');
   },
   // Update user subscription tier
   updateUserTier: async (id: string, tier: string): Promise<{ success: boolean; user: any }> => {
@@ -476,11 +472,11 @@ export const adminAPI = {
     return apiFetch('/admin/financial-stats');
   },
 
-  // Update subscription price
-  updateSubscriptionPrice: async (amount: number) => {
+  // Update subscription price & limit
+  updateSubscriptionPrice: async (tier: string, amount: number, messageLimit: number) => {
     return apiFetch('/subscription/price', {
       method: 'PUT',
-      body: JSON.stringify({ amount })
+      body: JSON.stringify({ tier, amount, messageLimit })
     });
   },
 
@@ -626,4 +622,35 @@ export const isAuthenticated = (): boolean => {
 
 export const getToken = (): string | null => {
   return localStorage.getItem('jwt');
-}; 
+};
+
+// Contact / Demo Submissions API (Admin)
+export interface ContactSubmission {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  type: 'contact' | 'demo';
+  company?: string;
+  role?: string;
+  teamSize?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export const contactSubmissionsAPI = {
+  list: async (type?: 'contact' | 'demo'): Promise<ContactSubmission[]> => {
+    const q = type ? `?type=${type}` : '';
+    const res = await apiFetch(`/contact/admin/submissions${q}`) as any;
+    return Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+  },
+  markRead: async (id: string): Promise<void> => {
+    await apiFetch(`/contact/admin/submissions/${id}/read`, { method: 'PUT' });
+  },
+  delete: async (id: string): Promise<void> => {
+    await apiFetch(`/contact/admin/submissions/${id}`, { method: 'DELETE' });
+  },
+};
+

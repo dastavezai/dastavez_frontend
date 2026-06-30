@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@chakra-ui/react';
 
 const AuthContext = createContext();
 
@@ -9,9 +10,43 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [csrfToken, setCsrfToken] = useState(localStorage.getItem('csrfToken'));
+  const toast = useToast();
+  const navigate = useNavigate();
 
   // Set up axios defaults and check user on mount
   useEffect(() => {
+    // Setup axios interceptor for 401 Unauthorized
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          // Ignore if already on auth or root
+          if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+            toast({
+              title: "Session Expired",
+              description: "Your session has expired. Please log in again.",
+              status: "warning",
+              duration: 5000,
+              isClosable: true,
+            });
+            // Clear all possible tokens
+            setUser(null);
+            setToken(null);
+            setCsrfToken(null);
+            localStorage.removeItem('token');
+            localStorage.removeItem('jwt');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('csrfToken');
+            localStorage.removeItem('user');
+            delete axios.defaults.headers.common['Authorization'];
+            delete axios.defaults.headers.common['x-csrf-token'];
+            navigate('/auth');
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       if (csrfToken) {
@@ -21,7 +56,11 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
-  }, [token, csrfToken]);
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, [token, csrfToken, navigate, toast]);
 
   const checkUser = async () => {
     try {
@@ -36,6 +75,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setToken(null);
       localStorage.removeItem('token');
+      localStorage.removeItem('jwt');
       localStorage.removeItem('user');
       setLoading(false);
     }
@@ -138,6 +178,7 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
       setCsrfToken(null);
       localStorage.removeItem('token');
+      localStorage.removeItem('jwt');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('csrfToken');
       localStorage.removeItem('user');
