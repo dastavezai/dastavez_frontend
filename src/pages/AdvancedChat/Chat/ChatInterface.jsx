@@ -350,13 +350,13 @@ const ChatPage = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const inputBg = useColorModeValue('white', 'gray.700');
-  const textColor = useColorModeValue('gray.600', 'gray.300');
-  const headerBg = useColorModeValue('white', 'gray.800');
-  const bgMain = useColorModeValue('gray.50', 'gray.900');
-  const placeholderColor = useColorModeValue('gray.500', 'gray.400');
+  const bgColor = (colorMode === 'dark' ? 'gray.800' : 'white');
+  const borderColor = (colorMode === 'dark' ? 'gray.700' : 'gray.200');
+  const inputBg = (colorMode === 'dark' ? 'gray.700' : 'white');
+  const textColor = (colorMode === 'dark' ? 'gray.300' : 'gray.600');
+  const headerBg = (colorMode === 'dark' ? 'gray.800' : 'white');
+  const bgMain = (colorMode === 'dark' ? 'gray.900' : 'gray.50');
+  const placeholderColor = (colorMode === 'dark' ? 'gray.400' : 'gray.500');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -2652,7 +2652,7 @@ const ChatPage = () => {
     }
 
     try {
-      setUploading(true);
+      setIsUploading(true);
       setUploadProgress(0);
       let lastResponse = null;
 
@@ -2683,7 +2683,7 @@ const ChatPage = () => {
         setSubscriptionStatus(lastResponse.subscriptionStatus);
       }
 
-      // After upload Ã¢â‚¬â€ reset scanner state, show upload success
+      // After upload — reset scanner state, show upload success
       setScanStatus('none');
       setScanResults(null);
       setFormatMetadata(null);
@@ -2691,9 +2691,9 @@ const ChatPage = () => {
       setHtmlContent('');
 
       toast({
-        title: language === 'hi' ? 'Ã Â¤Â«Ã Â¤Â¼Ã Â¤Â¾Ã Â¤â€¡Ã Â¤Â² Ã Â¤â€¦Ã Â¤ÂªÃ Â¤Â²Ã Â¥â€¹Ã Â¤Â¡ Ã Â¤Â¹Ã Â¥â€¹ Ã Â¤â€”Ã Â¤Ë†' : 'File uploaded',
+        title: language === 'hi' ? 'फ़ाइल अपलोड हो गई' : 'File uploaded',
         description: language === 'hi'
-          ? 'Ã Â¤Â«Ã Â¤Â¼Ã Â¤Â¾Ã Â¤â€¡Ã Â¤Â² Ã Â¤â€¦Ã Â¤ÂªÃ Â¤Â²Ã Â¥â€¹Ã Â¤Â¡ Ã Â¤Â¹Ã Â¥â€¹ Ã Â¤â€”Ã Â¤Ë†Ã Â¥Â¤ Ã Â¤Â¸Ã Â¥ÂÃ Â¤â€¢Ã Â¥Ë†Ã Â¤Â¨ Ã Â¤Â¯Ã Â¤Â¾ Ã Â¤ÂÃ Â¤Â¡Ã Â¤Â¿Ã Â¤Å¸ Ã Â¤â€¢Ã Â¤Â°Ã Â¤Â¨Ã Â¥â€¡ Ã Â¤â€¢Ã Â¥â€¡ Ã Â¤Â²Ã Â¤Â¿Ã Â¤Â Ã Â¤Â¹Ã Â¥â€¡Ã Â¤Â¡Ã Â¤Â° Ã Â¤Â¬Ã Â¤Å¸Ã Â¤Â¨ Ã Â¤â€°Ã Â¤ÂªÃ Â¤Â¯Ã Â¥â€¹Ã Â¤â€” Ã Â¤â€¢Ã Â¤Â°Ã Â¥â€¡Ã Â¤â€šÃ Â¥Â¤'
+          ? 'फ़ाइल अपलोड हो गई। स्कैन या एडिट करने के लिए हेडर बटन उपयोग करें।'
           : 'Use the Smart Scanner or Edit Document buttons in the header.',
         status: 'success',
         duration: 3000,
@@ -2727,7 +2727,7 @@ const ChatPage = () => {
         isClosable: true,
       });
     } finally {
-      setUploading(false);
+      setIsUploading(false);
       setUploadProgress(0);
       e.target.value = '';
     }
@@ -3897,14 +3897,14 @@ const ChatPage = () => {
       case 'dashboard':
         return (
           <VStack spacing={4} align="stretch">
-            <Box p={4} borderRadius="lg" bg={useColorModeValue('white', 'gray.900')} border="1px solid" borderColor={borderColor}>
+            <Box p={4} borderRadius="lg" bg={(colorMode === 'dark' ? 'gray.900' : 'white')} border="1px solid" borderColor={borderColor}>
               <Text fontSize="sm" fontWeight="bold">Balance Summary</Text>
               <Text fontSize="2xl" fontWeight="black" mt={2} color="judicial.gold">
                 {remainingMessages !== null ? `${remainingMessages} Left` : 'Unlimited'}
               </Text>
               <Text fontSize="xs" color="gray.500" mt={1}>Remaining messages today</Text>
             </Box>
-            <Box p={4} borderRadius="lg" bg={useColorModeValue('white', 'gray.900')} border="1px solid" borderColor={borderColor}>
+            <Box p={4} borderRadius="lg" bg={(colorMode === 'dark' ? 'gray.900' : 'white')} border="1px solid" borderColor={borderColor}>
               <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase">Workspace Details</Text>
               <VStack align="stretch" mt={3} spacing={2} fontSize="sm">
                 <HStack justify="space-between">
@@ -3952,12 +3952,12 @@ const ChatPage = () => {
                     key={session.slug}
                     p={3}
                     borderRadius="md"
-                    bg={isActive ? useColorModeValue('blue.50', 'gray.900') : 'transparent'}
+                    bg={isActive ? (colorMode === 'dark' ? 'gray.900' : 'blue.50') : 'transparent'}
                     border={isActive ? '1px solid' : 'none'}
                     borderColor={isActive ? 'blue.200' : 'transparent'}
                     cursor="pointer"
                     onClick={() => navigate(`/c/${session.slug}`)}
-                    _hover={{ bg: useColorModeValue('gray.100', 'gray.850') }}
+                    _hover={{ bg: (colorMode === 'dark' ? 'gray.850' : 'gray.100') }}
                   >
                     <HStack justify="space-between" mb={1}>
                       <Badge size="xs" colorScheme={
@@ -3970,7 +3970,7 @@ const ChatPage = () => {
                         {new Date(session.updatedAt).toLocaleDateString()}
                       </Text>
                     </HStack>
-                    <Text fontSize="sm" fontWeight="semibold" noOfLines={1} color={isActive ? useColorModeValue('blue.600', 'blue.300') : textColor}>
+                    <Text fontSize="sm" fontWeight="semibold" noOfLines={1} color={isActive ? (colorMode === 'dark' ? 'blue.300' : 'blue.600') : textColor}>
                       {session.title || 'Conversation'}
                     </Text>
                     <Text fontSize="xs" noOfLines={1} mt={0.5} color="gray.500">
@@ -4562,10 +4562,10 @@ const ChatPage = () => {
   const FILE_COLORS = ['blue', 'green', 'purple', 'orange', 'cyan', 'pink', 'teal', 'red', 'yellow', 'gray'];
 
   const renderTimelinePanel = () => {
-    const panelBg = useColorModeValue('white', 'gray.850');
-    const panelBorder = useColorModeValue('gray.200', 'gray.700');
-    const sectionBg = useColorModeValue('gray.50', 'gray.800');
-    const headingColor = useColorModeValue('gray.700', 'gray.200');
+    const panelBg = (colorMode === 'dark' ? 'gray.850' : 'white');
+    const panelBorder = (colorMode === 'dark' ? 'gray.700' : 'gray.200');
+    const sectionBg = (colorMode === 'dark' ? 'gray.800' : 'gray.50');
+    const headingColor = (colorMode === 'dark' ? 'gray.200' : 'gray.700');
     const etaRemaining = Math.max(0, chronologyEta - chronologyElapsed);
     const progressPercent = Math.min(100, (chronologyElapsed / chronologyEta) * 100);
 
@@ -4596,7 +4596,7 @@ const ChatPage = () => {
           px={4}
           borderBottom="1px solid"
           borderColor={panelBorder}
-          bg={useColorModeValue('green.50', 'green.900')}
+          bg={(colorMode === 'dark' ? 'green.900' : 'green.50')}
         >
           <HStack spacing={2}>
             <Icon as={FiClock} color="green.500" />
@@ -4637,9 +4637,9 @@ const ChatPage = () => {
               <Box
                 p={5}
                 borderRadius="xl"
-                bg={useColorModeValue('green.50', 'green.900')}
+                bg={(colorMode === 'dark' ? 'green.900' : 'green.50')}
                 border="1px solid"
-                borderColor={useColorModeValue('green.100', 'green.700')}
+                borderColor={(colorMode === 'dark' ? 'green.700' : 'green.100')}
                 textAlign="center"
               >
                 <Box position="relative" display="inline-block" mb={3}>
@@ -4734,17 +4734,17 @@ const ChatPage = () => {
                     📅 Events ({chronologyResults.events.length})
                   </Text>
                   {/* Timeline line */}
-                  <Box position="relative" pl={4} borderLeft="2px solid" borderLeftColor={useColorModeValue('green.200', 'green.700')}>
+                  <Box position="relative" pl={4} borderLeft="2px solid" borderLeftColor={(colorMode === 'dark' ? 'green.700' : 'green.200')}>
                     {chronologyResults.events.map((ev, i) => (
                       <Box
                         key={i}
                         position="relative"
                         mb={3}
                         p={3}
-                        bg={useColorModeValue('white', 'gray.900')}
+                        bg={(colorMode === 'dark' ? 'gray.900' : 'white')}
                         borderRadius="lg"
                         border="1px solid"
-                        borderColor={useColorModeValue('gray.100', 'gray.700')}
+                        borderColor={(colorMode === 'dark' ? 'gray.700' : 'gray.100')}
                         _hover={{ borderColor: `${CATEGORY_COLORS[ev.category] || 'gray'}.300`, boxShadow: 'sm' }}
                         transition="all 0.2s"
                       >
@@ -4826,10 +4826,10 @@ const ChatPage = () => {
   // PRECEDENCE ANALYSIS PANEL
   // ============================================
   const renderPrecedencePanel = () => {
-    const panelBg = useColorModeValue('white', 'gray.850');
-    const panelBorder = useColorModeValue('gray.200', 'gray.700');
-    const sectionBg = useColorModeValue('gray.50', 'gray.800');
-    const headingColor = useColorModeValue('gray.700', 'gray.200');
+    const panelBg = (colorMode === 'dark' ? 'gray.850' : 'white');
+    const panelBorder = (colorMode === 'dark' ? 'gray.700' : 'gray.200');
+    const sectionBg = (colorMode === 'dark' ? 'gray.800' : 'gray.50');
+    const headingColor = (colorMode === 'dark' ? 'gray.200' : 'gray.700');
 
     return (
       <Box
@@ -4850,7 +4850,7 @@ const ChatPage = () => {
           px={4}
           borderBottom="1px solid"
           borderColor={panelBorder}
-          bg={useColorModeValue('teal.50', 'teal.900')}
+          bg={(colorMode === 'dark' ? 'teal.900' : 'teal.50')}
         >
           <HStack spacing={2}>
             <Icon as={FiZap} color="teal.500" />
@@ -4947,10 +4947,10 @@ const ChatPage = () => {
   // COUNTER MAKER PANEL
   // ============================================
   const renderCounterMakerPanel = () => {
-    const panelBg = useColorModeValue('white', 'gray.850');
-    const panelBorder = useColorModeValue('gray.200', 'gray.700');
-    const sectionBg = useColorModeValue('gray.50', 'gray.800');
-    const headingColor = useColorModeValue('gray.700', 'gray.200');
+    const panelBg = (colorMode === 'dark' ? 'gray.850' : 'white');
+    const panelBorder = (colorMode === 'dark' ? 'gray.700' : 'gray.200');
+    const sectionBg = (colorMode === 'dark' ? 'gray.800' : 'gray.50');
+    const headingColor = (colorMode === 'dark' ? 'gray.200' : 'gray.700');
 
     return (
       <Box
@@ -4971,7 +4971,7 @@ const ChatPage = () => {
           px={4}
           borderBottom="1px solid"
           borderColor={panelBorder}
-          bg={useColorModeValue('orange.50', 'orange.900')}
+          bg={(colorMode === 'dark' ? 'orange.900' : 'orange.50')}
         >
           <HStack spacing={2}>
             <Icon as={FiEdit} color="orange.500" />
@@ -5031,7 +5031,7 @@ const ChatPage = () => {
                   minH="300px"
                   fontFamily="mono"
                   fontSize="sm"
-                  bg={useColorModeValue('white', 'gray.900')}
+                  bg={(colorMode === 'dark' ? 'gray.900' : 'white')}
                 />
               </Box>
 
@@ -5058,10 +5058,10 @@ const ChatPage = () => {
 
   // ============================================
   const renderResearchReportPanel = () => {
-    const panelBg = useColorModeValue('white', 'gray.850');
-    const panelBorder = useColorModeValue('gray.200', 'gray.700');
-    const sectionBg = useColorModeValue('gray.50', 'gray.800');
-    const headingColor = useColorModeValue('gray.700', 'gray.200');
+    const panelBg = (colorMode === 'dark' ? 'gray.850' : 'white');
+    const panelBorder = (colorMode === 'dark' ? 'gray.700' : 'gray.200');
+    const sectionBg = (colorMode === 'dark' ? 'gray.800' : 'gray.50');
+    const headingColor = (colorMode === 'dark' ? 'gray.200' : 'gray.700');
 
     const etaRemaining = Math.max(0, researchEta - researchElapsed);
     const progressPercent = Math.min(100, (researchElapsed / researchEta) * 100);
@@ -5086,7 +5086,7 @@ const ChatPage = () => {
           px={4}
           borderBottom="1px solid"
           borderColor={panelBorder}
-          bg={useColorModeValue('blue.50', 'blue.900')}
+          bg={(colorMode === 'dark' ? 'blue.900' : 'blue.50')}
         >
           <HStack spacing={2}>
             <Icon as={FiCpu} color="blue.500" />
@@ -5128,9 +5128,9 @@ const ChatPage = () => {
               <Box
                 p={5}
                 borderRadius="xl"
-                bg={useColorModeValue('blue.50', 'blue.900')}
+                bg={(colorMode === 'dark' ? 'blue.900' : 'blue.50')}
                 border="1px solid"
-                borderColor={useColorModeValue('blue.100', 'blue.700')}
+                borderColor={(colorMode === 'dark' ? 'blue.700' : 'blue.100')}
                 textAlign="center"
               >
                 <Box position="relative" display="inline-block" mb={3}>
@@ -5181,7 +5181,7 @@ const ChatPage = () => {
                       key={i}
                       p={3}
                       borderRadius="lg"
-                      bg={isActive ? useColorModeValue('blue.50', 'blue.900') : sectionBg}
+                      bg={isActive ? (colorMode === 'dark' ? 'blue.900' : 'blue.50') : sectionBg}
                       border={isActive ? '1px solid' : 'none'}
                       borderColor={isActive ? 'blue.300' : 'transparent'}
                       opacity={researchElapsed < agent.threshold ? 0.4 : 1}
@@ -5274,7 +5274,7 @@ const ChatPage = () => {
                       </Text>
                       <VStack spacing={1} align="stretch">
                         {researchResults.agent1Data.dates.slice(0, 10).map((d, i) => (
-                          <HStack key={i} fontSize="xs" p={2} bg={useColorModeValue('white', 'gray.900')} borderRadius="md" spacing={3}>
+                          <HStack key={i} fontSize="xs" p={2} bg={(colorMode === 'dark' ? 'gray.900' : 'white')} borderRadius="md" spacing={3}>
                             <Badge colorScheme="green" fontSize="2xs" minW="70px" textAlign="center">
                               {d.date || 'N/A'}
                             </Badge>
@@ -5403,10 +5403,10 @@ const ChatPage = () => {
         {/* User Input Prompt controls */}
         <Box pt={4} w="full">
           <VStack spacing={2} w="full">
-            {/* Selected File Display inline inside Chat */}
-            {selectedFile && (
+            {/* Selected File / Uploading Status Display */}
+            {(selectedFile || isUploading || analyzingFile) && (
               <HStack
-                bg={useColorModeValue('blue.50', 'blue.900')}
+                bg={(colorMode === 'dark' ? 'blue.900' : 'blue.50')}
                 p={2}
                 px={3}
                 borderRadius="md"
@@ -5416,34 +5416,43 @@ const ChatPage = () => {
                 borderColor="blue.100"
               >
                 <HStack spacing={2}>
-                  <Icon as={FaFile} color="blue.500" />
-                  <Text color={textColor} fontSize="xs" fontWeight="semibold" isTruncated maxW="200px">
-                    {selectedFile.fileName}
+                  {(isUploading || analyzingFile) ? (
+                    <Spinner size="sm" color="blue.500" />
+                  ) : (
+                    <Icon as={FaFile} color="blue.500" />
+                  )}
+                  <Text color={textColor} fontSize="xs" fontWeight="semibold" isTruncated maxW="300px">
+                    {isUploading ? 'Uploading file...' : analyzingFile ? 'Extracting text and analyzing...' : selectedFile?.fileName}
                   </Text>
-                  {scanStatus === 'scanned' && (
+                  {!isUploading && !analyzingFile && scanStatus === 'scanned' && (
                     <Badge colorScheme="green" fontSize="2xs">Scanned</Badge>
                   )}
-                  {editSessionActive && (
+                  {!isUploading && !analyzingFile && editSessionActive && (
                     <Badge colorScheme="purple" fontSize="2xs">Edit Active</Badge>
                   )}
                 </HStack>
-                <HStack spacing={1}>
-                  {editSessionActive && (
+                <HStack spacing={2}>
+                  {isUploading && uploadProgress > 0 && (
+                     <Progress value={uploadProgress} size="xs" colorScheme="blue" w="100px" borderRadius="full" />
+                  )}
+                  {!isUploading && !analyzingFile && editSessionActive && (
                     <Button size="2xs" variant="ghost" colorScheme="gray" onClick={handleExitEditMode}>
                       Exit Edit
                     </Button>
                   )}
-                  <IconButton
-                    icon={<FaTimes />}
-                    size="xs"
-                    variant="ghost"
-                    colorScheme="blue"
-                    onClick={() => {
-                      handleExitEditMode();
-                      setSelectedFile(null);
-                    }}
-                    aria-label="Remove file"
-                  />
+                  {!isUploading && !analyzingFile && (
+                    <IconButton
+                      icon={<FaTimes />}
+                      size="xs"
+                      variant="ghost"
+                      colorScheme="blue"
+                      onClick={() => {
+                        handleExitEditMode();
+                        setSelectedFile(null);
+                      }}
+                      aria-label="Remove file"
+                    />
+                  )}
                 </HStack>
               </HStack>
             )}
@@ -5486,7 +5495,7 @@ const ChatPage = () => {
                               : "Type your message..."
                 }
                 size="md"
-                bg={isListening ? useColorModeValue('red.50', 'red.900') : inputBg}
+                bg={isListening ? (colorMode === 'dark' ? 'red.900' : 'red.50') : inputBg}
                 color={textColor}
                 isDisabled={isPendingUserChoice || isLoading || analyzingFile}
                 onKeyPress={handleKeyPress}
@@ -5509,7 +5518,8 @@ const ChatPage = () => {
                 onClick={() => handleSendMessage()}
                 size="md"
                 colorScheme="blue"
-                isDisabled={!input.trim() || isLoading}
+                isLoading={isLoading || isUploading || analyzingFile}
+                isDisabled={!input.trim() || isLoading || isUploading || analyzingFile}
                 aria-label="Send message"
               />
             </HStack>
@@ -5521,3 +5531,4 @@ const ChatPage = () => {
 };
 
 export default ChatPage;
+
