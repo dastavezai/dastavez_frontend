@@ -8,6 +8,8 @@ import PrecedencePanel from './Panels/PrecedencePanel';
 import CounterMakerPanel from './Panels/CounterMakerPanel';
 import ResearchPanel from './Panels/ResearchPanel';
 import BulkReviewPanel from './Panels/BulkReviewPanel';
+import MyFilesPanel from './Panels/MyFilesPanel';
+import OcrIntelligencePanel from './Panels/OcrIntelligencePanel';
 import DocumentEditor from './Editor/DocumentEditor';
 import ChatInterface from './Chat/ChatInterface';
 
@@ -45,9 +47,19 @@ const AdvancedChatLayout = () => {
         <SubSidebar />
       </Box>
 
-      {/* 3. Main Chat Area */}
+      {/* 3. Main Content Area */}
       <Box flex="1" position="relative" display="flex" flexDirection="column">
-        <ChatInterface />
+        {activeTab === 'my_files' ? (
+          <Box p={4} h="full">
+            <MyFilesPanel />
+          </Box>
+        ) : activeTab === 'ocr_intelligence' ? (
+          <Box h="full">
+            <OcrIntelligencePanel />
+          </Box>
+        ) : (
+          <ChatInterface />
+        )}
       </Box>
 
       {/* 4. Right Split Panel (Dynamic based on active feature) */}

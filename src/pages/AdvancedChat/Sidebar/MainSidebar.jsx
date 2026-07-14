@@ -1,7 +1,7 @@
 import React from 'react';
 import { VStack, IconButton, Tooltip, Icon, useColorMode, useColorModeValue, Spacer, Avatar } from '@chakra-ui/react';
 import { SunIcon, MoonIcon } from '@chakra-ui/icons';
-import { FiMessageSquare, FiClock, FiLayers, FiCpu, FiSettings, FiGrid, FiFileText, FiGlobe, FiZap, FiLogOut, FiRefreshCw } from 'react-icons/fi';
+import { FiMessageSquare, FiClock, FiLayers, FiCpu, FiSettings, FiGrid, FiFileText, FiGlobe, FiZap, FiLogOut, FiRefreshCw, FiFolder, FiCamera } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { useAdvancedChat } from '../AdvancedChatContext';
 
@@ -34,6 +34,8 @@ const MainSidebar = () => {
             {[
               { id: 'dashboard', label: 'Dashboard', icon: FiGrid },
               { id: 'history', label: 'History', icon: FiMessageSquare },
+              { id: 'my_files', label: 'My Files', icon: FiFolder },
+              { id: 'ocr_intelligence', label: 'OCR Intelligence', icon: FiCamera },
               { id: 'research', label: 'Deep Research', icon: FiCpu },
               { id: 'review', label: 'Parallel Review', icon: FiLayers },
               { id: 'chronology', label: 'Time Chronology', icon: FiClock },
@@ -91,7 +93,6 @@ const MainSidebar = () => {
           />
         </VStack>
       </VStack>
-
 
     </>
   );

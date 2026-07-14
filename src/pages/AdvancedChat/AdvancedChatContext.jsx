@@ -44,6 +44,16 @@ export const AdvancedChatProvider = ({ children }) => {
     });
   }, [activeTab]);
 
+  const [onboardCompanyName, setOnboardCompanyName] = useState(user?.companyName || '');
+  const [onboardSector, setOnboardSector] = useState(user?.sector || 'legal');
+  const [isOnboardingSubmitLoading, setIsOnboardingSubmitLoading] = useState(false);
+
+  // OCR Intelligence State
+  const [ocrFiles, setOcrFiles] = useState([]);
+  const [ocrStatus, setOcrStatus] = useState('idle');
+  const [ocrResult, setOcrResult] = useState(null);
+  const [ocrSessionId, setOcrSessionId] = useState(null);
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -131,6 +141,7 @@ export const AdvancedChatProvider = ({ children }) => {
   const [scanStatus, setScanStatus] = useState('none');
   const [scanResults, setScanResults] = useState(null);
   const [smartSuggestions, setSmartSuggestions] = useState([]);
+  const [formatMetadata, setFormatMetadata] = useState(null);
 
   // Template & Forms State
   const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
@@ -188,8 +199,15 @@ export const AdvancedChatProvider = ({ children }) => {
     handleStartBulkReview, setHandleStartBulkReview,
     handleResetChronology, setHandleResetChronology,
     handleChronologyFilesUpload, setHandleChronologyFilesUpload,
+    isOnboardingSubmitLoading, setIsOnboardingSubmitLoading,
     handleOnboardSubmit, setHandleOnboardSubmit,
     handleSuggestedActionClick, setHandleActionClick,
+    
+    // OCR Intelligence
+    ocrFiles, setOcrFiles,
+    ocrStatus, setOcrStatus,
+    ocrResult, setOcrResult,
+    ocrSessionId, setOcrSessionId,
     
     // UI Navigation
     activeTab, setActiveTab,
@@ -277,6 +295,7 @@ export const AdvancedChatProvider = ({ children }) => {
     scanStatus, setScanStatus,
     scanResults, setScanResults,
     smartSuggestions, setSmartSuggestions,
+    formatMetadata, setFormatMetadata,
 
     // Forms & Modals
     isTemplateBrowserOpen, setIsTemplateBrowserOpen,

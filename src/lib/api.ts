@@ -280,6 +280,11 @@ export const chatAPI = {
 
 // File Management API 
 export const fileAPI = {
+  // Get all user files
+  getUserFiles: async () => {
+    return apiFetch('/files/user');
+  },
+
   // Upload file
   uploadFile: async (file: File) => {
     const formData = new FormData();
@@ -654,3 +659,14 @@ export const contactSubmissionsAPI = {
   },
 };
 
+export const ocrAPI = {
+  digitizeDocument: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await apiFetch("/ocr/digitize", {
+      method: "POST",
+      body: formData
+    });
+    return res;
+  }
+};

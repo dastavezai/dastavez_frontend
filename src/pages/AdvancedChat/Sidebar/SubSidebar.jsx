@@ -8,6 +8,41 @@ import { FaFile, FaTimes, FaPaperclip } from 'react-icons/fa';
 import { AddIcon } from '@chakra-ui/icons';
 import { useAdvancedChat } from '../AdvancedChatContext';
 
+const groupSessions = (sessions) => {
+  const groups = {
+    'Today': [],
+    'Yesterday': [],
+    'Previous 7 Days': [],
+    'Previous 30 Days': [],
+    'Older': []
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const last7 = new Date(today);
+  last7.setDate(last7.getDate() - 7);
+  const last30 = new Date(today);
+  last30.setDate(last30.getDate() - 30);
+
+  sessions.forEach(session => {
+    const d = new Date(session.updatedAt);
+    if (d >= today) {
+      groups['Today'].push(session);
+    } else if (d >= yesterday) {
+      groups['Yesterday'].push(session);
+    } else if (d >= last7) {
+      groups['Previous 7 Days'].push(session);
+    } else if (d >= last30) {
+      groups['Previous 30 Days'].push(session);
+    } else {
+      groups['Older'].push(session);
+    }
+  });
+
+  return groups;
+};
 
 const SubSidebar = () => {
   const {
@@ -25,6 +60,8 @@ const SubSidebar = () => {
     reviewFiles, setReviewFiles, reviewStatus, setReviewStatus,
     setMessages,
     bulkReviewSessionId, setBulkReviewSessionId, bulkReviewResults, bulkReviewElapsed, bulkReviewEta, isBulkReviewPanelOpen, setIsBulkReviewPanelOpen, handleStartBulkReview,
+    setPrecedenceSessionId, setIsPrecedencePanelOpen,
+    setCounterMakerSessionId, setIsCounterMakerPanelOpen,
     onboardCompanyName, setOnboardCompanyName,
     onboardSector, setOnboardSector,
     isOnboardingSubmitLoading, handleOnboardSubmit,
@@ -41,7 +78,6 @@ const SubSidebar = () => {
   const { colorMode, toggleColorMode } = useColorMode();
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   
-  // Rules of Hooks fixes:
   const bgBox = useColorModeValue('white', 'gray.900');
   const bgHistoryActive = useColorModeValue('blue.50', 'gray.900');
   const bgHistoryHover = useColorModeValue('gray.100', 'gray.850');
@@ -79,8 +115,9 @@ const SubSidebar = () => {
         );
 
       case 'history':
+        const groupedSessions = groupSessions(sessionsList);
         return (
-          <VStack spacing={2} align="stretch">
+          <VStack spacing={4} align="stretch" overflowY="auto" flex="1">
             <Button
               size="sm"
               colorScheme="blue"
@@ -98,43 +135,80 @@ const SubSidebar = () => {
             ) : sessionsList.length === 0 ? (
               <Text fontSize="xs" color="gray.500" textAlign="center">No conversation history yet.</Text>
             ) : (
-              sessionsList.map(session => {
-                const isActive = slug === session.slug;
+              Object.entries(groupedSessions).map(([groupName, items]) => {
+                if (items.length === 0) return null;
                 return (
-                  <Box
-                    key={session.slug}
-                    p={3}
-                    borderRadius="md"
-                    bg={isActive ? bgHistoryActive : 'transparent'}
-                    border={isActive ? '1px solid' : 'none'}
-                    borderColor={isActive ? 'blue.200' : 'transparent'}
-                    cursor="pointer"
-                    onClick={() => navigate(`/c/${session.slug}`)}
-                    _hover={{ bg: bgHistoryHover }}
-                  >
-                    <HStack justify="space-between" mb={1}>
-                      <Badge size="xs" colorScheme={
-                        session.feature === 'document_ready' ? 'purple' :
-                        session.feature === 'legal_analysis' ? 'green' : 'blue'
-                      }>
-                        {session.feature.replace('_', ' ')}
-                      </Badge>
-                      <Text fontSize="2xs" color="gray.400">
-                        {new Date(session.updatedAt).toLocaleDateString()}
-                      </Text>
-                    </HStack>
-                    <Text fontSize="sm" fontWeight="semibold" noOfLines={1} color={isActive ? colorHistoryActive : textColor}>
-                      {session.title || 'Conversation'}
+                  <Box key={groupName} mb={2}>
+                    <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={2} px={2}>
+                      {groupName}
                     </Text>
-                    <Text fontSize="xs" noOfLines={1} mt={0.5} color="gray.500">
-                      {session.preview}
-                    </Text>
+                    <VStack align="stretch" spacing={1}>
+                      {items.map(session => {
+                        const isCurrentUrlSlug = slug === session.slug;
+                        const isToolActive = session.type === activeTab && activeTab !== 'history' && activeTab !== 'dashboard';
+                        const isActive = isCurrentUrlSlug || isToolActive;
+                        
+                        let icon = <FiMessageSquare />;
+                        let badgeColor = 'blue';
+                        if (session.type === 'research') { icon = <FiCpu />; badgeColor = 'purple'; }
+                        if (session.type === 'chronology') { icon = <FiClock />; badgeColor = 'orange'; }
+                        if (session.type === 'counter_maker') { icon = <FiEdit />; badgeColor = 'green'; }
+                        if (session.type === 'precedence') { icon = <FiGlobe />; badgeColor = 'teal'; }
+
+                        return (
+                          <HStack
+                            key={session.slug}
+                            p={2}
+                            borderRadius="md"
+                            bg={isActive ? bgHistoryActive : 'transparent'}
+                            cursor="pointer"
+                            onClick={() => {
+                              if (!session.type || session.type === 'chat') {
+                                navigate(`/c/${session.slug}`);
+                                setActiveTab('history');
+                              } else {
+                                if (session.type === 'counter_maker' || session.type === 'precedence') {
+                                  setActiveTab('drafting');
+                                } else {
+                                  setActiveTab(session.type);
+                                }
+                                if (session.type === 'research') {
+                                  setResearchSessionId(session.slug);
+                                  localStorage.setItem('deepResearchSessionId', session.slug);
+                                }
+                                if (session.type === 'chronology') {
+                                  setChronologySessionId(session.slug);
+                                  localStorage.setItem('chronologySessionId', session.slug);
+                                }
+                                navigate(`/c/${user?.companySlug || 'default'}`);
+                              }
+                            }}
+                            _hover={{ bg: bgHistoryHover }}
+                            spacing={3}
+                          >
+                            <Box color={`${badgeColor}.500`}>
+                              {icon}
+                            </Box>
+                            <VStack align="start" spacing={0} flex={1} overflow="hidden">
+                              <Text fontSize="sm" fontWeight={isActive ? "bold" : "normal"} noOfLines={1} color={isActive ? colorHistoryActive : textColor}>
+                                {session.title || 'Conversation'}
+                              </Text>
+                              <Text fontSize="2xs" noOfLines={1} color="gray.500">
+                                {session.preview}
+                              </Text>
+                            </VStack>
+                          </HStack>
+                        );
+                      })}
+                    </VStack>
                   </Box>
                 );
               })
             )}
           </VStack>
         );
+
+      
 
       case 'research':
         return (
@@ -180,7 +254,7 @@ const SubSidebar = () => {
                 _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}
                 transition="all 0.2s"
               >
-                🔬 Start Deep Research
+                ðŸ”¬ Start Deep Research
               </Button>
             )}
 
@@ -211,18 +285,18 @@ const SubSidebar = () => {
                     onClick={() => setIsReportPanelOpen(true)}
                     mt={2}
                   >
-                    View Progress →
+                    View Progress â†’
                   </Button>
                 )}
               </Box>
             )}
 
-            {/* Completed – View Report */}
+            {/* Completed â€“ View Report */}
             {(researchStatus === 'completed' || researchStatus === 'completed_with_errors') && (
               <VStack spacing={2} align="stretch">
                 <Box p={3} bg="green.50" _dark={{ bg: 'green.900' }} borderRadius="md" border="1px solid" borderColor="green.200">
                   <HStack spacing={2}>
-                    <Text fontSize="sm">✅</Text>
+                    <Text fontSize="sm">âœ…</Text>
                     <Text fontSize="xs" fontWeight="bold" color="green.600" isTruncated>
                       Research Complete
                     </Text>
@@ -235,7 +309,7 @@ const SubSidebar = () => {
                   onClick={() => setIsReportPanelOpen(!isReportPanelOpen)}
                   w="full"
                 >
-                   {isReportPanelOpen ? 'Hide Report' : 'View Report →'}
+                   {isReportPanelOpen ? 'Hide Report' : 'View Report â†’'}
                 </Button>
                 <Button
                   size="xs"
@@ -256,11 +330,11 @@ const SubSidebar = () => {
               </VStack>
             )}
 
-            {/* Failed – Retry */}
+            {/* Failed â€“ Retry */}
             {researchStatus === 'failed' && (
               <Box p={3} bg="red.50" _dark={{ bg: 'red.900' }} borderRadius="md">
                 <Text fontSize="xs" color="red.600" fontWeight="bold" mb={2}>
-                  ❌ Research Failed
+                  âŒ Research Failed
                 </Text>
                 <Button
                   size="xs"
@@ -338,7 +412,7 @@ const SubSidebar = () => {
               </VStack>
             )}
 
-            {/* Start Review button — needs at least 2 files */}
+            {/* Start Review button â€” needs at least 2 files */}
             {reviewFiles.length >= 2 && reviewStatus === 'idle' && (
               <Button
                 size="sm"
@@ -349,7 +423,7 @@ const SubSidebar = () => {
                 transition="all 0.2s"
                 onClick={handleStartBulkReview}
               >
-                🔍 Start Parallel Review ({reviewFiles.length} files)
+                ðŸ” Start Parallel Review ({reviewFiles.length} files)
               </Button>
             )}
 
@@ -379,7 +453,7 @@ const SubSidebar = () => {
                 </Text>
                 {!isBulkReviewPanelOpen && (
                   <Button size="xs" variant="link" colorScheme="purple" onClick={() => setIsBulkReviewPanelOpen(true)} mt={2}>
-                    View Progress →
+                    View Progress â†’
                   </Button>
                 )}
               </Box>
@@ -390,7 +464,7 @@ const SubSidebar = () => {
               <VStack spacing={2} align="stretch">
                 <Box p={3} bg="purple.50" _dark={{ bg: 'purple.900' }} borderRadius="md" border="1px solid" borderColor="purple.200">
                   <HStack spacing={2}>
-                    <Text fontSize="sm">✅</Text>
+                    <Text fontSize="sm">âœ…</Text>
                     <Text fontSize="xs" fontWeight="bold" color="purple.600">
                       Analysis Complete ({bulkReviewResults?.documents?.length || 0} docs)
                     </Text>
@@ -403,7 +477,7 @@ const SubSidebar = () => {
                   onClick={() => setIsBulkReviewPanelOpen(!isBulkReviewPanelOpen)}
                   w="full"
                 >
-                  {isBulkReviewPanelOpen ? 'Hide Report' : 'View Report →'}
+                  {isBulkReviewPanelOpen ? 'Hide Report' : 'View Report â†’'}
                 </Button>
                 <Button
                   size="xs"
@@ -427,7 +501,7 @@ const SubSidebar = () => {
             {/* Failed */}
             {reviewStatus === 'failed' && (
               <Box p={3} bg="red.50" _dark={{ bg: 'red.900' }} borderRadius="md">
-                <Text fontSize="xs" color="red.600" fontWeight="bold" mb={2}>❌ Analysis Failed</Text>
+                <Text fontSize="xs" color="red.600" fontWeight="bold" mb={2}>âŒ Analysis Failed</Text>
                 <Button size="xs" colorScheme="purple" onClick={handleStartBulkReview} w="full">
                   Retry
                 </Button>
@@ -544,7 +618,7 @@ const SubSidebar = () => {
                 </Text>
                 {!isTimelinePanelOpen && (
                   <Button size="xs" variant="link" colorScheme="green" onClick={() => setIsTimelinePanelOpen(true)} mt={2}>
-                    View Progress →
+                    View Progress â†’
                   </Button>
                 )}
               </Box>
@@ -570,7 +644,7 @@ const SubSidebar = () => {
                   onClick={() => setIsTimelinePanelOpen(!isTimelinePanelOpen)}
                   w="full"
                 >
-                   {isTimelinePanelOpen ? 'Hide Timeline' : 'View Timeline →'}
+                   {isTimelinePanelOpen ? 'Hide Timeline' : 'View Timeline â†’'}
                 </Button>
                 <Button
                   size="xs"
@@ -589,7 +663,7 @@ const SubSidebar = () => {
             {/* Failed */}
             {chronologyStatus === 'failed' && (
               <Box p={3} bg="red.50" _dark={{ bg: 'red.900' }} borderRadius="md">
-                <Text fontSize="xs" color="red.600" fontWeight="bold" mb={2}>❌ Timeline Failed</Text>
+                <Text fontSize="xs" color="red.600" fontWeight="bold" mb={2}>âŒ Timeline Failed</Text>
                 <Button size="xs" colorScheme="green" onClick={handleStartChronology} w="full">
                   Retry
                 </Button>
@@ -698,7 +772,7 @@ const SubSidebar = () => {
               <FormLabel fontSize="xs">System Language</FormLabel>
               <Select size="sm" value={language} onChange={(e) => setLanguage(e.target.value)}>
                 <option value="en">English (EN)</option>
-                <option value="hi">हिंदी (HI)</option>
+                <option value="hi">à¤¹à¤¿à¤‚à¤¦à¥€ (HI)</option>
               </Select>
             </FormControl>
             <FormControl>
