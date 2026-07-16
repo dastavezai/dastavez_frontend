@@ -186,6 +186,12 @@ const ChatPage = () => {
   const researchPollRef = useRef(null);
   const researchTimerRef = useRef(null);
 
+  // File Session State — tracks per-file chat isolation
+  // A new "file session" is created when a NEW file is uploaded and a tool is triggered.
+  // If the same file is still active, switching tools reuses the same session.
+  const [fileSessionId, setFileSessionId] = useState(null);
+  const lastToolSessionFileId = useRef(null); // file._id of the last session that was "started"
+
   // Chronology State
   const [chronologySessionId, setChronologySessionId] = useState(() => localStorage.getItem('chronologySessionId') || null);
   const [chronologyStatus, setChronologyStatus] = useState('idle');
@@ -2265,25 +2271,62 @@ const ChatPage = () => {
     try {
       setIsLoading(true);
 
-      // **SKIP BACKEND CALL** - directly open fields modal with schema
-      console.log('📋 [handleTemplateSelect] Opening fields modal directly...');
+      console.log('📋 [handleTemplateSelect] Fetching schema and opening fields modal...');
 
-      await openFieldsModalWithSchema({
-        templatePath: template.relPath,
-        templateTitle: template.displayTitle,
-        missingFields: null // Will fetch schema from backend
-      });
+      try {
+        // Primary path: fetch schema from backend
+        await openFieldsModalWithSchema({
+          templatePath: template.relPath,
+          templateTitle: template.displayTitle,
+          missingFields: null
+        });
+        console.log('✅ [handleTemplateSelect] Fields modal opened via schema');
+      } catch (schemaError) {
+        console.warn('⚠️ [handleTemplateSelect] Schema API failed, using template.fields fallback:', schemaError.message);
 
-      console.log('✅ [handleTemplateSelect] Fields modal opened successfully');
+        // Fallback: use the fields already bundled in the template object from the browser
+        const fallbackFields = (template.fields || []).map(f => ({
+          key: f.key || f,
+          label: f.label || f.key || f,
+          type: f.type || 'text',
+          required: f.required !== false,
+          example: f.example || '',
+          description: f.description || ''
+        }));
+
+        if (fallbackFields.length > 0) {
+          // Open modal with the fields we already have
+          setFieldsModalData({
+            templatePath: template.relPath,
+            templateTitle: template.displayTitle,
+            fields: fallbackFields,
+            initialValues: {}
+          });
+          setIsFieldsModalOpen(true);
+          setFormClosedWithoutSubmit(false);
+          console.log('✅ [handleTemplateSelect] Fields modal opened via fallback fields');
+        } else {
+          // No fields available at all — show a helpful assistant message
+          toast({
+            title: language === 'hi' ? 'स्कीमा लोड नहीं हुई' : 'Schema Unavailable',
+            description: language === 'hi'
+              ? 'टेम्पलेट फ़ील्ड लोड नहीं हो सके। कृपया पुनः प्रयास करें।'
+              : 'Template fields could not be loaded. Please try again.',
+            status: 'warning',
+            duration: 4000,
+            isClosable: true,
+          });
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: language === 'hi'
+              ? `"${template.displayTitle}" के लिए फ़ील्ड उपलब्ध नहीं हैं। कृपया बताएं कि आपको क्या जानकारी देनी है।`
+              : `Fields for "${template.displayTitle}" could not be loaded. Please describe what information you'd like to provide.`
+          }]);
+        }
+      }
 
     } catch (error) {
-      console.error('❌ [handleTemplateSelect] Error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        stack: error.stack
-      });
-
+      console.error('❌ [handleTemplateSelect] Unexpected error:', error);
       toast({
         title: language === 'hi' ? 'त्रुटि' : 'Error',
         description: error.response?.data?.message || error.message || (language === 'hi' ? 'टेम्पलेट लोड करने में विफल' : 'Failed to load template'),
@@ -2291,14 +2334,6 @@ const ChatPage = () => {
         duration: 5000,
         isClosable: true,
       });
-
-      // Still show a helpful message
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: language === 'hi'
-          ? `क्षमा करें, "${template.displayTitle}" लोड करते समय त्रुटि हुई। कृपया पुनः प्रयास करें।`
-          : `Sorry, there was an error loading "${template.displayTitle}". Please try again.`
-      }]);
     } finally {
       setIsLoading(false);
     }
@@ -2504,6 +2539,46 @@ const ChatPage = () => {
     }
   };
 
+  // ─── FILE SESSION MANAGEMENT ───────────────────────────────────────────────
+  //
+  // startNewFileSession(file, toolName)
+  //   Called when a tool (Deep Research, Chronology, Parallel Review) is triggered.
+  //   - If the file is NEW compared to the last session → reset messages and add a session header.
+  //   - If it's the SAME file as the last session → do nothing (continue in same conversation).
+  //
+  const startNewFileSession = (file, toolName) => {
+    if (!file?._id) return;
+
+    const isSameFile = lastToolSessionFileId.current === file._id;
+
+    if (isSameFile) {
+      // Same file as last tool session → just add a divider so the user can see the tool changed
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `🔄 **${toolName}** started using the same file. Continuing in this session.`,
+          isSessionDivider: true,
+        }
+      ]);
+      return;
+    }
+
+    // New file (or first tool ever) → reset chat and start fresh session
+    lastToolSessionFileId.current = file._id;
+
+    const fileName = file.fileName || file.originalName || file.name || 'Uploaded file';
+    const headerMessage = {
+      role: 'assistant',
+      content: `📁 **New Session Started**\n\n**File:** ${fileName}\n**Tool:** ${toolName}\n\n---\nAll messages in this session are scoped to the above file.`,
+      isSessionHeader: true,
+    };
+
+    // Clear previous messages and start with the session header
+    setMessages([headerMessage]);
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // Deep Research functions
   const stopResearchPolling = () => {
     if (researchPollRef.current) {
@@ -2587,6 +2662,10 @@ const ChatPage = () => {
       });
       return;
     }
+
+    // 🆕 File session management — create new session or continue existing one
+    startNewFileSession(targetFile, 'Deep Research');
+
     try {
       setResearchStatus('starting');
       setResearchResults(null);
@@ -2720,6 +2799,14 @@ const ChatPage = () => {
       toast({ title: 'No files', description: 'Upload at least one file.', status: 'warning', duration: 3000 });
       return;
     }
+
+    // 🆕 File session management — use first file in list as the session key
+    // For chronology with multiple files, we use the first file as the "anchor"
+    const firstFile = chronologyFiles[0]?.file;
+    if (firstFile) {
+      startNewFileSession(firstFile, 'Time Chronology');
+    }
+
     try {
       isMergingChronologyRef.current = false;
       setChronologyStatus('starting');
@@ -2818,6 +2905,14 @@ const ChatPage = () => {
       toast({ title: 'Upload at least 2 files to compare', status: 'warning', duration: 3000 });
       return;
     }
+
+    // 🆕 File session management — use the first review file as the session anchor
+    // For bulk review, any new set of files means a new session
+    const firstReviewFile = reviewFiles[0]?.file;
+    if (firstReviewFile) {
+      startNewFileSession(firstReviewFile, 'Parallel Review');
+    }
+
     setReviewStatus('starting');
     setBulkReviewElapsed(0);
     setBulkReviewEta(40 + reviewFiles.length * 30);
@@ -3157,6 +3252,11 @@ const ChatPage = () => {
       setSelectedFile(response.file);
       setUploadProgress(100);
       setTimeout(() => setUploadProgress(0), 1000);
+
+      // Generate a new file session ID for this upload.
+      // The actual session reset happens when a tool is triggered (not on upload itself).
+      const newFileSessionId = crypto.randomUUID();
+      setFileSessionId(newFileSessionId);
 
       // Auto-trigger drafting tools or deep research if active
       if (activeDraftingTool === 'precedence') {
