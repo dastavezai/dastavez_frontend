@@ -4,7 +4,7 @@ import {
   Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon,
   useColorModeValue, Center
 } from '@chakra-ui/react';
-import { FiLayers, FiFileText } from 'react-icons/fi';
+
 import { useAdvancedChat } from '../AdvancedChatContext';
 
 const BulkReviewPanel = () => {

@@ -9,7 +9,13 @@ export function LoadingScreen() {
     let hideTimeout: NodeJS.Timeout;
 
     if (loadingScreen && loadingProgress) {
-      document.body.style.overflow = "hidden";
+      /*
+       * DO NOT set document.body.style.overflow here.
+       * The global CSS (html { overflow-y: scroll }) permanently reserves the
+       * scrollbar gutter so the viewport width never changes between pages.
+       * Overriding overflow via JS creates inline styles that fight the CSS
+       * and cause the navbar to shift horizontally when pages load.
+       */
 
       // Kick off the progress bar fill
       requestAnimationFrame(() => {
@@ -26,14 +32,13 @@ export function LoadingScreen() {
         // Give fade-out transitions time to finish (500ms)
         hideTimeout = setTimeout(() => {
           loadingScreen.classList.add("is-hidden");
-          document.body.style.overflow = "";
+          // NOTE: do NOT reset body.style.overflow — CSS handles it globally
         }, 500);
       }, 2500);
 
-      // Expose globally reusable interface as requested in reference script
+      // Expose globally reusable interface
       (window as any).LoadingScreen = {
         show: () => {
-          document.body.style.overflow = "hidden";
           loadingScreen.classList.remove("is-hidden");
           if (loadingSlogan) loadingSlogan.classList.remove("is-exiting");
           loadingProgress.classList.remove("is-exiting");
@@ -46,14 +51,14 @@ export function LoadingScreen() {
         },
         hide: () => {
           loadingScreen.classList.add("is-hidden");
-          document.body.style.overflow = "";
+          // NOTE: do NOT reset body.style.overflow — CSS handles it globally
         },
       };
 
       return () => {
         clearTimeout(exitTimeout);
         if (hideTimeout) clearTimeout(hideTimeout);
-        document.body.style.overflow = "";
+        // NOTE: do NOT reset body.style.overflow — CSS handles it globally
       };
     }
   }, []);

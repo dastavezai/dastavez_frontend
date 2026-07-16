@@ -5,7 +5,7 @@ import {
   Alert, AlertIcon, AlertTitle, AlertDescription
 } from '@chakra-ui/react';
 import { FaTimes } from 'react-icons/fa';
-import { FiZap, FiUploadCloud, FiCheckCircle } from 'react-icons/fi';
+import { FiZap, FiUploadCloud } from 'react-icons/fi';
 import { useAdvancedChat } from '../AdvancedChatContext';
 
 const PrecedencePanel = () => {

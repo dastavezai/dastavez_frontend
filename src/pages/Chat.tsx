@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { ChakraProvider, extendTheme } from '@chakra-ui/react';
 import { AuthProvider } from '../chat-advanced/AuthBridge';
-import AdvancedChatPage from './AdvancedChat/index';
+import AdvancedChatPage from './AdvancedChat';
 
 // Custom theme to make Chakra play nice with our dark mode
 const theme = extendTheme({
@@ -19,6 +20,13 @@ const theme = extendTheme({
   },
   styles: {
     global: (props: any) => ({
+      'html, body': {
+        margin: 0,
+        padding: 0,
+        height: '100%',
+        width: '100%',
+        overflow: 'hidden',
+      },
       body: {
         bg: props.colorMode === 'dark' ? 'judicial.dark' : 'white',
       },
@@ -30,11 +38,7 @@ const Chat = () => {
   return (
     <ChakraProvider theme={theme}>
       <AuthProvider>
-        <div className="min-h-screen bg-white dark:bg-judicial-dark flex flex-col">
-          <div className="flex-1 overflow-hidden">
-            <AdvancedChatPage />
-          </div>
-        </div>
+        <AdvancedChatPage />
       </AuthProvider>
     </ChakraProvider>
   );

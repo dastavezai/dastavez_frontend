@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { 
   FileText, Search, Award, ShieldCheck, Layers, Sparkles, Brain, Globe, 
@@ -398,8 +397,8 @@ export default function UseCases() {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300 relative overflow-hidden font-sans-premium">
-      <Navbar />
+    <div className="min-h-screen pt-16 bg-white dark:bg-judicial-dark transition-colors duration-300 relative overflow-hidden font-sans-premium">
+
 
       {/* Floating particles background background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-40">

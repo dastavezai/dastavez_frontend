@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ArrowLeft, Calendar, Clock, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -88,8 +87,7 @@ const BlogPost = () => {
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
-        <Navbar />
+      <div className="min-h-screen pt-16 bg-white dark:bg-judicial-dark transition-colors duration-300">
         <div className="container mx-auto px-4 py-24">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -134,7 +132,7 @@ const BlogPost = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
-      <Navbar />
+
 
       <article className="pt-16 pb-16">
         <div className="container mx-auto px-4 max-w-6xl">

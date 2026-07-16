@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUp, Link2, Check } from "lucide-react";
@@ -172,7 +171,7 @@ export function LegalLayout({
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 relative">
-      <Navbar />
+
 
       {/* Progress Bar (print:hidden) */}
       <div 

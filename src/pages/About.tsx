@@ -1,12 +1,11 @@
 import React from "react";
-import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Info } from "lucide-react";
 
 const About = () => {
   return (
-    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
-      <Navbar />
+    <div className="min-h-screen pt-16 bg-white dark:bg-judicial-dark transition-colors duration-300">
+
       <main className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center p-3 rounded-full bg-judicial-gold/10 mb-6">

@@ -33,7 +33,7 @@ export function HeroSection() {
   };
 
   return (
-    <div className="relative pt-14 pb-16 sm:pt-16 sm:pb-20 md:pt-20 md:pb-28 overflow-hidden w-full bg-[var(--bg-primary)] transition-colors duration-300">
+    <div className="relative pt-16 pb-16 sm:pt-20 sm:pb-20 md:pt-24 md:pb-28 overflow-hidden w-full bg-[var(--bg-primary)] transition-colors duration-300">
       {/* Background Glows and Grid */}
       <div className="hero-bg-grid opacity-25"></div>
       <div className="hero-glow opacity-60 dark:opacity-40"></div>
@@ -50,14 +50,14 @@ export function HeroSection() {
               Top-Tier Legal AI.<br />
               <span className="rotating-word-wrapper">
                 <span className="rotating-words-slide">
-                  <span className="gradient-text">2-Hour Turnaround</span>
-                  <span className="gradient-text">Legal Drafting</span>
-                  <span className="gradient-text">Precedent Research</span>
-                  <span className="gradient-text">Case Analysis</span>
-                  <span className="gradient-text">Regulatory Compliance</span>
-                  <span className="gradient-text">Court Rebuttals</span>
+                  <span className="gradient-text">2-Hour Turnaround.</span>
+                  <span className="gradient-text">Legal Drafting.</span>
+                  <span className="gradient-text">Precedent Research.</span>
+                  <span className="gradient-text">Case Analysis.</span>
+                  <span className="gradient-text">Regulatory Compliance.</span>
+                  <span className="gradient-text">Court Rebuttals.</span>
                 </span>
-              </span>.
+              </span>
             </h1>
             
             <p className="hero-subtitle text-base sm:text-lg text-[var(--text-secondary)] max-w-xl leading-relaxed font-body-premium">

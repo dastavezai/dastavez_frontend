@@ -974,7 +974,7 @@ const UploadWizard = ({ isOpen, onClose, onOpenEditor }) => {
             )}
 
             <Text fontSize="xs" color={textMuted} textAlign="center" maxW="400px">
-              Powered by Dastavezai LLM.  Checking compliance, clauses, precedences, and timeline.
+              Powered by Dastavez AI LLM.  Checking compliance, clauses, precedences, and timeline.
             </Text>
           </VStack>
         </MotionBox>

@@ -136,9 +136,9 @@ const LandingPage = () => {
         backdropFilter="blur(16px)" borderBottom="1px solid" borderColor={border}>
         <Container maxW="7xl" py={3}>
           <HStack justify="space-between">
-            <HStack spacing={2} cursor="pointer" onClick={() => navigate('/department')}>
+            <HStack spacing={2} cursor="pointer" onClick={() => navigate('/')}>
               <Icon as={MdGavel} color={accentColor} boxSize={6} />
-              <Text fontWeight="800" fontSize="lg" letterSpacing="tight" color={textColor}>Dastavezai</Text>
+              <Text fontWeight="800" fontSize="lg" letterSpacing="tight" color={textColor}>Dastavez AI</Text>
               <Badge fontSize="2xs" px={2} py={0.5} borderRadius="full"
                 bg={accentColor} color={isDark ? '#0d1b2a' : '#ffffff'}>Beta</Badge>
             </HStack>
@@ -262,7 +262,7 @@ const LandingPage = () => {
               bg={accentColor} color={isDark ? '#0d1b2a' : '#ffffff'} fontWeight="700">Intelligence Layer</Badge>
             <Heading size="lg" textAlign="center"
               fontFamily={chakraTheme?.fonts?.heading || 'Georgia, serif'}>
-              What Dastavezai Does For You
+              What Dastavez AI Does For You
             </Heading>
             <Text color={mutedColor} textAlign="center" maxW="480px">
               Every uploaded document is automatically scanned across six specialised legal AI modules — built for Indian courts.
@@ -334,7 +334,7 @@ const LandingPage = () => {
               Built for Real Legal Work
             </Heading>
             <Text color={mutedColor} textAlign="center" maxW="480px">
-              From High Court counter affidavits to property disputes — Dastavezai handles the full spectrum of Indian legal drafting.
+              From High Court counter affidavits to property disputes — Dastavez AI handles the full spectrum of Indian legal drafting.
             </Text>
           </VStack>
           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
@@ -365,7 +365,7 @@ const LandingPage = () => {
                   Ready to transform your legal workflow?
                 </Heading>
                 <Text color={mutedColor} maxW="380px">
-                  Join legal professionals using Dastavezai to draft, analyse, and perfect documents with AI.
+                  Join legal professionals using Dastavez AI to draft, analyse, and perfect documents with AI.
                 </Text>
                 <Button size="lg" bg={accentColor} color={isDark ? '#0d1b2a' : '#ffffff'}
                   fontWeight="800" rightIcon={<Icon as={FaArrowRight} />}
@@ -383,10 +383,10 @@ const LandingPage = () => {
       <Box py={6} borderTop="1px solid" borderColor={border} textAlign="center">
         <HStack justify="center" spacing={2} mb={1}>
           <Icon as={MdGavel} color={accentColor} boxSize={4} />
-          <Text fontWeight="bold" fontSize="sm" color={textColor}>Dastavezai</Text>
+          <Text fontWeight="bold" fontSize="sm" color={textColor}>Dastavez AI</Text>
         </HStack>
         <Text fontSize="xs" color={mutedColor}>
-          &copy; {new Date().getFullYear()} Dastavezai — AI Legal Document Platform. Built for Indian Law.
+          &copy; {new Date().getFullYear()} Dastavez AI — AI Legal Document Platform. Built for Indian Law.
         </Text>
       </Box>
 

@@ -1,4 +1,3 @@
-import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
 import { Brain, Zap, Cpu, Database, Code2, ArrowRight, ChevronRight } from "lucide-react";
@@ -7,8 +6,7 @@ import { Link } from "react-router-dom";
 
 const SmartAnalysis = () => {
   return (
-    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
-      <Navbar />
+    <div className="min-h-screen pt-16 bg-white dark:bg-judicial-dark transition-colors duration-300">
       
       <main className="pt-16 pb-16">
         <div className="container mx-auto px-4">
@@ -41,7 +39,7 @@ const SmartAnalysis = () => {
                 <Brain className="w-12 h-12 text-judicial-gold mb-4" />
               </div>
               <h3 className="text-xl font-bold text-black dark:text-white mb-2 font-serif-legal">Natural Language Processing</h3>
-              <p className="text-sm text-gray-650 dark:text-gray-400 leading-relaxed">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                 Advanced NLP algorithms understand and analyze legal documents with human-like comprehension.
               </p>
             </motion.div>
@@ -56,7 +54,7 @@ const SmartAnalysis = () => {
                 <Zap className="w-12 h-12 text-judicial-gold mb-4" />
               </div>
               <h3 className="text-xl font-bold text-black dark:text-white mb-2 font-serif-legal">Pattern Recognition</h3>
-              <p className="text-sm text-gray-650 dark:text-gray-400 leading-relaxed">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                 Identify key patterns and trends across case law, statutes, and legal precedents.
               </p>
             </motion.div>
@@ -71,7 +69,7 @@ const SmartAnalysis = () => {
                 <Cpu className="w-12 h-12 text-judicial-gold mb-4" />
               </div>
               <h3 className="text-xl font-bold text-black dark:text-white mb-2 font-serif-legal">Machine Learning</h3>
-              <p className="text-sm text-gray-650 dark:text-gray-400 leading-relaxed">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                 Continuously learns from legal data to improve analysis accuracy and relevance.
               </p>
             </motion.div>

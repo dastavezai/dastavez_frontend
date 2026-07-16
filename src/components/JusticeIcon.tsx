@@ -1,4 +1,6 @@
-import React from 'react';
+import { useTheme } from './ThemeProvider';
+import { useColorMode } from '@chakra-ui/react';
+import { useLocation } from 'react-router-dom';
 
 interface JusticeIconProps {
   className?: string;
@@ -7,6 +9,23 @@ interface JusticeIconProps {
 
 const JusticeIcon: React.FC<JusticeIconProps> = ({ className = "", size }) => {
   const sizeStyle = size ? { width: size, height: size } : undefined;
+  
+  const { theme } = useTheme();
+  
+  let chakraMode = 'light';
+  try {
+    const { colorMode } = useColorMode();
+    chakraMode = colorMode;
+  } catch (e) {}
+
+  // Bulletproof theme detection checking both context states and root DOM class
+  const isDark = theme === 'dark' || 
+                 chakraMode === 'dark' || 
+                 (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+
+  // Standard color scheme matching the theme (dark background in dark mode, light background in light mode)
+  const bgSecondary = isDark ? '#0a0d14' : '#ffffff';
+  const borderColorVal = isDark ? 'rgba(212, 175, 55, 0.2)' : '#e2e8f0';
 
   const sparkDirections = [
     { dx: -9, dy: -9 },
@@ -25,6 +44,18 @@ const JusticeIcon: React.FC<JusticeIconProps> = ({ className = "", size }) => {
       style={sizeStyle}
     >
       <style>{`
+        .justice-logo-bg {
+          fill: #ffffff;
+          stroke: #e2e8f0;
+          transition: fill 0.35s ease, stroke 0.35s ease;
+        }
+        .dark .justice-logo-bg,
+        [data-theme="dark"] .justice-logo-bg,
+        .chakra-ui-dark .justice-logo-bg {
+          fill: #0a0d14;
+          stroke: rgba(212, 175, 55, 0.2);
+        }
+
         /* Gavel rotation animation */
         .gavel-strike-anim {
           transform-origin: 0px 0px;
@@ -34,19 +65,19 @@ const JusticeIcon: React.FC<JusticeIconProps> = ({ className = "", size }) => {
 
         @keyframes gavel-strike {
           0%, 30% {
-            transform: rotate(25deg);
+            transform: rotate(0deg);
           }
           45% {
-            transform: rotate(-7deg);
+            transform: rotate(28deg);
           }
           50% {
-            transform: rotate(3deg);
+            transform: rotate(-14deg);
           }
-          60% {
-            transform: rotate(-7deg);
+          55% {
+            transform: rotate(6deg);
           }
-          80%, 100% {
-            transform: rotate(25deg);
+          70%, 100% {
+            transform: rotate(0deg);
           }
         }
 
@@ -213,10 +244,8 @@ const JusticeIcon: React.FC<JusticeIconProps> = ({ className = "", size }) => {
           width="104" 
           height="104" 
           rx="24" 
-          fill="var(--bg-secondary)" 
-          stroke="var(--border-color)" 
+          className="justice-logo-bg"
           strokeWidth="1.5"
-          style={{ transition: 'fill 0.35s ease, stroke 0.35s ease' }}
         />
 
         {/* Scaled Gavel & Sound Block Group */}

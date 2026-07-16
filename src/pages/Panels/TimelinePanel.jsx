@@ -2,8 +2,8 @@ import React from 'react';
 import {
   Box, VStack, HStack, Text, Badge, Icon, Button, useColorModeValue, Spinner, Progress, IconButton, Tooltip, Flex
 } from '@chakra-ui/react';
-import { FaFile, FaRobot, FaTimes, FaDownload } from 'react-icons/fa';
-import { FiClock, FiMaximize2 } from 'react-icons/fi';
+import { FaFile, FaRobot, FaTimes } from 'react-icons/fa';
+import { FiClock } from 'react-icons/fi';
 import { useAdvancedChat } from '../AdvancedChatContext';
 
 const FILE_COLORS = ['blue', 'green', 'purple', 'orange', 'teal', 'cyan', 'pink', 'red', 'yellow'];

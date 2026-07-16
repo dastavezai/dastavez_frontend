@@ -43,6 +43,8 @@ import DepartmentPortal from "./departmentApp/DepartmentPortal";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { LegalChatbot } from "./components/LegalChatbot";
 
+import { Navbar } from "./components/Navbar";
+
 const queryClient = new QueryClient();
 
 const FeedbackPopup = () => {
@@ -136,6 +138,8 @@ const AppContent = () => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  const showNavbar = !["/auth", "/forgot-password", "/verify-reset-otp", "/reset-password", "/chat", "/c/", "/department", "/admin", "/admin-dashboard", "/profile"].some(path => location.pathname.startsWith(path));
+
   return (
     <>
       <Toaster />
@@ -143,6 +147,7 @@ const AppContent = () => {
       <FeedbackPopup />
       <LegalChatbot />
       <CursorFollower />
+      {showNavbar && <Navbar />}
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />

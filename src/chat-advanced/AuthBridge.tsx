@@ -10,6 +10,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [loading, setLoading] = useState(true);
     const [token, setToken] = useState<string | null>(() => {
         const stored = localStorage.getItem('jwt');
+        if (stored && stored !== 'mock-jwt-token-xyz' && stored !== 'undefined' && stored !== 'null') {
+            localStorage.removeItem('use_mock_backend');
+        }
         return (stored && stored !== 'undefined' && stored !== 'null') ? stored : null;
     });
     const navigate = useNavigate();

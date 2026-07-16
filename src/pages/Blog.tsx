@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import FloatingCard from '@/components/FloatingCard';
 import { ArrowRight } from "lucide-react";
@@ -130,8 +129,8 @@ const Blog = () => {
   const visiblePosts = isLoggedIn ? regularPosts : regularPosts.slice(0, 8);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
-      <Navbar />
+    <div className="min-h-screen pt-16 bg-white dark:bg-judicial-dark transition-colors duration-300">
+
 
       <main className="pt-16 pb-16">
         <div className="container mx-auto px-4">

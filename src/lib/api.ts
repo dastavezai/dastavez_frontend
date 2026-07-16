@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 // API Configuration - Connected to Cloud Run Backend
 // Use relative path '/api' if VITE_API_URL is not set (for local proxy)
 const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
@@ -77,8 +79,279 @@ export interface AdminCoupon {
   updatedAt?: string;
 }
 
+// Mock Backend Router for offline demo / development mode
+export const getMockUser = (): User => {
+  const isMockAdmin = localStorage.getItem('mock_user_role') === 'admin';
+  const stored = localStorage.getItem('mock_user_profile');
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch { }
+  }
+  const defaultUser: User = {
+    _id: "mock-user-id",
+    email: isMockAdmin ? "admin@dastavez.ai" : "user@dastavez.ai",
+    firstName: "Demo",
+    lastName: isMockAdmin ? "Admin" : "User",
+    isVerified: true,
+    isAdmin: isMockAdmin,
+    subscriptionStatus: "premium",
+    userTier: "premium",
+    remainingMessages: 100,
+    createdAt: "2026-06-27T00:00:00Z",
+    lastLogin: new Date().toISOString()
+  };
+  localStorage.setItem('mock_user_profile', JSON.stringify(defaultUser));
+  return defaultUser;
+};
+
+export function routeMockRequest(url: string, method: string = 'GET', body: any = null): any {
+  const cleanUrl = url.replace(/^\/api/, '').split('?')[0];
+  const m = method ? method.toUpperCase() : 'GET';
+
+  // 1. Auth & Profile
+  if (cleanUrl === '/auth/check-email') {
+    return { exists: true };
+  }
+  if (cleanUrl === '/auth/login' || cleanUrl === '/auth/signup') {
+    localStorage.setItem('use_mock_backend', 'true');
+    localStorage.setItem('jwt', 'mock-jwt-token-xyz');
+    return {
+      token: 'mock-jwt-token-xyz',
+      csrfToken: 'mock-csrf-token',
+      refreshToken: 'mock-refresh-token',
+      user: getMockUser()
+    };
+  }
+  if (cleanUrl === '/auth/user' || cleanUrl === '/profile/info') {
+    if (m === 'PUT') {
+      const parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
+      const current = getMockUser();
+      const updated = { ...current, ...parsedBody };
+      localStorage.setItem('mock_user_profile', JSON.stringify(updated));
+      return updated;
+    }
+    return getMockUser();
+  }
+  if (cleanUrl === '/profile/company-setup') {
+    const parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
+    const current = getMockUser();
+    const slug = (parsedBody?.companyName || 'demo-company')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    const updated = { 
+      ...current, 
+      companyName: parsedBody?.companyName || 'Demo Company', 
+      sector: parsedBody?.sector || 'legal',
+      companySlug: slug || 'demo-company'
+    };
+    localStorage.setItem('mock_user_profile', JSON.stringify(updated));
+    return { success: true, user: updated };
+  }
+  if (cleanUrl === '/auth/verify-reset-otp' || cleanUrl === '/auth/reset-password' || cleanUrl === '/auth/forgot-password') {
+    return { success: true };
+  }
+
+  // 2. Chat
+  if (cleanUrl === '/chat/sessions') {
+    const stored = localStorage.getItem('mock_chat_sessions');
+    if (stored) return JSON.parse(stored);
+    const defaults = [
+      { slug: "nda-review", preview: "Reviewing Non-Disclosure Agreement", updatedAt: new Date().toISOString(), feature: "nda" },
+      { slug: "employment-contract", preview: "Consulting on Employment Contract", updatedAt: new Date().toISOString(), feature: "employment" }
+    ];
+    localStorage.setItem('mock_chat_sessions', JSON.stringify(defaults));
+    return defaults;
+  }
+  if (cleanUrl === '/chat/history' || cleanUrl === '/chat') {
+    const stored = localStorage.getItem('mock_chat_history');
+    if (stored) return JSON.parse(stored);
+    const defaults = [
+      { role: 'assistant', content: "Hello! I am Dastavez AI, your legal intelligence assistant. How can I help you analyze, draft, or review your legal documents today?", timestamp: new Date().toISOString() }
+    ];
+    localStorage.setItem('mock_chat_history', JSON.stringify(defaults));
+    return defaults;
+  }
+  if (cleanUrl === '/chat/message' || cleanUrl === '/chat') {
+    let userMsg = '';
+    if (typeof body === 'string') {
+      try {
+        userMsg = JSON.parse(body).message || '';
+      } catch {
+        userMsg = body;
+      }
+    } else if (body && typeof body === 'object') {
+      userMsg = body.message || '';
+    }
+
+    const currentHistory = routeMockRequest('/chat/history', 'GET');
+    const newUserMsg = { role: 'user', content: userMsg, timestamp: new Date().toISOString() };
+    
+    let aiContent = "I've received your request. As Dastavez AI, I can help analyze this legal point. In general, legal documents require clear definitions of terms, obligations, and dispute resolution mechanisms. Could you provide more specific clauses or documents?";
+    const msgLower = userMsg.toLowerCase();
+    if (msgLower.includes("nda") || msgLower.includes("non-disclosure")) {
+      aiContent = "Analyzing Non-Disclosure Agreement (NDA) clause. Key areas to verify:\n1. **Definition of Confidential Information**: Ensure it is not overly broad.\n2. **Term & Obligations**: Usually 2-5 years after termination.\n3. **Exceptions**: Standard exclusions (public domain, prior knowledge) should be present.\n4. **Remedies**: Confirm if injunctions and damages are specified.";
+    } else if (msgLower.includes("indemnity") || msgLower.includes("indemnification")) {
+      aiContent = "Examining Indemnification clause. In standard commercial contracts:\n- **Scope**: Indemnity should be limited to direct losses arising from breach of agreement or negligence.\n- **Cap**: Ensure there is a reasonable liability cap (e.g., 1x or 2x contract value).\n- **Notice**: A prompt notice requirement for third-party claims should be included.";
+    } else if (msgLower.includes("termination")) {
+      aiContent = "Reviewing Termination clause. Recommendation:\n- **For Cause**: Standard 30-day cure period for remediable breaches.\n- **For Convenience**: Ensure mutual notice period (e.g., 30 to 60 days) is defined.\n- **Effects of Termination**: Clearly state obligations regarding data return, deletion, and payment for services rendered up to termination date.";
+    } else if (msgLower.includes("arbitration") || msgLower.includes("governing law")) {
+      aiContent = "Checking Governing Law & Dispute Resolution:\n- **Jurisdiction**: Verify the courts of choice (e.g., New Delhi, Mumbai, or as per agreement).\n- **Arbitration**: Under the Arbitration and Conciliation Act, 1996, specifying the place of arbitration, language (English), and sole arbitrator selection process.";
+    }
+
+    const newAiMsg = {
+      role: 'assistant',
+      content: aiContent,
+      response: aiContent,
+      missingFields: null,
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedHistory = [...currentHistory, newUserMsg, newAiMsg];
+    localStorage.setItem('mock_chat_history', JSON.stringify(updatedHistory));
+    
+    return newAiMsg;
+  }
+  if (cleanUrl === '/chat/clear') {
+    localStorage.removeItem('mock_chat_history');
+    return { success: true };
+  }
+
+  // 3. Files
+  if (cleanUrl === '/files/all') {
+    const stored = localStorage.getItem('mock_uploaded_files');
+    if (stored) return JSON.parse(stored);
+    const defaults = [
+      {
+        _id: "file-1",
+        fileName: "nda_draft_final.pdf",
+        fileType: "pdf",
+        fileSize: 184520,
+        fileUrl: "#",
+        uploadedBy: { _id: "mock-user-id", firstName: "Demo", lastName: "User", email: "demo@dastavez.ai" },
+        createdAt: "2026-06-27T10:15:00Z"
+      }
+    ];
+    localStorage.setItem('mock_uploaded_files', JSON.stringify(defaults));
+    return defaults;
+  }
+  if (cleanUrl === '/files/upload') {
+    const files = routeMockRequest('/files/all', 'GET');
+    const newFile = {
+      _id: "file_" + Date.now(),
+      fileName: "uploaded_document.pdf",
+      fileType: "pdf",
+      fileSize: 250000,
+      fileUrl: "#",
+      uploadedBy: { _id: "mock-user-id", firstName: "Demo", lastName: "User", email: "demo@dastavez.ai" },
+      createdAt: new Date().toISOString()
+    };
+    files.push(newFile);
+    localStorage.setItem('mock_uploaded_files', JSON.stringify(files));
+    return newFile;
+  }
+  if (cleanUrl.startsWith('/files/analyze/')) {
+    return { analysis: "Based on the uploaded document, I found 3 key liability clauses. First, the liability cap is set to $10,000. Second, the governing law is Delaware. Third, the indemnification obligations are reciprocal." };
+  }
+  if (cleanUrl.startsWith('/files/')) {
+    if (m === 'DELETE') {
+      const fileId = cleanUrl.split('/').pop();
+      const files = routeMockRequest('/files/all', 'GET');
+      const filtered = files.filter((f: any) => f._id !== fileId);
+      localStorage.setItem('mock_uploaded_files', JSON.stringify(filtered));
+      return { success: true };
+    }
+  }
+
+  // 4. Subscriptions
+  if (cleanUrl === '/subscription/status') {
+    return { subscription: { plan: 'premium', status: 'active', startDate: '2026-06-27T00:00:00Z', endDate: '2027-06-27T00:00:00Z' } };
+  }
+  if (cleanUrl === '/subscription/price') {
+    return { price: 999 };
+  }
+  if (cleanUrl === '/subscription/validate-coupon') {
+    const parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
+    return { coupon: { code: parsedBody?.code || 'MOCK50', discountPercentage: 50, originalAmount: 999, finalAmount: 499.5 } };
+  }
+  if (cleanUrl === '/subscription/order') {
+    return { id: 'order_mock_' + Date.now(), amount: 999, currency: 'INR' };
+  }
+  if (cleanUrl === '/subscription/verify') {
+    return { success: true };
+  }
+
+  // 5. Admin
+  if (cleanUrl === '/admin/users') {
+    return [
+      { _id: "user-1", firstName: "John", lastName: "Doe", email: "john@example.com", isAdmin: false, subscriptionStatus: "free", createdAt: "2026-06-01T12:00:00Z", lastLogin: "2026-06-25T14:30:00Z" },
+      { _id: "user-2", firstName: "Jane", lastName: "Smith", email: "jane@example.com", isAdmin: false, subscriptionStatus: "premium", createdAt: "2026-06-05T09:00:00Z", lastLogin: "2026-06-27T08:15:00Z" },
+      { _id: "user-3", firstName: "Admin", lastName: "Dastavez", email: "admin@dastavez.ai", isAdmin: true, subscriptionStatus: "premium", createdAt: "2026-05-01T00:00:00Z", lastLogin: "2026-06-27T13:30:00Z" }
+    ];
+  }
+  if (cleanUrl === '/admin/financial-stats') {
+    return {
+      totalRevenue: 450000,
+      activeSubscriptions: 120,
+      totalUsers: 1250,
+      monthlyEarnings: [
+        { month: "Jan", amount: 35000 },
+        { month: "Feb", amount: 42000 },
+        { month: "Mar", amount: 50000 },
+        { month: "Apr", amount: 62000 },
+        { month: "May", amount: 75000 },
+        { month: "Jun", amount: 86000 }
+      ]
+    };
+  }
+  if (cleanUrl === '/admin/settings/free-message-limit') {
+    return { limit: 10 };
+  }
+  if (cleanUrl === '/lawyers' || cleanUrl === '/admin/lawyers') {
+    return [
+      { _id: "lawyer-1", name: "Harish Salve", phone: "+91 98765 43210", email: "harish.salve@courts.gov.in", address: "Delhi High Court Chambers, New Delhi", createdAt: "2026-01-10T10:00:00Z" },
+      { _id: "lawyer-2", name: "Indira Jaising", phone: "+91 98765 43211", email: "indira.jaising@courts.gov.in", address: "Supreme Court Chambers, New Delhi", createdAt: "2026-01-15T12:00:00Z" }
+    ];
+  }
+
+  return { success: true };
+}
+
+// Axios Mock adapter setup
+const originalAdapter = axios.getAdapter(axios.defaults.adapter);
+axios.defaults.adapter = async (config: any) => {
+  if (localStorage.getItem('use_mock_backend') === 'true') {
+    try {
+      const responseData = routeMockRequest(config.url || '', config.method, config.data);
+      return {
+        data: responseData,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config
+      };
+    } catch (e: any) {
+      return Promise.reject(new Error(e.message || 'Mock Adapter Error'));
+    }
+  }
+  if (originalAdapter) {
+    try {
+      return await originalAdapter(config);
+    } catch (err: any) {
+      console.warn("Axios request failed:", err);
+      return Promise.reject(err);
+    }
+  }
+  return Promise.reject(new Error('No Axios adapter configured'));
+};
+
 // Helper function for authenticated API requests (with CSRF retry on 403)
 export async function apiFetch(url: string, options: RequestInit = {}, retried = false): Promise<any> {
+  if (localStorage.getItem('use_mock_backend') === 'true') {
+    return routeMockRequest(url, options.method, options.body);
+  }
   const token = localStorage.getItem('jwt');
   const csrfToken = localStorage.getItem('csrfToken');
   const headers: Record<string, string> = {
@@ -88,49 +361,44 @@ export async function apiFetch(url: string, options: RequestInit = {}, retried =
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (csrfToken) headers['x-csrf-token'] = csrfToken;
 
-  const response = await fetch(`${API_BASE_URL}${url}`, {
-    ...options,
-    headers
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...options,
+      headers
+    });
 
-  // On 403 CSRF error, refresh token and retry once
-  if (response.status === 403 && !retried && token) {
-    const errorData = await response.json().catch(() => ({}));
-    const isCsrfError =
-      errorData?.message === 'Invalid CSRF token' || errorData?.error === 'Invalid CSRF token';
-    if (isCsrfError) {
-      try {
-        const refreshResp = await fetch(`${API_BASE_URL}/auth/refresh-csrf`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const refreshData = await refreshResp.json();
-        if (refreshData?.csrfToken) {
-          localStorage.setItem('csrfToken', refreshData.csrfToken);
-          return apiFetch(url, options, true);
+    // On 403 CSRF error, refresh token and retry once
+    if (response.status === 403 && !retried && token) {
+      const errorData = await response.json().catch(() => ({}));
+      const isCsrfError =
+        errorData?.message === 'Invalid CSRF token' || errorData?.error === 'Invalid CSRF token';
+      if (isCsrfError) {
+        try {
+          const refreshResp = await fetch(`${API_BASE_URL}/auth/refresh-csrf`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const refreshData = await refreshResp.json();
+          if (refreshData?.csrfToken) {
+            localStorage.setItem('csrfToken', refreshData.csrfToken);
+            return apiFetch(url, options, true);
+          }
+        } catch {
+          // fall through
         }
-      } catch {
-        // fall through to throw original error
       }
     }
-  }
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
-        localStorage.removeItem('jwt');
-        localStorage.removeItem('token');
-        localStorage.removeItem('csrfToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        window.location.href = '/auth';
-      }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-  }
 
-  return response.json();
+    return await response.json();
+  } catch (err) {
+    console.error(`Network/API error for ${url}:`, err);
+    throw err;
+  }
 }
 
 // Authentication API
@@ -247,6 +515,14 @@ export const authAPI = {
     localStorage.removeItem('jwt');
     localStorage.removeItem('csrfToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('use_mock_backend');
+    localStorage.removeItem('mock_user_role');
+    localStorage.removeItem('mock_user_profile');
+    localStorage.removeItem('mock_chat_history');
+    localStorage.removeItem('mock_chat_sessions');
+    localStorage.removeItem('mock_uploaded_files');
+    localStorage.removeItem('user');
+    localStorage.removeItem('login_timestamp');
   }
 };
 
@@ -280,13 +556,11 @@ export const chatAPI = {
 
 // File Management API 
 export const fileAPI = {
-  // Get all user files
-  getUserFiles: async () => {
-    return apiFetch('/files/user');
-  },
-
   // Upload file
   uploadFile: async (file: File) => {
+    if (localStorage.getItem('use_mock_backend') === 'true') {
+      return routeMockRequest('/files/upload', 'POST', null);
+    }
     const formData = new FormData();
     formData.append('file', file);
 
@@ -332,18 +606,32 @@ export const fileAPI = {
   }
 };
 
-export interface TierConfig {
-  tier: string;
-  amount: number; // in paise
-  messageLimit: number;
-  updatedAt?: string;
-}
-
 // Subscription & Payments API
 export const subscriptionAPI = {
-  // Get all subscription prices and limits
-  getPrices: async (): Promise<{ success: boolean; prices: TierConfig[] }> => {
-    return apiFetch('/subscription/price');
+  // Get subscription price
+  getPrice: async (): Promise<{ price: number }> => {
+    // Try multiple endpoints and normalize response shape
+    const tryEndpoints = [
+      '/subscription/price',
+    ];
+
+    let lastError: unknown = undefined;
+    for (const endpoint of tryEndpoints) {
+      try {
+        const data = await apiFetch(endpoint);
+        const priceRaw = (data && typeof data === 'object')
+          ? ((data as any).price ?? (data as any).amount ?? (data as any).value)
+          : data;
+        const priceNum = Number(priceRaw);
+        if (!Number.isNaN(priceNum)) {
+          return { price: priceNum };
+        }
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    if (lastError) throw lastError;
+    return { price: 0 };
   },
 
   // Create payment order
@@ -463,7 +751,7 @@ export const contactAPI = {
 export const adminAPI = {
   // Get all users
   getAllUsers: async () => {
-    return apiFetch('/admin/users?limit=1000&page=1');
+    return apiFetch('/admin/users');
   },
   // Update user subscription tier
   updateUserTier: async (id: string, tier: string): Promise<{ success: boolean; user: any }> => {
@@ -477,11 +765,11 @@ export const adminAPI = {
     return apiFetch('/admin/financial-stats');
   },
 
-  // Update subscription price & limit
-  updateSubscriptionPrice: async (tier: string, amount: number, messageLimit: number) => {
+  // Update subscription price
+  updateSubscriptionPrice: async (amount: number) => {
     return apiFetch('/subscription/price', {
       method: 'PUT',
-      body: JSON.stringify({ tier, amount, messageLimit })
+      body: JSON.stringify({ amount })
     });
   },
 
@@ -627,46 +915,4 @@ export const isAuthenticated = (): boolean => {
 
 export const getToken = (): string | null => {
   return localStorage.getItem('jwt');
-};
-
-// Contact / Demo Submissions API (Admin)
-export interface ContactSubmission {
-  _id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  subject: string;
-  message: string;
-  type: 'contact' | 'demo';
-  company?: string;
-  role?: string;
-  teamSize?: string;
-  isRead: boolean;
-  createdAt: string;
-}
-
-export const contactSubmissionsAPI = {
-  list: async (type?: 'contact' | 'demo'): Promise<ContactSubmission[]> => {
-    const q = type ? `?type=${type}` : '';
-    const res = await apiFetch(`/contact/admin/submissions${q}`) as any;
-    return Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-  },
-  markRead: async (id: string): Promise<void> => {
-    await apiFetch(`/contact/admin/submissions/${id}/read`, { method: 'PUT' });
-  },
-  delete: async (id: string): Promise<void> => {
-    await apiFetch(`/contact/admin/submissions/${id}`, { method: 'DELETE' });
-  },
-};
-
-export const ocrAPI = {
-  digitizeDocument: async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await apiFetch("/ocr/digitize", {
-      method: "POST",
-      body: formData
-    });
-    return res;
-  }
-};
+}; 

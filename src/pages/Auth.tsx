@@ -9,7 +9,7 @@ import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 declare global {
   interface Window { google?: any }
 }
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authAPI } from '../lib/api';
 
 // Validation schemas
@@ -84,7 +84,24 @@ const Auth = () => {
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirm, setShowRegConfirm] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [googleReady, setGoogleReady] = useState(false);
+
+  // Pre-fill email from URL query parameter, React Router state, or localStorage
+  useEffect(() => {
+    // Reset mock backend to ensure real backend is used by default when visiting login/signup
+    localStorage.removeItem('use_mock_backend');
+
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get('email');
+    const stateEmail = (location.state as any)?.email;
+    const savedEmail = localStorage.getItem('lastLoginEmail');
+    
+    const emailToUse = emailParam || stateEmail || savedEmail;
+    if (emailToUse) {
+      setState(prev => ({ ...prev, email: emailToUse }));
+    }
+  }, [location]);
 
   const performRedirect = (defaultPath: string) => {
     if (defaultPath === '/admin') {
@@ -352,7 +369,19 @@ const Auth = () => {
     }
   };
 
-
+  const handleMockLogin = (role: 'user' | 'admin') => {
+    localStorage.removeItem('jwt');
+    localStorage.removeItem('mock_user_profile');
+    localStorage.setItem('use_mock_backend', 'true');
+    localStorage.setItem('jwt', 'mock-jwt-token-xyz');
+    localStorage.setItem('mock_user_role', role);
+    
+    if (role === 'admin') {
+      performRedirect('/admin');
+    } else {
+      performRedirect('/chat');
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden pb-20 bg-white dark:bg-judicial-dark transition-colors duration-300">

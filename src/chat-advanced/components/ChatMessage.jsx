@@ -11,20 +11,22 @@ import {
   Badge,
 } from '@chakra-ui/react';
 import { FaFile, FaImage, FaDownload } from 'react-icons/fa';
+import { FiUser, FiCpu } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import SuggestedActions from './SuggestedActions';
 
-const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = 'en' }) => {
+const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = 'en', fontSize = 14 }) => {
   const isUser = message.role === 'user';
-  const bgColor = useColorModeValue(
-    isUser ? 'blue.50' : 'gray.50',
-    isUser ? 'blue.900' : 'gray.700'
-  );
+  const bgColor = isUser 
+    ? useColorModeValue('rgba(212, 175, 55, 0.06)', 'rgba(212, 175, 55, 0.12)') 
+    : useColorModeValue('white', 'rgba(13, 17, 23, 0.45)');
   const textColor = useColorModeValue('gray.800', 'gray.100');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const borderColor = isUser 
+    ? 'rgba(212, 175, 55, 0.35)' 
+    : useColorModeValue('gray.200', 'rgba(212, 175, 55, 0.18)');
   const fileBg = useColorModeValue('white', 'gray.800');
   const fileBorder = useColorModeValue('gray.200', 'gray.600');
-  const boldColor = useColorModeValue('blue.700', 'blue.200');
+  const boldColor = useColorModeValue('gray.900', 'judicial.gold');
 
   const getFileIcon = (fileType) => {
     if (!fileType) return FaFile;
@@ -116,34 +118,66 @@ const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = '
   };
 
   return (
-    <Box
+    <HStack
       alignSelf={isUser ? 'flex-end' : 'flex-start'}
-      maxW="80%"
-      bg={bgColor}
-      p={4}
-      borderRadius="lg"
-      borderWidth={1}
-      borderColor={borderColor}
+      spacing={2.5}
+      maxW="72%"
+      align="start"
     >
-      <VStack align="start" spacing={3}>
-        <Box color={textColor} whiteSpace="pre-wrap" w="100%">
-          <ReactMarkdown
+
+
+      {/* AI Avatar — left of AI bubble */}
+      {!isUser && (
+        <Box
+          p={2.5}
+          borderRadius="full"
+          bg="rgba(212, 175, 55, 0.22)"
+          border="1.5px solid"
+          borderColor="judicial.gold"
+          color="judicial.gold"
+          boxShadow="0 0 16px rgba(212, 175, 55, 0.35), inset 0 1px 1px rgba(255,255,255,0.1)"
+          mt={1}
+          transition="all 0.2s ease"
+          _hover={{ transform: 'scale(1.1) rotate(10deg)', boxShadow: '0 0 24px rgba(212, 175, 55, 0.55)' }}
+        >
+          <Icon as={FiCpu} w={5} h={5} />
+        </Box>
+      )}
+
+      <Box
+        bg={bgColor}
+        p={3}
+        borderRadius="xl"
+        borderWidth="1px"
+        borderLeft={isUser ? '1px solid' : '2.5px solid'}
+        borderLeftColor={isUser ? 'rgba(212, 175, 55, 0.35)' : 'judicial.gold'}
+        borderColor={borderColor}
+        boxShadow={isUser ? '0 2px 8px rgba(212, 175, 55, 0.06)' : '0 4px 20px rgba(0, 0, 0, 0.14)'}
+        backdropFilter="blur(16px)"
+        fontSize={`${fontSize}px`}
+        fontFamily="'Inter', 'Plus Jakarta Sans', sans-serif"
+        letterSpacing="0.01em"
+        transition="all 0.2s ease"
+      >
+        <VStack align="start" spacing={3}>
+          <Box color={textColor} whiteSpace="pre-wrap" w="100%">
+            <ReactMarkdown
             components={{
               // Render bold text with nice styling
               strong: ({ children }) => (
-                <Text as="span" fontWeight="bold" color={boldColor}>
+                <Text as="span" fontWeight="600" color={boldColor} letterSpacing="0.02em">
                   {children}
                 </Text>
               ),
               // Render paragraphs properly
               p: ({ children }) => (
-                <Text mb={2} lineHeight="1.6">
+                <Text mb={1.5} lineHeight="1.65" fontSize="inherit">
                   {children}
                 </Text>
               ),
               // Render lists nicely
               ul: ({ children }) => (
-                <Box as="ul" pl={4} mb={2}>
+                <Box as="ul" pl={3} mb={1.5}>
                   {children}
                 </Box>
               ),
@@ -159,7 +193,7 @@ const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = '
               ),
               // Handle code/preformatted text
               code: ({ children }) => (
-                <Text as="code" bg={useColorModeValue('gray.100', 'gray.600')} px={1} borderRadius="sm" fontSize="sm">
+                <Text as="code" bg={useColorModeValue('gray.100', 'gray.600')} px={1} borderRadius="sm" fontSize="0.9em">
                   {children}
                 </Text>
               ),
@@ -170,22 +204,42 @@ const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = '
         </Box>
 
         {/* Note: Missing fields list is now included in the message content itself
-            to support language preferences (Hindi/English) from the backend */}
+            to allow proper AI context and inline explanation */}
 
-        {message.file && renderFile(message.file)}
-
-        {/* Render suggested actions if present */}
         {message.suggestedActions && message.suggestedActions.length > 0 && (
           <SuggestedActions
-            suggestions={message.suggestedActions}
+            actions={message.suggestedActions}
             onActionClick={onSuggestedActionClick}
-            language={language}
-            isActive={message.actionsActive !== false}
           />
+        )}
+
+        {message.files && message.files.length > 0 && (
+          <VStack align="stretch" spacing={2} w="100%">
+            {message.files.map((file, idx) => renderFile(file))}
+          </VStack>
         )}
       </VStack>
     </Box>
+
+      {/* User Avatar — right of user bubble */}
+      {isUser && (
+        <Box
+          p={2.5}
+          borderRadius="full"
+          bg={useColorModeValue('rgba(212, 175, 55, 0.12)', 'rgba(212, 175, 55, 0.2)')}
+          border="1.5px solid"
+          borderColor="judicial.gold"
+          color="judicial.gold"
+          boxShadow="0 0 14px rgba(212, 175, 55, 0.25), inset 0 1px 1px rgba(255,255,255,0.08)"
+          mt={1}
+          transition="all 0.2s ease"
+          _hover={{ transform: 'scale(1.1)', boxShadow: '0 0 20px rgba(212, 175, 55, 0.45)' }}
+        >
+          <Icon as={FiUser} w={5} h={5} />
+        </Box>
+      )}
+  </HStack>
   );
 };
 
-export default ChatMessage; 
+export default ChatMessage;

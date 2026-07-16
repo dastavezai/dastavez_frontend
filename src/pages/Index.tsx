@@ -1,4 +1,3 @@
-import { Navbar } from "@/components/Navbar";
 import { HeroSection } from "@/components/HeroSection";
 import { StatsBanner } from "@/components/StatsBanner";
 import { InteractiveFeatureShowcase } from "@/components/InteractiveFeatureShowcase";
@@ -11,8 +10,7 @@ import { Link } from "react-router-dom";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300 font-sans-premium">
-      <Navbar />
+    <div className="min-h-screen pt-16 bg-white dark:bg-judicial-dark transition-colors duration-300 font-sans-premium">
       
       {/* Premium Hero Section */}
       <section className="relative">
@@ -26,13 +24,13 @@ const Index = () => {
       <InteractiveFeatureShowcase />
       
       {/* Demo Section */}
-      <div className="py-16 bg-gray-50/50 dark:bg-judicial-navy/20 border-y border-gray-200/60 dark:border-judicial-gold/10" id="cases">
+      <div className="py-16 bg-gray-50/50 dark:bg-[#0a0d14] border-y border-gray-200/60 dark:border-judicial-gold/10" id="cases">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-5xl font-bold font-serif-legal mb-4 text-gray-900 dark:text-white">
               See <span className="text-judicial-gold">Dastavez AI</span> in Action
             </h2>
-            <p className="text-gray-550 dark:text-white max-w-2xl mx-auto">
+            <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
               Experience our powerful legal AI tools through interactive demos of our core features.
             </p>
           </div>

@@ -69,18 +69,23 @@ const Profile = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const userData = await profileAPI.getInfo();
+      const userData = await profileAPI.getInfo().catch(() => authAPI.getCurrentUser());
+
+      if (!userData?._id) {
+        throw new Error('No user profile data returned');
+      }
+
       setProfile({
         id: userData._id,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        email: userData.email,
+        firstName: userData.firstName || '',
+        lastName: userData.lastName || '',
+        email: userData.email || '',
         phone: '',
         location: '',
-        joinDate: userData.createdAt,
-        lastLogin: userData.lastLogin,
-        subscription: userData.subscriptionStatus,
-        verified: userData.isVerified
+        joinDate: userData.createdAt || '',
+        lastLogin: userData.lastLogin || '',
+        subscription: userData.subscriptionStatus || 'free',
+        verified: userData.isVerified || false
       });
       setFormData({
         firstName: userData.firstName || '',
@@ -92,23 +97,11 @@ const Profile = () => {
       });
     } catch (error) {
       console.error('Failed to fetch profile:', error);
-      // Fallback to mock data for demo
-      setProfile({
-        id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john.doe@example.com',
-        phone: '+91 8210607476',
-        location: 'New York, NY',
-        joinDate: '2024-01-15',
-        lastLogin: '2024-12-19T10:30:00Z',
-        subscription: 'premium',
-        verified: true
-      });
+      setProfile(null);
       setFormData({
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john.doe@example.com',
+        firstName: '',
+        lastName: '',
+        email: '',
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
@@ -188,7 +181,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-judicial-dark transition-colors duration-300">
+    <div className="min-h-screen pt-16 bg-white dark:bg-judicial-dark transition-colors duration-300">
       {/* Header */}
       <div className="bg-judicial-navy/50 backdrop-blur-sm border-b border-judicial-gold/20">
         <div className="container mx-auto px-4 py-6">

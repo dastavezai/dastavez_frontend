@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,8 +83,8 @@ const Contact = () => {
   ];
 
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-judicial-dark' : 'bg-white'} transition-colors duration-300`}>
-      <Navbar />
+    <div className={`min-h-screen pt-16 ${theme === 'dark' ? 'bg-judicial-dark' : 'bg-white'} transition-colors duration-300`}>
+
 
       {/* Hero Section */}
       <section className={`${theme === 'dark' ? 'bg-judicial-dark' : 'bg-gradient-to-br from-slate-50 to-slate-100'} py-16 transition-colors duration-300`}>

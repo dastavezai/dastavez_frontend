@@ -4,8 +4,8 @@ import {
   useColorModeValue, Spinner, IconButton, Textarea,
   Alert, AlertIcon, AlertTitle, AlertDescription
 } from '@chakra-ui/react';
-import { FaDownload, FaTimes } from 'react-icons/fa';
-import { FiEdit, FiUploadCloud } from 'react-icons/fi';
+import { FaTimes } from 'react-icons/fa';
+import { FiUploadCloud } from 'react-icons/fi';
 import { useAdvancedChat } from '../AdvancedChatContext';
 
 const CounterMakerPanel = () => {

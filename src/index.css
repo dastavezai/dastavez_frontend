@@ -3,6 +3,73 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * NAVBAR SHIFT FIX — Root Cause & Solution:
+   *
+   * Problem: When navigating between pages of different heights, the scrollbar
+   * appears/disappears causing the viewport width to jump by ~15-17px.
+   * Since the navbar uses mx-auto centering, it shifts left/right.
+   *
+   * Wrong fix: `html::-webkit-scrollbar { width: 0 }` removes the gutter
+   * entirely in Chrome, meaning the viewport width still changes per page.
+   *
+   * Correct fix: Keep a NON-ZERO scrollbar width (6px) but make it fully
+   * transparent. Chrome preserves the gutter space even with overflow-y:scroll
+   * only when the scrollbar track has a non-zero width.
+   * Result: viewport width is permanently locked at (screen - 6px) on ALL pages.
+   */
+  html {
+    scroll-behavior: smooth;
+    overflow-y: scroll;   /* Always show scrollbar track, even on short pages */
+    overflow-x: hidden;
+    /* Reserve gutter space — works alongside the transparent scrollbar below */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    overflow-x: hidden;
+    width: 100%;
+    /* Prevent Radix/Shadcn dialog scroll lock padding shift */
+    padding-right: 0px !important;
+  }
+
+  /*
+   * HTML scrollbar — transparent but NON-ZERO width.
+   * This is the key: width MUST be > 0 for Chrome to reserve gutter space.
+   */
+  html::-webkit-scrollbar {
+    width: 6px;               /* Must be > 0 — Chrome removes gutter if 0 */
+    background: transparent;
+  }
+
+  html::-webkit-scrollbar-thumb {
+    background: transparent;  /* Invisible */
+    border-radius: 3px;
+  }
+
+  html::-webkit-scrollbar-track {
+    background: transparent;  /* Invisible */
+  }
+
+  /* Firefox: none removes scrollbar but scrollbar-gutter:stable keeps space */
+  html {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  /* Hide scrollbars on all other elements (not html — that one we handle above) */
+  body *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  body * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+
   /* Default to light theme (dark text) to prevent white-on-white text on macOS/Safari */
   :root {
     /* Tailwind mapping variables in HSL */
@@ -201,12 +268,15 @@
     @apply bg-background text-foreground;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
     font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+    margin: 0;
+    padding: 0;
     overflow-x: hidden;
-    max-width: 100vw;
+    width: 100%;
   }
 
   html {
-    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
     font-family: 'Plus Jakarta Sans', Inter, sans-serif;
   }
 
@@ -723,42 +793,16 @@
     scroll-behavior: smooth;
   }
 
-  /* Chat container scrollbar styles */
-  .chat-messages-container::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .chat-messages-container::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 4px;
-  }
-
-  .chat-messages-container::-webkit-scrollbar-thumb {
-    background-color: rgba(214, 171, 85, 0.3);
-    border-radius: 4px;
-    border: 1px solid rgba(214, 171, 85, 0.1);
-  }
-
-  .chat-messages-container::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(214, 171, 85, 0.5);
-    border: 1px solid rgba(214, 171, 85, 0.2);
-  }
-
-  /* Firefox scrollbar for chat container */
+  /* Chat container — hidden scrollbar, smooth scroll */
   .chat-messages-container {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(214, 171, 85, 0.3) transparent;
+    overflow-y: auto !important;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
-  /* Ensure scrollbar is always visible */
-  .chat-messages-container {
-    overflow-y: scroll !important;
-  }
-
-  /* Force scrollbar to show */
   .chat-messages-container::-webkit-scrollbar {
-    -webkit-appearance: none;
-    width: 8px;
+    display: none;
   }
 
   /* Ensure content doesn't overflow */
@@ -1082,8 +1126,8 @@
 
 /* Tablet responsive helpers */
 @media (max-width: 767px) {
-  /* Ensure no horizontal overflow anywhere */
-  * {
+  /* Ensure no horizontal overflow on block/layout elements */
+  body, main, section, article, aside, div:not(nav *) {
     max-width: 100%;
   }
 
@@ -1285,16 +1329,31 @@ html.light {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Header & Sticky Navigation */
+/* ============================================================
+   Header & Sticky Navigation — all navbar classes defined here
+   ============================================================ */
+
 .dastavez-header-nav {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 90;
+  left: 0;
+  right: 0;
+  /* Single authoritative z-index — remove z-50 (=50) from JSX to avoid conflict */
+  z-index: 9999;
   border-bottom: 1px solid var(--border-color);
   background-color: var(--bg-primary);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: all var(--transition-normal);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  /* Prevent Radix scroll lock margin/padding injection from shifting the fixed navbar */
+  margin-right: 0px !important;
+  padding-right: 0px !important;
+  /* Only animate visual properties — never position/size */
+  transition:
+    background-color var(--transition-normal),
+    border-color var(--transition-normal),
+    box-shadow var(--transition-normal),
+    padding var(--transition-normal);
+  will-change: background-color, box-shadow;
 }
 
 .dastavez-header-nav.is-sticky {
@@ -1302,6 +1361,97 @@ html.light {
   border-bottom-color: var(--glass-border);
   box-shadow: var(--shadow-md);
 }
+
+/* Nav links — hover and active states */
+.nav-link {
+  position: relative;
+  font-size: 0.875rem;
+  font-weight: 450;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.18s ease;
+  white-space: nowrap;
+  padding: 2px 0;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background-color: var(--accent-primary);
+  border-radius: 1px;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.2s ease;
+}
+
+.nav-link:hover {
+  color: var(--accent-primary);
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+
+/* Logo link — no underline, stable layout */
+.logo-link {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  transition: opacity 0.15s ease;
+}
+
+.logo-link:hover {
+  opacity: 0.9;
+}
+
+/* Theme toggle button */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  flex-shrink: 0;
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--accent-primary) / 0.08;
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* Sun/moon icon sizing inside theme toggle */
+.sun-icon,
+.moon-icon {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Dept Login CTA button */
+.btn-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: var(--font-body);
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
 
 /* Rotating word animation in Hero */
 .rotating-word-wrapper {
@@ -1851,3 +2001,66 @@ html.light {
 .logo-accent {
   color: inherit;
 }
+
+/* ============================================================
+   Premium Aesthetics & Smooth Interactions (dastavez-oracle)
+   ============================================================ */
+
+/* Global Anti-aliasing and subpixel smoothing */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Base class transitions for all interactive elements */
+a, button, input, textarea, select, .card, .tool-card, .trusted-card, .btn-nav-cta, .nav-link {
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+/* Smooth page load animations for routes */
+main {
+  animation: smoothPageFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes smoothPageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Premium input focus glows */
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px rgba(214, 171, 85, 0.15) !important;
+  outline: none !important;
+  transform: translateY(-1px);
+}
+
+/* Clean, modern button hover enhancements */
+.btn-nav-cta:hover, .btn-primary:hover, button[type="submit"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(214, 171, 85, 0.25);
+}
+
+/* Interactive card hover lifts */
+.trusted-card, .tool-card {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease, box-shadow 0.4s ease !important;
+}
+
+.trusted-card:hover {
+  transform: translateY(-6px) !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.15), 0 0 25px -5px rgba(214, 171, 85, 0.1) !important;
+  border-color: rgba(214, 171, 85, 0.4) !important;
+}
+
+/* Smooth selection overlay */
+::selection {
+  background-color: rgba(214, 171, 85, 0.2);
+  color: var(--text-primary);
+}
