@@ -1,15 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import AdvancedChatContext, { useAdvancedChat, AdvancedChatProvider } from '../chat-advanced/context/AdvancedChatContext';
 
-const AdvancedChatContext = createContext();
-
-export const useAdvancedChat = () => {
-  return useContext(AdvancedChatContext);
-};
-
-export const AdvancedChatProvider = ({ value, children }) => {
-  return (
-    <AdvancedChatContext.Provider value={value}>
-      {children}
-    </AdvancedChatContext.Provider>
-  );
-};
+export { useAdvancedChat, AdvancedChatProvider };
+export default AdvancedChatContext;

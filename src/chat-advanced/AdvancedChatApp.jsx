@@ -1,0 +1,1297 @@
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import {
+  Box, Flex, VStack, Center, Spinner, Text, Input, Button, Modal, ModalOverlay, ModalContent,
+  ModalHeader, ModalBody, ModalFooter, ModalCloseButton, useDisclosure, useToast, useColorMode, useColorModeValue,
+  FormControl, FormLabel, InputGroup, InputRightElement, Show, Heading, Select, Icon, HStack
+} from '@chakra-ui/react';
+import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
+import { FiGlobe, FiEdit } from 'react-icons/fi';
+import { MdDocumentScanner } from 'react-icons/md';
+import axios from 'axios';
+import { useParams, useNavigate } from 'react-router-dom';
+import ChatMessage from './components/ChatMessage';
+import { useAuth } from './AuthBridge';
+import { profileAPI } from '../lib/api';
+import fileService from './services/fileService';
+import draftService from './services/draftService';
+import researchService from './services/researchService';
+import chronologyService from './services/chronologyService';
+import precedenceService from './services/precedenceService';
+import counterMakerService from './services/counterMakerService';
+import bulkReviewService from './services/bulkReviewService';
+import { API_BASE_URL as BASE_URL } from './constants';
+
+import TimelinePanel from '../pages/Panels/TimelinePanel';
+import PrecedencePanel from '../pages/Panels/PrecedencePanel';
+import CounterMakerPanel from '../pages/Panels/CounterMakerPanel';
+import ResearchPanel from '../pages/Panels/ResearchPanel';
+import BulkReviewPanel from '../pages/Panels/BulkReviewPanel';
+
+import DocumentFieldsModal from './components/DocumentFieldsModal';
+import PostDownloadOptions from './components/PostDownloadOptions';
+import TemplateBrowser from './components/TemplateBrowser';
+import DocumentTypeSelector from './components/DocumentTypeSelector';
+import LegalGuidanceModal from './components/LegalGuidanceModal';
+import ComplaintFormModal from './components/ComplaintFormModal';
+import TemplateDesignSelector from './components/TemplateDesignSelector';
+
+import IconSidebar from './components/layout/IconSidebar';
+import SubSidebarContainer from './components/layout/SubSidebarContainer';
+import HeaderBar from './components/layout/HeaderBar';
+import WelcomeDashboard from './components/layout/WelcomeDashboard';
+import ChatInputBar from './components/layout/ChatInputBar';
+import MultiFileModal from './components/layout/MultiFileModal';
+import { AdvancedChatProvider } from './context/AdvancedChatContext';
+
+const FullPageEditor = lazy(() => import('./components/FullPageEditor'));
+
+const AdvancedChatApp = () => {
+  const cv_red_50_red_900 = useColorModeValue('red.50', 'red.900');
+  const cv_orange_50_orange_900 = useColorModeValue('orange.50', 'orange.900');
+  const cv_green_50_green_900 = useColorModeValue('green.50', 'green.900');
+  const cv_purple_50_purple_900 = useColorModeValue('purple.50', 'purple.900');
+  const cv_blue_50_blue_900 = useColorModeValue('blue.50', 'blue.900');
+  const cv_white_gray_800 = useColorModeValue('white', 'gray.800');
+  const cv_gray_100_rgba_212_175_55_0_08 = useColorModeValue('gray.100', 'rgba(212, 175, 55, 0.08)');
+  const cv_gray_600_gray_400 = useColorModeValue('gray.600', 'gray.400');
+  const cv_gray_350_white = useColorModeValue('gray.350', 'white');
+  const cv_gray_700_white = useColorModeValue('gray.700', 'white');
+  const cv_white_gray_900 = useColorModeValue('white', 'gray.900');
+  const cv_gray_50_gray_950 = useColorModeValue('gray.50', 'gray.950');
+  const cv_gray_400_gray_650 = useColorModeValue('gray.400', 'gray.650');
+  const cv_gray_100_gray_800 = useColorModeValue('gray.100', 'gray.800');
+  const cv_gray_250_rgba_212_175_55_0_25 = useColorModeValue('gray.250', 'rgba(212, 175, 55, 0.25)');
+  const cv_0_8px_30px_rgba_0_0_0_0_02_0_12px_40px_rgba_0_0_0_0_25 = useColorModeValue('0 8px 30px rgba(0, 0, 0, 0.02)', '0 12px 40px rgba(0, 0, 0, 0.25)');
+  const cv_rgba_226_232_240_0_8_rgba_212_175_55_0_15 = useColorModeValue('rgba(226, 232, 240, 0.8)', 'rgba(212, 175, 55, 0.15)');
+  const cv_rgba_255_255_255_0_85_rgba_10_13_20_0_35 = useColorModeValue('rgba(255, 255, 255, 0.85)', 'rgba(10, 13, 20, 0.35)');
+  const cv_gray_200_gray_700 = useColorModeValue('gray.200', 'gray.700');
+
+  const bgMain = useColorModeValue('gray.50', 'judicial.dark');
+  const borderColor = cv_gray_200_gray_700;
+  const textColor = useColorModeValue('gray.800', 'gray.100');
+  const inputBg = useColorModeValue('white', 'gray.800');
+
+  const { slug } = useParams();
+  const navigate = useNavigate();
+  const { colorMode, toggleColorMode } = useColorMode();
+  const { token, logout, user, loading, checkUser } = useAuth();
+  const toast = useToast();
+
+  useEffect(() => {
+    if (user && !loading) {
+      if (user.companySlug) {
+        if (!slug || slug !== user.companySlug) {
+          navigate(`/c/${user.companySlug}`, { replace: true });
+        }
+      }
+    }
+  }, [slug, user, loading, navigate]);
+
+  useEffect(() => {
+    if (slug) {
+      axios.defaults.headers.common['x-chat-slug'] = slug;
+    } else {
+      delete axios.defaults.headers.common['x-chat-slug'];
+    }
+    return () => {
+      delete axios.defaults.headers.common['x-chat-slug'];
+    };
+  }, [slug]);
+
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [remainingMessages, setRemainingMessages] = useState(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState('free');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [analyzingFile, setAnalyzingFile] = useState(false);
+
+  // Deep Research State
+  const [researchSessionId, setResearchSessionId] = useState(() => localStorage.getItem('deepResearchSessionId') || null);
+  const [researchStatus, setResearchStatus] = useState('idle');
+  const [researchResults, setResearchResults] = useState(null);
+  const [researchStartTime, setResearchStartTime] = useState(null);
+  const [researchEta, setResearchEta] = useState(90);
+  const [researchElapsed, setResearchElapsed] = useState(0);
+  const [isReportPanelOpen, setIsReportPanelOpen] = useState(false);
+  const [researchAgentStage, setResearchAgentStage] = useState('');
+  const researchPollRef = useRef(null);
+  const researchTimerRef = useRef(null);
+
+  // File Session State
+  const [fileSessionId, setFileSessionId] = useState(null);
+  const lastToolSessionFileId = useRef(null);
+
+  // Chronology State
+  const [chronologySessionId, setChronologySessionId] = useState(() => localStorage.getItem('chronologySessionId') || null);
+  const [chronologyStatus, setChronologyStatus] = useState('idle');
+  const [chronologyResults, setChronologyResults] = useState(null);
+  const [chronologyElapsed, setChronologyElapsed] = useState(0);
+  const [chronologyEta, setChronologyEta] = useState(60);
+  const [chronologyAgentStage, setChronologyAgentStage] = useState('');
+  const [isTimelinePanelOpen, setIsTimelinePanelOpen] = useState(false);
+  const [chronologyFiles, setChronologyFiles] = useState([]);
+  const chronologyPollRef = useRef(null);
+  const chronologyTimerRef = useRef(null);
+  const isMergingChronologyRef = useRef(false);
+
+  // Parallel Review State
+  const [reviewFiles, setReviewFiles] = useState([]);
+  const [reviewStatus, setReviewStatus] = useState('idle');
+  const [bulkReviewSessionId, setBulkReviewSessionId] = useState(() => localStorage.getItem('bulkReviewSessionId') || null);
+  const [bulkReviewResults, setBulkReviewResults] = useState(null);
+  const [bulkReviewElapsed, setBulkReviewElapsed] = useState(0);
+  const [bulkReviewEta, setBulkReviewEta] = useState(60);
+  const [isBulkReviewPanelOpen, setIsBulkReviewPanelOpen] = useState(false);
+  const bulkReviewPollRef = useRef(null);
+  const bulkReviewTimerRef = useRef(null);
+
+  // Uploading indicators
+  const [isUploadingReview, setIsUploadingReview] = useState(false);
+  const [isUploadingChronology, setIsUploadingChronology] = useState(false);
+
+  // Confirmation modal
+  const [isMultiFileModalOpen, setIsMultiFileModalOpen] = useState(false);
+  const [multiFilePendingAction, setMultiFilePendingAction] = useState(null);
+
+  // Drafting Tools State
+  const [activeDraftingTool, setActiveDraftingTool] = useState(null);
+  const [precedenceSessionId, setPrecedenceSessionId] = useState(null);
+  const [precedenceStatus, setPrecedenceStatus] = useState('idle');
+  const [precedenceResults, setPrecedenceResults] = useState(null);
+  const [isPrecedencePanelOpen, setIsPrecedencePanelOpen] = useState(false);
+  const precedencePollRef = useRef(null);
+
+  const [counterMakerSessionId, setCounterMakerSessionId] = useState(null);
+  const [counterMakerStatus, setCounterMakerStatus] = useState('idle');
+  const [counterMakerResults, setCounterMakerResults] = useState(null);
+  const [counterMakerFacts, setCounterMakerFacts] = useState('');
+  const [isCounterMakerPanelOpen, setIsCounterMakerPanelOpen] = useState(false);
+  const [counterMakerFileId, setCounterMakerFileId] = useState(null);
+  const counterMakerPollRef = useRef(null);
+
+  // Onboarding Modal
+  const [onboardCompanyName, setOnboardCompanyName] = useState('');
+  const [onboardSector, setOnboardSector] = useState('');
+  const [isOnboardingSubmitLoading, setIsOnboardingSubmitLoading] = useState(false);
+  const [onboardError, setOnboardError] = useState('');
+
+  const handleOnboardSubmit = async (e) => {
+    e.preventDefault();
+    if (!onboardCompanyName.trim() || !onboardSector.trim()) {
+      setOnboardError('Please fill in all fields.');
+      return;
+    }
+    setIsOnboardingSubmitLoading(true);
+    setOnboardError('');
+    try {
+      const response = await profileAPI.setupCompany(onboardCompanyName, onboardSector);
+      if (response && response.user) {
+        await checkUser();
+        navigate(`/c/${response.user.companySlug}`, { replace: true });
+      }
+    } catch (err) {
+      console.error('Onboarding failed:', err);
+      setOnboardError(err.message || 'Onboarding failed. Please try again.');
+    } finally {
+      setIsOnboardingSubmitLoading(false);
+    }
+  };
+
+  // Clear chat modal state
+  const [clearPassword, setClearPassword] = useState('');
+  const [showClearPassword, setShowClearPassword] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const { isOpen: isClearModalOpen, onOpen: onClearModalOpen, onClose: onClearModalClose } = useDisclosure();
+
+  const [intentOverride, setIntentOverride] = useState(null);
+  const [intentLabel, setIntentLabel] = useState(null);
+
+  // Edit document state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editSessionActive, setEditSessionActive] = useState(false);
+  const [editChangesCount, setEditChangesCount] = useState(0);
+  const [documentAnalysis, setDocumentAnalysis] = useState(null);
+  const [editSession, setEditSession] = useState(null);
+  const [isFullEditorOpen, setIsFullEditorOpen] = useState(false);
+
+  // Smart Scanner state
+  const [scanStatus, setScanStatus] = useState('none');
+  const [scanResults, setScanResults] = useState(null);
+  const [smartSuggestions, setSmartSuggestions] = useState([]);
+  const [formatMetadata, setFormatMetadata] = useState(null);
+  const [htmlContent, setHtmlContent] = useState('');
+
+  // Other modals
+  const [documentFieldsOpen, setDocumentFieldsOpen] = useState(false);
+  const [documentFields, setDocumentFields] = useState([]);
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [lastGeneratedFile, setLastGeneratedFile] = useState(null);
+  const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
+  const [documentTypeModalOpen, setDocumentTypeModalOpen] = useState(false);
+  const [guidanceModalOpen, setGuidanceModalOpen] = useState(false);
+  const [complaintFormModalOpen, setComplaintFormModalOpen] = useState(false);
+
+  // Language state
+  const [language, setLanguage] = useState(() => localStorage.getItem('dastavez_language') || 'en');
+  useEffect(() => {
+    localStorage.setItem('dastavez_language', language);
+  }, [language]);
+  const toggleLanguage = () => {
+    setLanguage(prev => (prev === 'en' ? 'hi' : 'en'));
+  };
+
+  // Chat Font Size state
+  const [chatFontSize, setChatFontSize] = useState(() => {
+    const saved = localStorage.getItem('dastavez_chat_font_size');
+    return saved ? parseInt(saved, 10) : 14;
+  });
+  useEffect(() => {
+    localStorage.setItem('dastavez_chat_font_size', chatFontSize.toString());
+  }, [chatFontSize]);
+
+  // Voice speech state
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const recognitionRef = useRef(null);
+
+  // Session history list state
+  const [sessionsList, setSessionsList] = useState([]);
+  const [sessionsListLoading, setSessionsListLoading] = useState(false);
+
+  // Suggested actions & choice buttons state
+  const [isPendingUserChoice, setIsPendingUserChoice] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading, analyzingFile]);
+
+  // Fetch Session History
+  const fetchSessions = async () => {
+    try {
+      setSessionsListLoading(true);
+      const res = await axios.get(`${BASE_URL}/chat/sessions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const list = res.data?.sessions || (Array.isArray(res.data) ? res.data : []);
+      setSessionsList(list);
+    } catch (err) {
+      console.error('Error fetching sessions:', err);
+    } finally {
+      setSessionsListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchSessions();
+    }
+  }, [token]);
+
+  // Load chat session history when slug changes
+  useEffect(() => {
+    if (!token || !slug) return;
+    const loadSessionMessages = async () => {
+      try {
+        setIsInitialLoad(true);
+        const res = await axios.get(`${BASE_URL}/chat/session/${slug}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data && res.data.messages) {
+          setMessages(res.data.messages.map(m => ({
+            role: m.role,
+            content: m.content,
+            suggestedActions: m.suggestedActions || [],
+            isDocumentReady: m.isDocumentReady || false,
+            fileId: m.fileId || null,
+            fileUrl: m.fileUrl || null,
+            fileName: m.fileName || null,
+            scannedResult: m.scannedResult || null,
+            timestamp: m.createdAt || null
+          })));
+        } else {
+          setMessages([]);
+        }
+      } catch (err) {
+        console.error('Failed to load session messages:', err);
+        setMessages([]);
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
+    loadSessionMessages();
+  }, [slug, token]);
+
+  // New Chat Session handler
+  const handleStartNewChat = () => {
+    setMessages([]);
+    setSelectedFile(null);
+    setReviewFiles([]);
+    setChronologyFiles([]);
+    setFileSessionId(crypto.randomUUID());
+    lastToolSessionFileId.current = null;
+    setResearchStatus('idle');
+    setResearchResults(null);
+    setResearchSessionId(null);
+    setIsReportPanelOpen(false);
+    setChronologyStatus('idle');
+    setChronologyResults(null);
+    setChronologySessionId(null);
+    setIsTimelinePanelOpen(false);
+    setReviewStatus('idle');
+    setBulkReviewResults(null);
+    setBulkReviewSessionId(null);
+    setIsBulkReviewPanelOpen(false);
+    localStorage.removeItem('deepResearchSessionId');
+    localStorage.removeItem('chronologySessionId');
+    localStorage.removeItem('bulkReviewSessionId');
+    toast({
+      title: language === 'hi' ? 'नया चैट सत्र शुरू हुआ' : 'New Chat Session Started',
+      status: 'info',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
+  const triggerChronologyAction = () => {
+    if (chronologyFiles.length === 0) {
+      toast({ title: 'No files uploaded', description: 'Please upload at least one file first.', status: 'warning', duration: 3000 });
+      return;
+    }
+    const hasUserMessages = messages.some(m => !m.isSessionHeader && !m.isSessionDivider);
+    if (hasUserMessages) {
+      setMultiFilePendingAction('chronology');
+      setIsMultiFileModalOpen(true);
+    } else {
+      handleStartChronology();
+    }
+  };
+
+  const triggerParallelReviewAction = () => {
+    if (reviewFiles.length < 2) {
+      toast({ title: 'Upload at least 2 files', description: 'Please upload at least 2 files to compare.', status: 'warning', duration: 3000 });
+      return;
+    }
+    const hasUserMessages = messages.some(m => !m.isSessionHeader && !m.isSessionDivider);
+    if (hasUserMessages) {
+      setMultiFilePendingAction('review');
+      setIsMultiFileModalOpen(true);
+    } else {
+      handleStartBulkReview();
+    }
+  };
+
+  const handleConfirmMultiFileChoice = (startNewChat) => {
+    setIsMultiFileModalOpen(false);
+    if (startNewChat) {
+      handleStartNewChat();
+    }
+    if (multiFilePendingAction === 'chronology') {
+      handleStartChronology();
+    } else if (multiFilePendingAction === 'review') {
+      handleStartBulkReview();
+    }
+    setMultiFilePendingAction(null);
+  };
+
+  // Deep Research functions
+  const stopResearchPolling = () => {
+    if (researchPollRef.current) clearInterval(researchPollRef.current);
+    if (researchTimerRef.current) clearInterval(researchTimerRef.current);
+  };
+
+  const pollResearchStatus = (sessionId) => {
+    stopResearchPolling();
+    const stages = [
+      { label: 'Extracting document context...', at: 0 },
+      { label: 'Identifying key points & dates...', at: 15 },
+      { label: 'Analyzing actionable steps...', at: 45 },
+      { label: 'Generating comprehensive summary...', at: 65 },
+      { label: 'Finalizing report...', at: 80 },
+    ];
+    researchTimerRef.current = setInterval(() => {
+      setResearchElapsed(prev => {
+        const next = prev + 1;
+        const currentStage = [...stages].reverse().find(s => next >= s.at);
+        if (currentStage) setResearchAgentStage(currentStage.label);
+        return next;
+      });
+    }, 1000);
+
+    researchPollRef.current = setInterval(async () => {
+      try {
+        const result = await researchService.getResearchResults(sessionId);
+        if (['completed', 'completed_with_errors', 'failed'].includes(result.status)) {
+          stopResearchPolling();
+          setResearchResults(result);
+          setResearchStatus(result.status);
+          setIsReportPanelOpen(true);
+          setResearchAgentStage(result.status === 'failed' ? 'Research failed' : 'Report ready!');
+
+          if (result.status === 'completed' || result.status === 'completed_with_errors') {
+            const followUpQuestions = [
+              "Can you explain the key points in simpler terms?",
+              "What are the most critical dates or deadlines mentioned in this document?",
+              "What are the immediate actionable steps I should take based on this?"
+            ];
+            setMessages(prev => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: `I have completed the deep research on your document! You can view the full report in the right panel.\n\nHere are some follow-up questions you can ask me:\n1. ${followUpQuestions[0]}\n2. ${followUpQuestions[1]}\n3. ${followUpQuestions[2]}`
+              }
+            ]);
+          }
+
+          if (result.status !== 'failed') {
+            toast({
+              title: 'Deep Research Complete',
+              description: 'Your research report is ready. Check the right panel.',
+              status: 'success',
+              duration: 5000,
+              isClosable: true,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Research poll error:', err);
+      }
+    }, 5000);
+  };
+
+  const handleStartDeepResearch = async (autoFile = null) => {
+    const targetFile = autoFile && autoFile._id ? autoFile : selectedFile;
+    if (!targetFile?._id) {
+      toast({
+        title: 'No file selected',
+        description: 'Please upload a file first.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    handleStartNewChat();
+    setSelectedFile(targetFile);
+
+    const fileName = targetFile.fileName || targetFile.originalName || targetFile.name || 'Uploaded file';
+    setMessages([
+      {
+        role: 'assistant',
+        content: `🔬 **Deep Research Started**\n\n**File:** ${fileName}\n\nAnalyzing document context, key points, dates, and action items...`,
+        isSessionHeader: true,
+      }
+    ]);
+
+    try {
+      setResearchStatus('starting');
+      setResearchResults(null);
+      setResearchElapsed(0);
+      setResearchAgentStage('Preparing document...');
+      setIsReportPanelOpen(true);
+
+      const editResult = await fileService.startEditSession(targetFile._id);
+      const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
+      if (!editSessionId) throw new Error('Failed to create edit session.');
+
+      const researchResult = await researchService.startResearch([editSessionId]);
+      const newSessionId = researchResult.sessionId;
+
+      setResearchSessionId(newSessionId);
+      localStorage.setItem('deepResearchSessionId', newSessionId);
+      setResearchStatus('processing');
+      setResearchStartTime(Date.now());
+      pollResearchStatus(newSessionId);
+    } catch (err) {
+      console.error('Deep research error:', err);
+      setResearchStatus('failed');
+      setResearchAgentStage('Failed to start research');
+      toast({
+        title: 'Research Failed',
+        description: err?.response?.data?.error || err.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  // Chronology Functions
+  const stopChronologyPolling = () => {
+    if (chronologyPollRef.current) clearInterval(chronologyPollRef.current);
+    if (chronologyTimerRef.current) clearInterval(chronologyTimerRef.current);
+  };
+
+  const pollChronologyStatus = (sessionId) => {
+    stopChronologyPolling();
+    const stages = [
+      { label: 'Extracting events from files...', at: 0 },
+      { label: 'Building unified timeline...', at: 25 },
+      { label: 'Sorting & deduplicating events...', at: 40 },
+      { label: 'Generating timeline summary...', at: 50 },
+    ];
+    chronologyTimerRef.current = setInterval(() => {
+      setChronologyElapsed(prev => {
+        const next = prev + 1;
+        const currentStage = [...stages].reverse().find(s => next >= s.at);
+        if (currentStage) setChronologyAgentStage(currentStage.label);
+        return next;
+      });
+    }, 1000);
+
+    chronologyPollRef.current = setInterval(async () => {
+      try {
+        const result = await chronologyService.getChronologyResults(sessionId);
+        if (['completed', 'completed_with_errors', 'failed'].includes(result.status)) {
+          stopChronologyPolling();
+          setChronologyResults(result);
+          setChronologyStatus(result.status);
+          setIsTimelinePanelOpen(true);
+          setChronologyAgentStage(result.status === 'failed' ? 'Analysis failed' : 'Timeline ready!');
+
+          if (result.status === 'completed' || result.status === 'completed_with_errors') {
+            const fileNames = result.files?.map(f => `**${f.fileName}**`).join(', ') || 'uploaded files';
+            const eventCount = result.events?.length || 0;
+            const ismerge = isMergingChronologyRef.current;
+            const summaryText = result.summary
+              ? `\n\n---\n${result.summary}\n\n---\n*Full interactive timeline with ${eventCount} events is ready in the Timeline panel →*`
+              : `\n\n*${eventCount} events extracted. Open the Timeline panel to explore.*`;
+            const introLine = ismerge
+              ? `✅ Chronology updated! I've merged the new file(s) with your existing timeline.\n\nNow covering: ${fileNames}\n\n**Combined Summary:**${summaryText}`
+              : `📅 Chronology complete! I've built a timeline from ${fileNames}.\n\n**Timeline Summary:**${summaryText}`;
+
+            isMergingChronologyRef.current = false;
+            setMessages(prev => [
+              ...prev,
+              { role: 'assistant', content: introLine, isChronologySummary: true }
+            ]);
+          }
+
+          if (result.status !== 'failed') {
+            toast({
+              title: 'Chronology Complete',
+              description: `Timeline built with ${result.events?.length || 0} events.`,
+              status: 'success',
+              duration: 5000,
+              isClosable: true,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Chronology poll error:', err);
+      }
+    }, 5000);
+  };
+
+  const handleStartChronology = async () => {
+    if (chronologyFiles.length === 0) {
+      toast({ title: 'No files', description: 'Upload at least one file.', status: 'warning', duration: 3000 });
+      return;
+    }
+
+    try {
+      isMergingChronologyRef.current = false;
+      setChronologyStatus('starting');
+      setChronologyResults(null);
+      setChronologyElapsed(0);
+      setChronologyAgentStage('Preparing files...');
+      setIsTimelinePanelOpen(true);
+      setChronologyEta(40 + chronologyFiles.length * 20);
+
+      const fileLabel = chronologyFiles.length === 1
+        ? chronologyFiles[0].file?.name || 'file'
+        : `${chronologyFiles.length} files`;
+      setMessages(prev => [...prev, { role: 'user', content: `Build a chronology timeline from: ${fileLabel}` }]);
+
+      const editSessionIds = chronologyFiles.map(f => f.editSessionId);
+      const result = await chronologyService.startChronology(editSessionIds);
+      const newSessionId = result.sessionId;
+
+      setChronologySessionId(newSessionId);
+      localStorage.setItem('chronologySessionId', newSessionId);
+      setChronologyStatus('processing');
+      pollChronologyStatus(newSessionId);
+    } catch (err) {
+      console.error('Chronology error:', err);
+      setChronologyStatus('failed');
+      toast({
+        title: 'Chronology Failed',
+        description: err?.response?.data?.error || err.message,
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
+  const handleResetChronology = async () => {
+    try {
+      await fetchSessions();
+    } catch (err) {
+      console.error('Failed to refresh sessions:', err);
+    }
+    setChronologyStatus('idle');
+    setChronologyResults(null);
+    setChronologySessionId(null);
+    setChronologyFiles([]);
+    setIsTimelinePanelOpen(false);
+    localStorage.removeItem('chronologySessionId');
+  };
+
+  // Parallel Review Functions
+  const pollBulkReviewResults = async (sessionId) => {
+    if (bulkReviewPollRef.current) clearInterval(bulkReviewPollRef.current);
+    bulkReviewPollRef.current = setInterval(async () => {
+      try {
+        const results = await bulkReviewService.getResults(sessionId);
+        if (results) {
+          setBulkReviewResults(results);
+          if (results.status === 'completed' || results.status === 'completed_with_errors' || results.status === 'failed') {
+            clearInterval(bulkReviewPollRef.current);
+            clearInterval(bulkReviewTimerRef.current);
+            setReviewStatus(results.status);
+            if (results.status !== 'failed') {
+              setIsBulkReviewPanelOpen(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error polling bulk review:', err);
+      }
+    }, 3000);
+  };
+
+  const handleStartBulkReview = async () => {
+    if (reviewFiles.length < 2) {
+      toast({ title: 'Upload at least 2 files to compare', status: 'warning', duration: 3000 });
+      return;
+    }
+
+    setReviewStatus('starting');
+    setBulkReviewElapsed(0);
+    setBulkReviewEta(40 + reviewFiles.length * 30);
+    setBulkReviewResults(null);
+    setIsBulkReviewPanelOpen(true);
+
+    if (bulkReviewTimerRef.current) clearInterval(bulkReviewTimerRef.current);
+    bulkReviewTimerRef.current = setInterval(() => {
+      setBulkReviewElapsed(prev => prev + 1);
+    }, 1000);
+
+    try {
+      const editSessionIds = reviewFiles.map(f => f.editSessionId);
+      const res = await bulkReviewService.startBulkReview(editSessionIds);
+      const newSessionId = res.sessionId;
+      setBulkReviewSessionId(newSessionId);
+      localStorage.setItem('bulkReviewSessionId', newSessionId);
+      setReviewStatus('processing');
+      pollBulkReviewResults(newSessionId);
+    } catch (err) {
+      console.error('Start bulk review error:', err);
+      clearInterval(bulkReviewTimerRef.current);
+      setReviewStatus('failed');
+      toast({ title: 'Failed to start analysis', status: 'error', duration: 3000 });
+    }
+  };
+
+  // Multi-file upload handlers
+  const handleReviewFilesUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const allowedTypes = [
+      'application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/json',
+      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp'
+    ];
+    const allowedExtensions = ['.pdf', '.txt', '.md', '.csv', '.json', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const validFiles = files.filter(file => {
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      return allowedTypes.includes(file.type) || allowedExtensions.includes(ext);
+    });
+
+    if (validFiles.length === 0) {
+      toast({ title: 'No valid files', description: 'Supported: PDF, Word, Text, Images', status: 'error', duration: 3000 });
+      e.target.value = '';
+      return;
+    }
+    if (reviewFiles.length + validFiles.length > 10) {
+      toast({ title: 'Too many files', description: 'Maximum 10 files allowed for Parallel Review.', status: 'warning', duration: 3000 });
+      e.target.value = '';
+      return;
+    }
+    toast({ title: `Uploading ${validFiles.length} file(s)...`, status: 'info', duration: 2000 });
+
+    try {
+      setIsUploadingReview(true);
+      const uploaded = [];
+      for (const file of validFiles) {
+        try {
+          const response = await fileService.uploadFile(file);
+          const editResult = await fileService.startEditSession(response.file._id);
+          const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
+          uploaded.push({ file: response.file, editSessionId });
+        } catch (err) {
+          console.error(`Failed to upload "${file.name}":`, err);
+        }
+      }
+      if (uploaded.length > 0) {
+        setReviewFiles(prev => [...prev, ...uploaded]);
+        toast({ title: `${uploaded.length} file(s) ready for Parallel Review`, status: 'success', duration: 2500 });
+      }
+    } finally {
+      setIsUploadingReview(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleChronologyFilesUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const allowedTypes = [
+      'application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/json',
+      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp'
+    ];
+    const allowedExtensions = ['.pdf', '.txt', '.md', '.csv', '.json', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const validFiles = files.filter(file => {
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      return allowedTypes.includes(file.type) || allowedExtensions.includes(ext);
+    });
+
+    if (validFiles.length === 0) {
+      toast({ title: 'No valid files', description: 'Supported: PDF, Word, Text, Images', status: 'error', duration: 3000 });
+      e.target.value = '';
+      return;
+    }
+    if (chronologyFiles.length + validFiles.length > 10) {
+      toast({ title: 'Too many files', description: 'Maximum 10 files total allowed.', status: 'warning', duration: 3000 });
+      e.target.value = '';
+      return;
+    }
+    toast({ title: `Uploading ${validFiles.length} file(s)...`, status: 'info', duration: 2000 });
+
+    try {
+      setIsUploadingChronology(true);
+      const uploaded = [];
+      for (const file of validFiles) {
+        try {
+          const response = await fileService.uploadFile(file);
+          const editResult = await fileService.startEditSession(response.file._id);
+          const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
+          uploaded.push({ file: response.file, editSessionId });
+        } catch (err) {
+          console.error(`Failed to upload "${file.name}":`, err);
+        }
+      }
+      if (uploaded.length > 0) {
+        const newFiles = [...chronologyFiles, ...uploaded];
+        setChronologyFiles(newFiles);
+        if (['completed', 'completed_with_errors'].includes(chronologyStatus)) {
+          toast({ title: `Merging ${uploaded.length} new file(s) into timeline...`, status: 'info', duration: 3000 });
+          isMergingChronologyRef.current = true;
+          setTimeout(async () => {
+            try {
+              setChronologyStatus('starting');
+              setChronologyAgentStage('Merging new files into timeline...');
+              setChronologyElapsed(0);
+              setChronologyEta(40 + newFiles.length * 20);
+              const editSessionIds = newFiles.map(f => f.editSessionId);
+              const result = await chronologyService.startChronology(editSessionIds);
+              const newSessionId = result.sessionId;
+              setChronologySessionId(newSessionId);
+              localStorage.setItem('chronologySessionId', newSessionId);
+              setChronologyStatus('processing');
+              pollChronologyStatus(newSessionId);
+            } catch (err) {
+              console.error('Chronology merge error:', err);
+              setChronologyStatus('idle');
+              isMergingChronologyRef.current = false;
+            }
+          }, 300);
+        }
+      }
+    } finally {
+      setIsUploadingChronology(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      setUploadProgress(0);
+      const response = await fileService.uploadFile(file, (progress) => {
+        setUploadProgress(progress);
+      });
+      setSelectedFile(response.file);
+      setUploadProgress(100);
+      setTimeout(() => setUploadProgress(0), 1000);
+
+      setFileSessionId(crypto.randomUUID());
+
+      if (activeTab === 'research') {
+        handleStartDeepResearch(response.file);
+      }
+
+      if (response.remainingMessages !== null) {
+        setRemainingMessages(response.remainingMessages);
+      }
+      setSubscriptionStatus(response.subscriptionStatus);
+
+      setScanStatus('none');
+      setScanResults(null);
+      setFormatMetadata(null);
+      setSmartSuggestions([]);
+      setHtmlContent('');
+
+      toast({
+        title: language === 'hi' ? 'फ़ाइल अपलोड हो गई' : 'File uploaded',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (err) {
+      console.error('File upload error:', err);
+      toast({
+        title: 'Upload Failed',
+        description: err.message || 'Failed to upload file',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Chat message sending logic
+  const handleSendMessage = async (textToSend = null) => {
+    const text = textToSend || input;
+    if (!text.trim() && !selectedFile) return;
+
+    const userMessage = { role: 'user', content: text };
+    setMessages(prev => [...prev, userMessage]);
+    if (!textToSend) setInput('');
+    setIsLoading(true);
+
+    try {
+      const payload = {
+        message: text,
+        language: language || 'en',
+      };
+      if (selectedFile?._id) payload.fileId = selectedFile._id;
+      if (intentOverride) payload.intentOverride = intentOverride;
+
+      const response = await axios.post(`${BASE_URL}/chat/message`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+
+      if (response.data) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: response.data.response,
+          suggestedActions: response.data.suggestedActions || []
+        }]);
+        fetchSessions();
+      }
+    } catch (error) {
+      console.error('Message error:', error);
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to send message',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleSuggestedActionClick = (action) => {
+    handleSendMessage(action.text || action.label);
+  };
+
+  const handleClearChat = () => {
+    setMessages([]);
+    setSelectedFile(null);
+    toast({ title: 'Chat cleared', status: 'info', duration: 2000 });
+  };
+
+  const handleSmartScan = () => {
+    if (!selectedFile) return;
+    setScanStatus('scanned');
+    toast({ title: 'Smart Scan Complete', status: 'success', duration: 2500 });
+  };
+
+  const handleOpenEditor = () => {
+    setIsFullEditorOpen(true);
+  };
+
+  const handleExitEditMode = () => {
+    setIsEditMode(false);
+    setEditSessionActive(false);
+  };
+
+  const toggleListening = () => {
+    setIsListening(prev => !prev);
+  };
+
+  const contextValue = {
+    activeTab, setActiveTab,
+    messages, setMessages,
+    input, setInput,
+    isLoading, setIsLoading,
+    isInitialLoad, setIsInitialLoad,
+    remainingMessages, setRemainingMessages,
+    subscriptionStatus, setSubscriptionStatus,
+    language, setLanguage, toggleLanguage,
+    isUploading, setIsUploading,
+    uploadProgress, setUploadProgress,
+    selectedFile, setSelectedFile,
+    uploading, setUploading,
+    analyzingFile, setAnalyzingFile,
+    sessionsList, setSessionsList,
+    sessionsListLoading, setSessionsListLoading,
+    intentOverride, setIntentOverride,
+    intentLabel, setIntentLabel,
+    user, token, logout, toast, navigate, slug,
+    borderColor, textColor, inputBg, colorMode, toggleColorMode,
+    
+    isUploadingReview, setIsUploadingReview,
+    isUploadingChronology, setIsUploadingChronology,
+    isMultiFileModalOpen, setIsMultiFileModalOpen,
+    multiFilePendingAction, setMultiFilePendingAction,
+    handleStartNewChat,
+    triggerChronologyAction,
+    triggerParallelReviewAction,
+    handleConfirmMultiFileChoice,
+    
+    researchStatus, setResearchStatus,
+    researchResults, setResearchResults,
+    researchSessionId, setResearchSessionId,
+    researchElapsed, setResearchElapsed,
+    researchEta, setResearchEta,
+    researchAgentStage, setResearchAgentStage,
+    isReportPanelOpen, setIsReportPanelOpen,
+    handleStartDeepResearch,
+    
+    chronologyStatus, setChronologyStatus,
+    chronologyResults, setChronologyResults,
+    chronologySessionId, setChronologySessionId,
+    chronologyElapsed, setChronologyElapsed,
+    chronologyEta, setChronologyEta,
+    chronologyAgentStage, setChronologyAgentStage,
+    isTimelinePanelOpen, setIsTimelinePanelOpen,
+    chronologyFiles, setChronologyFiles,
+    handleStartChronology,
+    handleResetChronology,
+    handleChronologyFilesUpload,
+    
+    reviewFiles, setReviewFiles,
+    reviewStatus, setReviewStatus,
+    bulkReviewSessionId, setBulkReviewSessionId,
+    bulkReviewResults, setBulkReviewResults,
+    bulkReviewElapsed, setBulkReviewElapsed,
+    bulkReviewEta, setBulkReviewEta,
+    isBulkReviewPanelOpen, setIsBulkReviewPanelOpen,
+    handleStartBulkReview,
+    handleReviewFilesUpload,
+    
+    precedenceSessionId, setPrecedenceSessionId,
+    precedenceStatus, setPrecedenceStatus,
+    precedenceResults, setPrecedenceResults,
+    isPrecedencePanelOpen, setIsPrecedencePanelOpen,
+    
+    counterMakerSessionId, setCounterMakerSessionId,
+    counterMakerStatus, setCounterMakerStatus,
+    counterMakerResults, setCounterMakerResults,
+    counterMakerFacts, setCounterMakerFacts,
+    isCounterMakerPanelOpen, setIsCounterMakerPanelOpen,
+    counterMakerFileId, setCounterMakerFileId,
+
+    handleSuggestedActionClick,
+    handleClearChat,
+    handleSmartScan,
+    handleOpenEditor,
+    handleExitEditMode,
+    toggleListening,
+    speechSupported,
+    handleSendMessage,
+    handleKeyPress,
+    chatFontSize, setChatFontSize,
+    scanStatus, scanResults, smartSuggestions, formatMetadata,
+    onboardCompanyName, setOnboardCompanyName,
+    onboardSector, setOnboardSector,
+    handleOnboardSubmit, isOnboardingSubmitLoading
+  };
+
+  const isRightPanelOpen = 
+    (activeTab === 'chronology' && isTimelinePanelOpen) ||
+    (activeTab === 'drafting' && isPrecedencePanelOpen) ||
+    (activeTab === 'drafting' && isCounterMakerPanelOpen) ||
+    (activeTab === 'research' && isReportPanelOpen) ||
+    (activeTab === 'review' && isBulkReviewPanelOpen) ||
+    isEditMode;
+
+  return (
+    <AdvancedChatProvider value={contextValue}>
+      <Flex h="100vh" w="100vw" overflow="hidden" bg={bgMain}>
+        {/* 1. Left-most Icon Sidebar */}
+        <IconSidebar />
+
+        {/* 2. Sub-sidebar */}
+        <SubSidebarContainer />
+
+        {/* 3. Main Working Window */}
+        <Flex flex="1" direction="column" overflow="hidden" position="relative" bg={bgMain}>
+          <HeaderBar />
+
+          {/* Hidden inputs for uploaders */}
+          <Input
+            type="file"
+            accept=".pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+            onChange={handleFileUpload}
+            display="none"
+            id="file-upload"
+          />
+          <Input
+            type="file"
+            multiple
+            onChange={handleReviewFilesUpload}
+            display="none"
+            id="review-file-upload"
+          />
+          <Input
+            type="file"
+            multiple
+            onChange={handleChronologyFilesUpload}
+            display="none"
+            id="chronology-file-upload"
+          />
+
+          <Flex flex="1" overflow="hidden" position="relative">
+            <Flex w="full" h="full" direction="column" overflow="hidden" px={4} pt={4} pb={2}>
+              {/* Messages scroll area */}
+              <Box
+                flex="1"
+                w="full"
+                overflowY="auto"
+                borderRadius="2xl"
+                p={6}
+                bg={cv_rgba_255_255_255_0_85_rgba_10_13_20_0_35}
+                borderWidth="1px"
+                borderColor={cv_rgba_226_232_240_0_8_rgba_212_175_55_0_15}
+                backdropFilter="blur(32px)"
+                boxShadow={cv_0_8px_30px_rgba_0_0_0_0_02_0_12px_40px_rgba_0_0_0_0_25}
+                position="relative"
+                css={{
+                  '&::-webkit-scrollbar': { display: 'none' },
+                  scrollbarWidth: 'none'
+                }}
+              >
+                {isInitialLoad ? (
+                  <Center h="full">
+                    <Spinner size="lg" color="blue.500" />
+                  </Center>
+                ) : (
+                  <Flex direction="column" gap={4} w="full" align="stretch">
+                    {messages.filter(m => m.role === 'user').length === 0 && <WelcomeDashboard />}
+                    
+                    {messages.map((msg, index) => (
+                      <ChatMessage
+                        key={index}
+                        message={msg}
+                        role={msg.role}
+                        onSuggestedActionClick={handleSuggestedActionClick}
+                        language={language}
+                        fontSize={chatFontSize}
+                      />
+                    ))}
+                  </Flex>
+                )}
+                <div ref={messagesEndRef} />
+              </Box>
+
+              {/* Chat Input Prompt controls */}
+              <ChatInputBar />
+            </Flex>
+          </Flex>
+        </Flex>
+
+        {/* 4. Right Split Panel */}
+        {isRightPanelOpen && (
+          <Box w="45%" minW="400px" maxW="600px" borderLeft="1px solid" borderColor={borderColor} bg={cv_white_gray_900} overflowY="auto" display="flex" flexDirection="column" zIndex={5}>
+            {activeTab === 'chronology' && isTimelinePanelOpen && <TimelinePanel />}
+            {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
+            {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
+            {activeTab === 'research' && isReportPanelOpen && <ResearchPanel />}
+            {activeTab === 'review' && isBulkReviewPanelOpen && <BulkReviewPanel />}
+          </Box>
+        )}
+      </Flex>
+
+      {/* Multi-File Confirmation Modal */}
+      <MultiFileModal />
+
+      {/* Onboarding Spatial Card Modal */}
+      <Modal isOpen={Boolean(user && !user.companySlug)} closeOnOverlayClick={false} closeOnEsc={false} isCentered>
+        <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(10px)" />
+        <ModalContent bg={cv_white_gray_900} borderColor={borderColor} borderWidth={1} p={6} m={4} borderRadius="2xl">
+          <ModalHeader>
+            <VStack spacing={2} align="center">
+              <Icon as={FiGlobe} w={12} h={12} color="judicial.gold" />
+              <Heading size="md" textAlign="center" color={textColor}>Setup Your Workspace</Heading>
+              <Text fontSize="sm" color="gray.500" textAlign="center">
+                Configure your permanent dashboard page URL.
+              </Text>
+            </VStack>
+          </ModalHeader>
+          <ModalBody>
+            <form onSubmit={handleOnboardSubmit}>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel color={textColor}>Company Name</FormLabel>
+                  <Input
+                    placeholder="e.g. Acme Corp"
+                    value={onboardCompanyName}
+                    onChange={(e) => setOnboardCompanyName(e.target.value)}
+                    borderColor={borderColor}
+                    _focus={{ borderColor: 'judicial.gold' }}
+                  />
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel color={textColor}>Sector / Industry</FormLabel>
+                  <Select
+                    placeholder="Select Sector"
+                    value={onboardSector}
+                    onChange={(e) => setOnboardSector(e.target.value)}
+                    borderColor={borderColor}
+                    _focus={{ borderColor: 'judicial.gold' }}
+                    color={textColor}
+                  >
+                    <option value="legal">Legal & Compliance</option>
+                    <option value="finance">Finance & Banking</option>
+                    <option value="tech">Technology & IT</option>
+                    <option value="healthcare">Healthcare & Pharma</option>
+                    <option value="realestate">Real Estate & Construction</option>
+                    <option value="retail">Retail & E-commerce</option>
+                    <option value="other">Other / General</option>
+                  </Select>
+                </FormControl>
+                {onboardError && (
+                  <Text color="red.500" fontSize="sm" alignSelf="start">
+                    {onboardError}
+                  </Text>
+                )}
+                <Button
+                  type="submit"
+                  bg="judicial.gold"
+                  color="judicial.dark"
+                  _hover={{ bg: 'judicial.lightGold' }}
+                  w="full"
+                  isLoading={isOnboardingSubmitLoading}
+                  mt={2}
+                  borderRadius="xl"
+                  fontWeight="bold"
+                >
+                  Create Permanent Dashboard
+                </Button>
+              </VStack>
+            </form>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* Full Page Editor Modal */}
+      <Suspense fallback={
+        <Modal isOpen={isFullEditorOpen} onClose={() => setIsFullEditorOpen(false)} size="full">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalBody display="flex" alignItems="center" justifyContent="center" h="100vh">
+              <Spinner size="xl" />
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      }>
+        <FullPageEditor
+          isOpen={isFullEditorOpen}
+          onClose={() => setIsFullEditorOpen(false)}
+          session={editSession}
+          onSessionUpdate={() => {}}
+          selectedFile={selectedFile}
+          scanStatus={scanStatus}
+          formatMetadata={formatMetadata}
+          scanResults={scanResults}
+          smartSuggestions={smartSuggestions}
+          htmlContent={htmlContent}
+          language={language}
+        />
+      </Suspense>
+
+      {/* Template Browser Modal */}
+      <TemplateBrowser
+        isOpen={templateBrowserOpen}
+        onClose={() => setTemplateBrowserOpen(false)}
+        onSelectTemplate={(tpl) => {
+          setTemplateBrowserOpen(false);
+          handleSendMessage(`Selected template: ${tpl.name || tpl.title}`);
+        }}
+        language={language}
+        token={token}
+      />
+
+      {/* Document Type Selector Modal */}
+      <DocumentTypeSelector
+        isOpen={documentTypeModalOpen}
+        onClose={() => setDocumentTypeModalOpen(false)}
+        onSelectDocumentType={(dt) => {
+          setDocumentTypeModalOpen(false);
+          handleSendMessage(`Document type: ${dt}`);
+        }}
+        language={language}
+      />
+
+      {/* Legal Guidance Modal */}
+      <LegalGuidanceModal
+        isOpen={guidanceModalOpen}
+        onClose={() => setGuidanceModalOpen(false)}
+        onComplete={() => setGuidanceModalOpen(false)}
+        language={language}
+      />
+
+      {/* Complaint Form Modal */}
+      <ComplaintFormModal
+        isOpen={complaintFormModalOpen}
+        onClose={() => setComplaintFormModalOpen(false)}
+        onSubmit={(data) => {
+          setComplaintFormModalOpen(false);
+          handleSendMessage(`Submitted complaint form: ${JSON.stringify(data)}`);
+        }}
+        language={language}
+      />
+    </AdvancedChatProvider>
+  );
+};
+
+export default AdvancedChatApp;

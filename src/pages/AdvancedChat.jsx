@@ -216,6 +216,86 @@ const ChatPage = () => {
   const bulkReviewPollRef = useRef(null);
   const bulkReviewTimerRef = useRef(null);
 
+  // Uploading indicators for multi-file views
+  const [isUploadingReview, setIsUploadingReview] = useState(false);
+  const [isUploadingChronology, setIsUploadingChronology] = useState(false);
+
+  // Confirmation modal for multi-file continuation
+  const [isMultiFileModalOpen, setIsMultiFileModalOpen] = useState(false);
+  const [multiFilePendingAction, setMultiFilePendingAction] = useState(null); // 'chronology' | 'review'
+
+  // New Chat Session handler (+ button action)
+  const handleStartNewChat = () => {
+    setMessages([]);
+    setSelectedFile(null);
+    setReviewFiles([]);
+    setChronologyFiles([]);
+    setFileSessionId(crypto.randomUUID());
+    lastToolSessionFileId.current = null;
+    setResearchStatus('idle');
+    setResearchResults(null);
+    setResearchSessionId(null);
+    setIsReportPanelOpen(false);
+    setChronologyStatus('idle');
+    setChronologyResults(null);
+    setChronologySessionId(null);
+    setIsTimelinePanelOpen(false);
+    setReviewStatus('idle');
+    setBulkReviewResults(null);
+    setBulkReviewSessionId(null);
+    setIsBulkReviewPanelOpen(false);
+    localStorage.removeItem('deepResearchSessionId');
+    localStorage.removeItem('chronologySessionId');
+    localStorage.removeItem('bulkReviewSessionId');
+    toast({
+      title: language === 'hi' ? 'नया चैट सत्र शुरू हुआ' : 'New Chat Session Started',
+      status: 'info',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
+  const triggerChronologyAction = () => {
+    if (chronologyFiles.length === 0) {
+      toast({ title: 'No files uploaded', description: 'Please upload at least one file first.', status: 'warning', duration: 3000 });
+      return;
+    }
+    const hasUserMessages = messages.some(m => !m.isSessionHeader && !m.isSessionDivider);
+    if (hasUserMessages) {
+      setMultiFilePendingAction('chronology');
+      setIsMultiFileModalOpen(true);
+    } else {
+      handleStartChronology();
+    }
+  };
+
+  const triggerParallelReviewAction = () => {
+    if (reviewFiles.length < 2) {
+      toast({ title: 'Upload at least 2 files', description: 'Please upload at least 2 files to compare.', status: 'warning', duration: 3000 });
+      return;
+    }
+    const hasUserMessages = messages.some(m => !m.isSessionHeader && !m.isSessionDivider);
+    if (hasUserMessages) {
+      setMultiFilePendingAction('review');
+      setIsMultiFileModalOpen(true);
+    } else {
+      handleStartBulkReview();
+    }
+  };
+
+  const handleConfirmMultiFileChoice = (startNewChat) => {
+    setIsMultiFileModalOpen(false);
+    if (startNewChat) {
+      handleStartNewChat();
+    }
+    if (multiFilePendingAction === 'chronology') {
+      handleStartChronology();
+    } else if (multiFilePendingAction === 'review') {
+      handleStartBulkReview();
+    }
+    setMultiFilePendingAction(null);
+  };
+
   // Drafting Tools State
   const [activeDraftingTool, setActiveDraftingTool] = useState(null);
 
@@ -2663,8 +2743,18 @@ const ChatPage = () => {
       return;
     }
 
-    // 🆕 File session management — create new session or continue existing one
-    startNewFileSession(targetFile, 'Deep Research');
+    // Always start Deep Research in a new chat session (Gemini style)
+    handleStartNewChat();
+    setSelectedFile(targetFile);
+
+    const fileName = targetFile.fileName || targetFile.originalName || targetFile.name || 'Uploaded file';
+    setMessages([
+      {
+        role: 'assistant',
+        content: `🔬 **Deep Research Started**\n\n**File:** ${fileName}\n\nAnalyzing document context, key points, dates, and action items...`,
+        isSessionHeader: true,
+      }
+    ]);
 
     try {
       setResearchStatus('starting');
@@ -3112,22 +3202,27 @@ const ChatPage = () => {
     }
     toast({ title: `Uploading ${validFiles.length} file(s)...`, status: 'info', duration: 2000 });
 
-    const uploaded = [];
-    for (const file of validFiles) {
-      try {
-        const response = await fileService.uploadFile(file);
-        const editResult = await fileService.startEditSession(response.file._id);
-        const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
-        uploaded.push({ file: response.file, editSessionId });
-      } catch (err) {
-        console.error(`Failed to upload "${file.name}":`, err);
+    try {
+      setIsUploadingReview(true);
+      const uploaded = [];
+      for (const file of validFiles) {
+        try {
+          const response = await fileService.uploadFile(file);
+          const editResult = await fileService.startEditSession(response.file._id);
+          const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
+          uploaded.push({ file: response.file, editSessionId });
+        } catch (err) {
+          console.error(`Failed to upload "${file.name}":`, err);
+        }
       }
+      if (uploaded.length > 0) {
+        setReviewFiles(prev => [...prev, ...uploaded]);
+        toast({ title: `${uploaded.length} file(s) ready for Parallel Review`, status: 'success', duration: 2500 });
+      }
+    } finally {
+      setIsUploadingReview(false);
+      e.target.value = '';
     }
-    if (uploaded.length > 0) {
-      setReviewFiles(prev => [...prev, ...uploaded]);
-      toast({ title: `${uploaded.length} file(s) ready for Parallel Review`, status: 'success', duration: 2500 });
-    }
-    e.target.value = '';
   };
 
   const handleChronologyFilesUpload = async (e) => {
@@ -3156,45 +3251,50 @@ const ChatPage = () => {
     }
     toast({ title: `Uploading ${validFiles.length} file(s)...`, status: 'info', duration: 2000 });
 
-    const uploaded = [];
-    for (const file of validFiles) {
-      try {
-        const response = await fileService.uploadFile(file);
-        const editResult = await fileService.startEditSession(response.file._id);
-        const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
-        uploaded.push({ file: response.file, editSessionId });
-      } catch (err) {
-        console.error(`Failed to upload "${file.name}":`, err);
+    try {
+      setIsUploadingChronology(true);
+      const uploaded = [];
+      for (const file of validFiles) {
+        try {
+          const response = await fileService.uploadFile(file);
+          const editResult = await fileService.startEditSession(response.file._id);
+          const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
+          uploaded.push({ file: response.file, editSessionId });
+        } catch (err) {
+          console.error(`Failed to upload "${file.name}":`, err);
+        }
       }
-    }
-    if (uploaded.length > 0) {
-      const newFiles = [...chronologyFiles, ...uploaded];
-      setChronologyFiles(newFiles);
-      if (['completed', 'completed_with_errors'].includes(chronologyStatus)) {
-        toast({ title: `Merging ${uploaded.length} new file(s) into timeline...`, status: 'info', duration: 3000 });
-        isMergingChronologyRef.current = true;
-        setTimeout(async () => {
-          try {
-            setChronologyStatus('starting');
-            setChronologyAgentStage('Merging new files into timeline...');
-            setChronologyElapsed(0);
-            setChronologyEta(40 + newFiles.length * 20);
-            const editSessionIds = newFiles.map(f => f.editSessionId);
-            const result = await chronologyService.startChronology(editSessionIds);
-            const newSessionId = result.sessionId;
-            setChronologySessionId(newSessionId);
-            localStorage.setItem('chronologySessionId', newSessionId);
-            setChronologyStatus('processing');
-            pollChronologyStatus(newSessionId);
-          } catch (err) {
-            console.error('Chronology merge error:', err);
-            setChronologyStatus('idle');
-            isMergingChronologyRef.current = false;
-          }
-        }, 300);
+      if (uploaded.length > 0) {
+        const newFiles = [...chronologyFiles, ...uploaded];
+        setChronologyFiles(newFiles);
+        if (['completed', 'completed_with_errors'].includes(chronologyStatus)) {
+          toast({ title: `Merging ${uploaded.length} new file(s) into timeline...`, status: 'info', duration: 3000 });
+          isMergingChronologyRef.current = true;
+          setTimeout(async () => {
+            try {
+              setChronologyStatus('starting');
+              setChronologyAgentStage('Merging new files into timeline...');
+              setChronologyElapsed(0);
+              setChronologyEta(40 + newFiles.length * 20);
+              const editSessionIds = newFiles.map(f => f.editSessionId);
+              const result = await chronologyService.startChronology(editSessionIds);
+              const newSessionId = result.sessionId;
+              setChronologySessionId(newSessionId);
+              localStorage.setItem('chronologySessionId', newSessionId);
+              setChronologyStatus('processing');
+              pollChronologyStatus(newSessionId);
+            } catch (err) {
+              console.error('Chronology merge error:', err);
+              setChronologyStatus('idle');
+              isMergingChronologyRef.current = false;
+            }
+          }, 300);
+        }
       }
+    } finally {
+      setIsUploadingChronology(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const handleFileUpload = async (e) => {
@@ -3989,10 +4089,7 @@ const ChatPage = () => {
               }}
               _active={{ transform: 'translateY(0)' }}
               leftIcon={<AddIcon />}
-              onClick={() => {
-                const newSlug = Math.random().toString(36).substring(2, 15);
-                navigate(`/c/${newSlug}`);
-              }}
+              onClick={handleStartNewChat}
               w="full"
               borderRadius="xl"
               fontWeight="bold"
@@ -4124,7 +4221,7 @@ const ChatPage = () => {
               cursor="pointer"
               bg={cv_rgba_212_175_55_0_015_rgba_212_175_55_0_005}
               transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-              onClick={() => document.getElementById('chronology-file-upload')?.click()}
+              onClick={() => document.getElementById('file-upload')?.click()}
               _hover={{ 
                 borderColor: 'judicial.gold',
                 bg: cv_rgba_212_175_55_0_05_rgba_212_175_55_0_03,
@@ -4153,41 +4250,88 @@ const ChatPage = () => {
                 PDF, Word, TXT, images
               </Text>
             </Box>
-            {selectedFile && (
+
+            {/* Uploading Status Indicator */}
+            {uploading && (
               <Box 
-                p={3} 
+                p={3.5} 
                 bg={cv_gray_50_rgba_212_175_55_0_04} 
                 border="1px solid"
-                borderColor={cv_gray_200_rgba_212_175_55_0_15}
+                borderColor="judicial.gold"
                 borderRadius="xl"
-                position="relative"
               >
-                <HStack justify="space-between" mb={1}>
-                  <HStack spacing={2} maxW="85%">
-                    <Icon as={FiFileText} color="judicial.gold" w={4} h={4} />
-                    <Text fontSize="xs" fontWeight="semibold" isTruncated color={cv_gray_850_gray_100}>
-                      {selectedFile.fileName || selectedFile.name}
+                <HStack justify="space-between" mb={2}>
+                  <HStack spacing={2}>
+                    <Spinner size="xs" color="judicial.gold" />
+                    <Text fontSize="xs" fontWeight="bold" color={cv_gray_850_gray_100}>
+                      Uploading file...
                     </Text>
                   </HStack>
-                  <IconButton
-                    icon={<FaTimes />}
-                    size="2xs"
-                    variant="ghost"
-                    color="gray.400"
-                    _hover={{ color: 'red.500' }}
-                    onClick={() => setSelectedFile(null)}
-                    aria-label="Remove file"
-                  />
+                  <Text fontSize="2xs" color="gray.500">{uploadProgress}%</Text>
                 </HStack>
                 <Progress 
                   value={uploadProgress} 
                   size="2xs" 
                   colorScheme="yellow" 
                   bg={cv_gray_200_gray_800}
-                  mt={1} 
                   borderRadius="full" 
                 />
               </Box>
+            )}
+
+            {/* Uploaded File & Start Deep Research Button */}
+            {!uploading && selectedFile && (
+              <VStack spacing={3} align="stretch">
+                <Box 
+                  p={3.5} 
+                  bg={cv_gray_50_rgba_212_175_55_0_04} 
+                  border="1px solid"
+                  borderColor={cv_gray_200_rgba_212_175_55_0_15}
+                  borderRadius="xl"
+                  position="relative"
+                >
+                  <HStack justify="space-between">
+                    <HStack spacing={2} maxW="85%">
+                      <Icon as={FiFileText} color="judicial.gold" w={4} h={4} />
+                      <VStack align="start" spacing={0} overflow="hidden">
+                        <Text fontSize="xs" fontWeight="semibold" isTruncated color={cv_gray_850_gray_100}>
+                          {selectedFile.fileName || selectedFile.name}
+                        </Text>
+                        <Text fontSize="10px" color="gray.400">Ready for Deep Research</Text>
+                      </VStack>
+                    </HStack>
+                    <IconButton
+                      icon={<FaTimes />}
+                      size="2xs"
+                      variant="ghost"
+                      color="gray.400"
+                      _hover={{ color: 'red.500' }}
+                      onClick={() => setSelectedFile(null)}
+                      aria-label="Remove file"
+                    />
+                  </HStack>
+                </Box>
+
+                <Button
+                  size="sm"
+                  w="full"
+                  bg="judicial.gold"
+                  color="judicial.dark"
+                  fontWeight="bold"
+                  borderRadius="xl"
+                  leftIcon={<Icon as={FiCpu} />}
+                  onClick={() => handleStartDeepResearch()}
+                  isLoading={researchStatus === 'starting' || researchStatus === 'processing'}
+                  loadingText="Analyzing..."
+                  _hover={{
+                    bg: 'judicial.lightGold',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 15px rgba(212, 175, 55, 0.3)'
+                  }}
+                >
+                  Start Deep Research
+                </Button>
+              </VStack>
             )}
           </VStack>
         );
@@ -4209,7 +4353,7 @@ const ChatPage = () => {
               cursor="pointer"
               bg={cv_rgba_212_175_55_0_015_rgba_212_175_55_0_005}
               transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-              onClick={() => document.getElementById('chronology-file-upload')?.click()}
+              onClick={() => document.getElementById('review-file-upload')?.click()}
               _hover={{ 
                 borderColor: 'judicial.gold',
                 bg: cv_rgba_212_175_55_0_05_rgba_212_175_55_0_03,
@@ -4238,6 +4382,86 @@ const ChatPage = () => {
                 Upload up to 10 files in parallel
               </Text>
             </Box>
+
+            {/* Uploading Status Indicator */}
+            {isUploadingReview && (
+              <Box 
+                p={3.5} 
+                bg={cv_gray_50_rgba_212_175_55_0_04} 
+                border="1px solid"
+                borderColor="judicial.gold"
+                borderRadius="xl"
+              >
+                <HStack spacing={2}>
+                  <Spinner size="xs" color="judicial.gold" />
+                  <Text fontSize="xs" fontWeight="bold" color={cv_gray_850_gray_100}>
+                    Uploading file(s)...
+                  </Text>
+                </HStack>
+                <Progress size="2xs" isIndeterminate colorScheme="yellow" mt={2} borderRadius="full" />
+              </Box>
+            )}
+
+            {/* List of Uploaded Review Files */}
+            {reviewFiles.length > 0 && (
+              <VStack spacing={3} align="stretch">
+                <Text fontSize="11px" fontWeight="bold" color="gray.500" textTransform="uppercase">
+                  Uploaded Files ({reviewFiles.length})
+                </Text>
+                <VStack spacing={2} align="stretch" maxH="220px" overflowY="auto">
+                  {reviewFiles.map((rf, idx) => (
+                    <Box
+                      key={idx}
+                      p={2.5}
+                      bg={cv_gray_50_rgba_212_175_55_0_04}
+                      border="1px solid"
+                      borderColor={cv_gray_200_rgba_212_175_55_0_15}
+                      borderRadius="lg"
+                    >
+                      <HStack justify="space-between">
+                        <HStack spacing={2} maxW="85%">
+                          <Icon as={FiFileText} color="judicial.gold" w={3.5} h={3.5} />
+                          <Text fontSize="xs" isTruncated color={cv_gray_850_gray_100}>
+                            {rf.file?.fileName || rf.file?.name || `File ${idx + 1}`}
+                          </Text>
+                        </HStack>
+                        <IconButton
+                          icon={<FaTimes />}
+                          size="2xs"
+                          variant="ghost"
+                          color="gray.400"
+                          _hover={{ color: 'red.500' }}
+                          onClick={() => {
+                            setReviewFiles(prev => prev.filter((_, i) => i !== idx));
+                          }}
+                          aria-label="Remove file"
+                        />
+                      </HStack>
+                    </Box>
+                  ))}
+                </VStack>
+
+                <Button
+                  size="sm"
+                  w="full"
+                  bg="judicial.gold"
+                  color="judicial.dark"
+                  fontWeight="bold"
+                  borderRadius="xl"
+                  leftIcon={<Icon as={FiLayers} />}
+                  onClick={triggerParallelReviewAction}
+                  isLoading={reviewStatus === 'starting' || reviewStatus === 'processing'}
+                  loadingText="Reviewing..."
+                  _hover={{
+                    bg: 'judicial.lightGold',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 15px rgba(212, 175, 55, 0.3)'
+                  }}
+                >
+                  Start Parallel Review
+                </Button>
+              </VStack>
+            )}
           </VStack>
         );
 
@@ -4287,6 +4511,86 @@ const ChatPage = () => {
                 Analyze timeline sources
               </Text>
             </Box>
+
+            {/* Uploading Status Indicator */}
+            {isUploadingChronology && (
+              <Box 
+                p={3.5} 
+                bg={cv_gray_50_rgba_212_175_55_0_04} 
+                border="1px solid"
+                borderColor="judicial.gold"
+                borderRadius="xl"
+              >
+                <HStack spacing={2}>
+                  <Spinner size="xs" color="judicial.gold" />
+                  <Text fontSize="xs" fontWeight="bold" color={cv_gray_850_gray_100}>
+                    Uploading file(s)...
+                  </Text>
+                </HStack>
+                <Progress size="2xs" isIndeterminate colorScheme="yellow" mt={2} borderRadius="full" />
+              </Box>
+            )}
+
+            {/* List of Uploaded Chronology Files */}
+            {chronologyFiles.length > 0 && (
+              <VStack spacing={3} align="stretch">
+                <Text fontSize="11px" fontWeight="bold" color="gray.500" textTransform="uppercase">
+                  Uploaded Files ({chronologyFiles.length})
+                </Text>
+                <VStack spacing={2} align="stretch" maxH="220px" overflowY="auto">
+                  {chronologyFiles.map((cf, idx) => (
+                    <Box
+                      key={idx}
+                      p={2.5}
+                      bg={cv_gray_50_rgba_212_175_55_0_04}
+                      border="1px solid"
+                      borderColor={cv_gray_200_rgba_212_175_55_0_15}
+                      borderRadius="lg"
+                    >
+                      <HStack justify="space-between">
+                        <HStack spacing={2} maxW="85%">
+                          <Icon as={FiFileText} color="judicial.gold" w={3.5} h={3.5} />
+                          <Text fontSize="xs" isTruncated color={cv_gray_850_gray_100}>
+                            {cf.file?.fileName || cf.file?.name || `File ${idx + 1}`}
+                          </Text>
+                        </HStack>
+                        <IconButton
+                          icon={<FaTimes />}
+                          size="2xs"
+                          variant="ghost"
+                          color="gray.400"
+                          _hover={{ color: 'red.500' }}
+                          onClick={() => {
+                            setChronologyFiles(prev => prev.filter((_, i) => i !== idx));
+                          }}
+                          aria-label="Remove file"
+                        />
+                      </HStack>
+                    </Box>
+                  ))}
+                </VStack>
+
+                <Button
+                  size="sm"
+                  w="full"
+                  bg="judicial.gold"
+                  color="judicial.dark"
+                  fontWeight="bold"
+                  borderRadius="xl"
+                  leftIcon={<Icon as={FiClock} />}
+                  onClick={triggerChronologyAction}
+                  isLoading={chronologyStatus === 'starting' || chronologyStatus === 'processing'}
+                  loadingText="Building Timeline..."
+                  _hover={{
+                    bg: 'judicial.lightGold',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 15px rgba(212, 175, 55, 0.3)'
+                  }}
+                >
+                  Build Chronology
+                </Button>
+              </VStack>
+            )}
           </VStack>
         );
 
@@ -5024,6 +5328,7 @@ const ChatPage = () => {
             h="60px" 
             display="flex" 
             alignItems="center" 
+            justifyContent="space-between"
             px={4} 
             borderBottom="1px solid" 
             borderColor={borderColor}
@@ -5031,6 +5336,17 @@ const ChatPage = () => {
             <Heading size="xs" textTransform="uppercase" letterSpacing="wider" color="gray.500">
               {activeTab.replace('-', ' ')}
             </Heading>
+            <Tooltip label="Start New Chat" placement="bottom">
+              <IconButton
+                icon={<AddIcon />}
+                size="xs"
+                variant="ghost"
+                color="judicial.gold"
+                _hover={{ bg: cv_gray_100_rgba_212_175_55_0_08 }}
+                onClick={handleStartNewChat}
+                aria-label="Start New Chat"
+              />
+            </Tooltip>
           </Box>
           
           <Box flex="1" overflowY="auto" p={4}>
@@ -5135,6 +5451,25 @@ const ChatPage = () => {
             >
               {language === 'en' ? 'EN' : 'हिं'}
             </Button>
+            <Tooltip label="New Chat Session" placement="bottom">
+              <IconButton
+                icon={<AddIcon />}
+                onClick={handleStartNewChat}
+                variant="ghost"
+                size="sm"
+                aria-label="New chat session"
+                color={cv_gray_600_gray_400}
+                transition="all 0.2s ease"
+                _hover={{
+                  color: 'judicial.gold',
+                  bg: cv_gray_100_rgba_212_175_55_0_08,
+                  transform: 'scale(1.05)'
+                }}
+                _active={{
+                  bg: 'transparent'
+                }}
+              />
+            </Tooltip>
             <IconButton
               icon={<DeleteIcon />}
               onClick={handleClearChat}
@@ -5511,6 +5846,46 @@ const ChatPage = () => {
               </VStack>
             </form>
           </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* Multi-File Feature Continuation Confirmation Modal */}
+      <Modal isOpen={isMultiFileModalOpen} onClose={() => setIsMultiFileModalOpen(false)} isCentered size="md">
+        <ModalOverlay backdropFilter="blur(5px)" />
+        <ModalContent borderRadius="2xl" p={2} bg={cv_white_gray_900} border="1px solid" borderColor="judicial.gold">
+          <ModalHeader color={textColor} pt={4} fontSize="md" fontWeight="bold">
+            Start New Chat or Continue?
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={3} align="start">
+              <Text fontSize="sm" color={cv_gray_600_gray_400} lineHeight="1.5">
+                You are starting <strong>{multiFilePendingAction === 'chronology' ? 'Timeline Chronology' : 'Parallel Document Review'}</strong>.
+                Would you like to start a brand new chat session for this analysis or continue in your current conversation?
+              </Text>
+            </VStack>
+          </ModalBody>
+          <ModalFooter gap={3}>
+            <Button
+              variant="outline"
+              size="sm"
+              borderRadius="xl"
+              onClick={() => handleConfirmMultiFileChoice(false)}
+            >
+              Continue in Current Chat
+            </Button>
+            <Button
+              bg="judicial.gold"
+              color="judicial.dark"
+              size="sm"
+              borderRadius="xl"
+              fontWeight="bold"
+              _hover={{ bg: 'judicial.lightGold' }}
+              onClick={() => handleConfirmMultiFileChoice(true)}
+            >
+              Start New Chat
+            </Button>
+          </ModalFooter>
         </ModalContent>
       </Modal>
     </AdvancedChatProvider>
