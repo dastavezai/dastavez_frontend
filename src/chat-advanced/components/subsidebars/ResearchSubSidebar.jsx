@@ -9,7 +9,7 @@ import { useAdvancedChat } from '../../context/AdvancedChatContext';
 const ResearchSubSidebar = () => {
   const {
     uploading, uploadProgress, selectedFile, setSelectedFile, handleStartDeepResearch,
-    researchStatus
+    researchStatus, setIsReportPanelOpen
   } = useAdvancedChat();
 
   const cv_gray_250_rgba_212_175_55_0_25 = useColorModeValue('gray.250', 'rgba(212, 175, 55, 0.25)');
@@ -148,6 +148,22 @@ const ResearchSubSidebar = () => {
           >
             Start Deep Research
           </Button>
+
+          {researchStatus === 'completed' && (
+            <Button
+              size="sm"
+              w="full"
+              variant="outline"
+              borderColor="judicial.gold"
+              color="judicial.gold"
+              borderRadius="xl"
+              fontWeight="bold"
+              onClick={() => setIsReportPanelOpen(true)}
+              _hover={{ bg: 'rgba(212, 175, 55, 0.08)' }}
+            >
+              Open Research Report
+            </Button>
+          )}
         </VStack>
       )}
     </VStack>

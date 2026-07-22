@@ -10,6 +10,7 @@ import { MdDocumentScanner } from 'react-icons/md';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import ChatMessage from './components/ChatMessage';
+import ThinkingIndicator from './components/ThinkingIndicator';
 import { useAuth } from './AuthBridge';
 import { profileAPI } from '../lib/api';
 import fileService from './services/fileService';
@@ -308,8 +309,10 @@ const AdvancedChatApp = () => {
         const res = await axios.get(`${BASE_URL}/chat/session/${slug}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.data && res.data.messages) {
-          setMessages(res.data.messages.map(m => ({
+        if (res.data) {
+          // Restore messages
+          const msgs = res.data.messages || [];
+          setMessages(msgs.map(m => ({
             role: m.role,
             content: m.content,
             suggestedActions: m.suggestedActions || [],
@@ -318,10 +321,80 @@ const AdvancedChatApp = () => {
             fileUrl: m.fileUrl || null,
             fileName: m.fileName || null,
             scannedResult: m.scannedResult || null,
+            rightPanelToggle: m.rightPanelToggle || null,
             timestamp: m.createdAt || null
           })));
+
+          // Get user files to restore file object mappings
+          const allFiles = await fileService.getUserFiles();
+
+          // Restore Selected File
+          if (res.data.activeFileId) {
+            const foundFile = allFiles.find(f => f._id === res.data.activeFileId);
+            if (foundFile) setSelectedFile(foundFile);
+          } else {
+            setSelectedFile(null);
+          }
+
+          // Restore Deep Research State
+          if (res.data.researchSessionId) {
+            setResearchSessionId(res.data.researchSessionId);
+            localStorage.setItem('deepResearchSessionId', res.data.researchSessionId);
+            setResearchStatus('processing');
+            pollResearchStatus(res.data.researchSessionId);
+          } else {
+            setResearchSessionId(null);
+            setResearchResults(null);
+            setResearchStatus('idle');
+            localStorage.removeItem('deepResearchSessionId');
+          }
+
+          // Restore Chronology State
+          if (res.data.chronologySessionId) {
+            setChronologySessionId(res.data.chronologySessionId);
+            localStorage.setItem('chronologySessionId', res.data.chronologySessionId);
+            setChronologyStatus('processing');
+            pollChronologyStatus(res.data.chronologySessionId);
+          } else {
+            setChronologySessionId(null);
+            setChronologyResults(null);
+            setChronologyStatus('idle');
+            localStorage.removeItem('chronologySessionId');
+          }
+
+          // Restore Parallel Review State
+          if (res.data.bulkReviewSessionId) {
+            setBulkReviewSessionId(res.data.bulkReviewSessionId);
+            localStorage.setItem('bulkReviewSessionId', res.data.bulkReviewSessionId);
+            setReviewStatus('processing');
+            pollBulkReviewResults(res.data.bulkReviewSessionId);
+          } else {
+            setBulkReviewSessionId(null);
+            setBulkReviewResults(null);
+            setReviewStatus('idle');
+            localStorage.removeItem('bulkReviewSessionId');
+          }
+
+          // Restore Uploaded Parallel Review Files list
+          if (Array.isArray(res.data.reviewFileIds) && res.data.reviewFileIds.length > 0) {
+            const matched = allFiles.filter(f => res.data.reviewFileIds.includes(f._id));
+            setReviewFiles(matched.map(f => ({ file: f, editSessionId: f._id })));
+          } else {
+            setReviewFiles([]);
+          }
+
+          // Restore Uploaded Chronology Files list
+          if (Array.isArray(res.data.chronologyFileIds) && res.data.chronologyFileIds.length > 0) {
+            const matched = allFiles.filter(f => res.data.chronologyFileIds.includes(f._id));
+            setChronologyFiles(matched.map(f => ({ file: f, editSessionId: f._id })));
+          } else {
+            setChronologyFiles([]);
+          }
         } else {
           setMessages([]);
+          setSelectedFile(null);
+          setReviewFiles([]);
+          setChronologyFiles([]);
         }
       } catch (err) {
         console.error('Failed to load session messages:', err);
@@ -332,6 +405,27 @@ const AdvancedChatApp = () => {
     };
     loadSessionMessages();
   }, [slug, token]);
+
+  // Auto-save active chat state to database
+  useEffect(() => {
+    if (!token || !slug || slug === 'default') return;
+    const timer = setTimeout(() => {
+      const payload = {
+        activeFileId: selectedFile?._id || null,
+        researchSessionId: researchSessionId || null,
+        chronologySessionId: chronologySessionId || null,
+        bulkReviewSessionId: bulkReviewSessionId || null,
+        reviewFileIds: (reviewFiles || []).map(f => f.file?._id || f._id || f),
+        chronologyFileIds: (chronologyFiles || []).map(f => f.file?._id || f._id || f)
+      };
+      axios.patch(`${BASE_URL}/chat/session/${slug}/state`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => {
+        console.warn('Auto-save active chat state failed:', err);
+      });
+    }, 1000); // Debounce to prevent duplicate updates
+    return () => clearTimeout(timer);
+  }, [slug, token, selectedFile, researchSessionId, chronologySessionId, bulkReviewSessionId, reviewFiles, chronologyFiles]);
 
   // New Chat Session handler
   const handleStartNewChat = () => {
@@ -449,7 +543,12 @@ const AdvancedChatApp = () => {
               ...prev,
               {
                 role: 'assistant',
-                content: `I have completed the deep research on your document! You can view the full report in the right panel.\n\nHere are some follow-up questions you can ask me:\n1. ${followUpQuestions[0]}\n2. ${followUpQuestions[1]}\n3. ${followUpQuestions[2]}`
+                content: `I have completed the deep research on your document! You can view the full report in the right panel.\n\nHere are some follow-up questions you can ask me:\n1. ${followUpQuestions[0]}\n2. ${followUpQuestions[1]}\n3. ${followUpQuestions[2]}`,
+                rightPanelToggle: {
+                  label: 'Open Deep Research Report',
+                  tab: 'research',
+                  panelKey: 'isReportPanelOpen'
+                }
               }
             ]);
           }
@@ -575,7 +674,16 @@ const AdvancedChatApp = () => {
             isMergingChronologyRef.current = false;
             setMessages(prev => [
               ...prev,
-              { role: 'assistant', content: introLine, isChronologySummary: true }
+              { 
+                role: 'assistant', 
+                content: introLine, 
+                isChronologySummary: true,
+                rightPanelToggle: {
+                  label: 'Open Timeline Chronology Parser',
+                  tab: 'chronology',
+                  panelKey: 'isTimelinePanelOpen'
+                }
+              }
             ]);
           }
 
@@ -663,6 +771,18 @@ const AdvancedChatApp = () => {
             setReviewStatus(results.status);
             if (results.status !== 'failed') {
               setIsBulkReviewPanelOpen(true);
+              setMessages(prev => [
+                ...prev,
+                {
+                  role: 'assistant',
+                  content: `I have completed the Parallel Document Review of your ${reviewFiles.length} files. You can see compared clauses, summaries, and conflicts in the right panel.`,
+                  rightPanelToggle: {
+                    label: 'Open Parallel Review Results',
+                    tab: 'review',
+                    panelKey: 'isBulkReviewPanelOpen'
+                  }
+                }
+              ]);
             }
           }
         }
@@ -929,6 +1049,15 @@ const AdvancedChatApp = () => {
   };
 
   const handleSuggestedActionClick = (action) => {
+    if (action.type === 'toggle_right_panel') {
+      setActiveTab(action.tab);
+      setIsTimelinePanelOpen(action.panelKey === 'isTimelinePanelOpen');
+      setIsPrecedencePanelOpen(action.panelKey === 'isPrecedencePanelOpen');
+      setIsCounterMakerPanelOpen(action.panelKey === 'isCounterMakerPanelOpen');
+      setIsReportPanelOpen(action.panelKey === 'isReportPanelOpen');
+      setIsBulkReviewPanelOpen(action.panelKey === 'isBulkReviewPanelOpen');
+      return;
+    }
     handleSendMessage(action.text || action.label);
   };
 
@@ -1091,7 +1220,7 @@ const AdvancedChatApp = () => {
           />
 
           <Flex flex="1" overflow="hidden" position="relative">
-            <Flex w="full" h="full" direction="column" overflow="hidden" px={4} pt={4} pb={2}>
+            <Flex flex="1" h="full" direction="column" overflow="hidden" px={4} pt={4} pb={2}>
               {/* Messages scroll area */}
               <Box
                 flex="1"
@@ -1128,6 +1257,12 @@ const AdvancedChatApp = () => {
                         fontSize={chatFontSize}
                       />
                     ))}
+                    {isLoading && (
+                      <ThinkingIndicator 
+                        userMessage={[...messages].reverse().find(m => m.role === 'user')?.content || ''}
+                        hasActiveFile={Boolean(selectedFile)}
+                      />
+                    )}
                   </Flex>
                 )}
                 <div ref={messagesEndRef} />
@@ -1136,19 +1271,19 @@ const AdvancedChatApp = () => {
               {/* Chat Input Prompt controls */}
               <ChatInputBar />
             </Flex>
+
+            {/* 4. Right Split Panel */}
+            {isRightPanelOpen && (
+              <Box w="38%" minW="380px" maxW="550px" h="100%" borderLeft="1px solid" borderColor={borderColor} bg={cv_white_gray_900} overflow="hidden" display="flex" flexDirection="column" zIndex={5}>
+                {activeTab === 'chronology' && isTimelinePanelOpen && <TimelinePanel />}
+                {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
+                {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
+                {activeTab === 'research' && isReportPanelOpen && <ResearchPanel />}
+                {activeTab === 'review' && isBulkReviewPanelOpen && <BulkReviewPanel />}
+              </Box>
+            )}
           </Flex>
         </Flex>
-
-        {/* 4. Right Split Panel */}
-        {isRightPanelOpen && (
-          <Box w="38%" minW="380px" maxW="550px" h="100%" borderLeft="1px solid" borderColor={borderColor} bg={cv_white_gray_900} overflow="hidden" display="flex" flexDirection="column" zIndex={5} flex="1">
-            {activeTab === 'chronology' && isTimelinePanelOpen && <TimelinePanel />}
-            {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
-            {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
-            {activeTab === 'research' && isReportPanelOpen && <ResearchPanel />}
-            {activeTab === 'review' && isBulkReviewPanelOpen && <BulkReviewPanel />}
-          </Box>
-        )}
       </Flex>
 
       {/* Multi-File Confirmation Modal */}

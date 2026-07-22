@@ -8,7 +8,8 @@ import { useAdvancedChat } from '../../context/AdvancedChatContext';
 
 const ReviewSubSidebar = () => {
   const {
-    isUploadingReview, reviewFiles, setReviewFiles, triggerParallelReviewAction, reviewStatus
+    isUploadingReview, reviewFiles, setReviewFiles, triggerParallelReviewAction, reviewStatus,
+    setIsBulkReviewPanelOpen
   } = useAdvancedChat();
 
   const cv_gray_250_rgba_212_175_55_0_25 = useColorModeValue('gray.250', 'rgba(212, 175, 55, 0.25)');
@@ -143,6 +144,22 @@ const ReviewSubSidebar = () => {
           >
             Start Parallel Review
           </Button>
+
+          {reviewStatus === 'completed' && (
+            <Button
+              size="sm"
+              w="full"
+              variant="outline"
+              borderColor="judicial.gold"
+              color="judicial.gold"
+              borderRadius="xl"
+              fontWeight="bold"
+              onClick={() => setIsBulkReviewPanelOpen(true)}
+              _hover={{ bg: 'rgba(212, 175, 55, 0.08)' }}
+            >
+              Open Parallel Review
+            </Button>
+          )}
         </VStack>
       )}
     </VStack>

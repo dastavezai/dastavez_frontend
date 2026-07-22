@@ -10,6 +10,7 @@ import { ChakraProvider, extendTheme } from "@chakra-ui/react";
 const appTheme = extendTheme({
   config: { initialColorMode: 'light', useSystemColorMode: false },
 });
+import ErrorBoundary from "./components/ErrorBoundary";
 import { useEffect, useState, lazy, Suspense } from "react";
 
 const UseCases = lazy(() => import("./pages/UseCases"));
@@ -283,18 +284,20 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ChakraProvider theme={appTheme}>
-      <ThemeProvider defaultTheme="light" storageKey="dastavez-theme">
-        <TooltipProvider>
-          <LoadingScreen />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </TooltipProvider>
-      </ThemeProvider>
-    </ChakraProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ChakraProvider theme={appTheme}>
+        <ThemeProvider defaultTheme="light" storageKey="dastavez-theme">
+          <TooltipProvider>
+            <LoadingScreen />
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </TooltipProvider>
+        </ThemeProvider>
+      </ChakraProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

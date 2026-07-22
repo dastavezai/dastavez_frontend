@@ -46,6 +46,18 @@ const ResearchPanel = () => {
   const etaRemaining = Math.max(0, (researchEta || 90) - (researchElapsed || 0));
   const progressPercent = Math.min(100, ((researchElapsed || 0) / (researchEta || 90)) * 100);
 
+  const formatSummary = (summaryObj) => {
+    if (!summaryObj) return '';
+    if (typeof summaryObj === 'string') return stripMarkdown(summaryObj);
+    if (summaryObj.summary && typeof summaryObj.summary === 'string') return stripMarkdown(summaryObj.summary);
+    if (summaryObj.content && typeof summaryObj.content === 'string') return stripMarkdown(summaryObj.content);
+    
+    return Object.entries(summaryObj)
+      .filter(([key, val]) => typeof val === 'string' && key !== 'error' && key !== 'status')
+      .map(([key, val]) => `${key.charAt(0).toUpperCase() + key.slice(1)}: ${val}`)
+      .join('\n\n');
+  };
+
   const handleReset = () => {
     setResearchStatus('idle');
     setResearchResults(null);
@@ -215,6 +227,18 @@ const ResearchPanel = () => {
               </Box>
             )}
 
+            {/* Summary (Agent 3) - SHOWN FIRST */}
+            {researchResults.agent3Summary && !researchResults.agent3Summary.error && (
+              <Box p={3} bg={sectionBg} borderRadius="lg" borderLeft="3px solid" borderLeftColor="cyan.400">
+                <Text fontSize="xs" fontWeight="bold" color="cyan.600" textTransform="uppercase" mb={2}>
+                  📝 Document Summary
+                </Text>
+                <Text fontSize="sm" color={headingColor} whiteSpace="pre-wrap">
+                  {formatSummary(researchResults.agent3Summary)}
+                </Text>
+              </Box>
+            )}
+
             {/* Document Context & Key Points (Agent 1) */}
             {researchResults.agent1Data && !researchResults.agent1Data.error && (
               <>
@@ -283,20 +307,7 @@ const ResearchPanel = () => {
               </Box>
             )}
 
-            {/* Summary (Agent 3) */}
-            {researchResults.agent3Summary && !researchResults.agent3Summary.error && (
-              <Box p={3} bg={sectionBg} borderRadius="lg" borderLeft="3px solid" borderLeftColor="cyan.400">
-                <Text fontSize="xs" fontWeight="bold" color="cyan.600" textTransform="uppercase" mb={2}>
-                  📝 Document Summary
-                </Text>
-                <Text fontSize="sm" color={headingColor} whiteSpace="pre-wrap">
-                  {typeof researchResults.agent3Summary === 'string'
-                    ? stripMarkdown(researchResults.agent3Summary)
-                    : stripMarkdown(researchResults.agent3Summary.summary) || JSON.stringify(researchResults.agent3Summary, null, 2)
-                  }
-                </Text>
-              </Box>
-            )}
+
 
             <Button
               size="sm"

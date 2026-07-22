@@ -81,6 +81,17 @@ export const getAllFiles = async () => {
   }
 };
 
+export const getUserFiles = async () => {
+  try {
+    const response = await api.get(`${API_URL}/user-files`);
+    if (Array.isArray(response.data)) return response.data;
+    if (response.data && Array.isArray(response.data.files)) return response.data.files;
+    return [];
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
 export const deleteFile = async (fileId) => {
   try {
     const response = await api.delete(`${API_URL}/${fileId}`);
@@ -520,5 +531,6 @@ const fileService = {
 fileService.forgotPasswordRequest = forgotPasswordRequest;
 fileService.verifyResetOTP = verifyResetOTP;
 fileService.resetPassword = resetPassword;
+fileService.getUserFiles = getUserFiles;
 
 export default fileService; 

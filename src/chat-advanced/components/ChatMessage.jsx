@@ -213,6 +213,46 @@ const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = '
           />
         )}
 
+        {message.rightPanelToggle && (
+          <Box
+            onClick={() => onSuggestedActionClick({
+              type: 'toggle_right_panel',
+              tab: message.rightPanelToggle.tab,
+              panelKey: message.rightPanelToggle.panelKey
+            })}
+            cursor="pointer"
+            p={3.5}
+            borderRadius="xl"
+            bg={useColorModeValue('rgba(212, 175, 55, 0.05)', 'rgba(212, 175, 55, 0.12)')}
+            border="1px solid"
+            borderColor="judicial.gold"
+            transition="all 0.2s ease"
+            _hover={{
+              transform: 'translateY(-1px)',
+              boxShadow: '0 4px 14px rgba(212, 175, 55, 0.25)'
+            }}
+            mt={2.5}
+            w="full"
+          >
+            <HStack justify="space-between" w="full">
+              <HStack spacing={3}>
+                <Icon as={FiCpu} color="judicial.gold" boxSize={5} />
+                <VStack align="start" spacing={0.5}>
+                  <Text fontSize="sm" fontWeight="bold" color={textColor}>
+                    {message.rightPanelToggle.label}
+                  </Text>
+                  <Text fontSize="xs" color="gray.500">
+                    Click to view full interactive analysis report in the right panel.
+                  </Text>
+                </VStack>
+              </HStack>
+              <Text fontSize="xs" fontWeight="bold" color="judicial.gold">
+                View Report →
+              </Text>
+            </HStack>
+          </Box>
+        )}
+
         {message.files && message.files.length > 0 && (
           <VStack align="stretch" spacing={2} w="100%">
             {message.files.map((file, idx) => renderFile(file))}

@@ -8,7 +8,8 @@ import { useAdvancedChat } from '../../context/AdvancedChatContext';
 
 const ChronologySubSidebar = () => {
   const {
-    isUploadingChronology, chronologyFiles, setChronologyFiles, triggerChronologyAction, chronologyStatus
+    isUploadingChronology, chronologyFiles, setChronologyFiles, triggerChronologyAction, chronologyStatus,
+    setIsTimelinePanelOpen
   } = useAdvancedChat();
 
   const cv_gray_250_rgba_212_175_55_0_25 = useColorModeValue('gray.250', 'rgba(212, 175, 55, 0.25)');
@@ -143,6 +144,22 @@ const ChronologySubSidebar = () => {
           >
             Build Chronology
           </Button>
+
+          {chronologyStatus === 'completed' && (
+            <Button
+              size="sm"
+              w="full"
+              variant="outline"
+              borderColor="judicial.gold"
+              color="judicial.gold"
+              borderRadius="xl"
+              fontWeight="bold"
+              onClick={() => setIsTimelinePanelOpen(true)}
+              _hover={{ bg: 'rgba(212, 175, 55, 0.08)' }}
+            >
+              Open Chronology Timeline
+            </Button>
+          )}
         </VStack>
       )}
     </VStack>
