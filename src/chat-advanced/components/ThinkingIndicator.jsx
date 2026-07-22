@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, HStack, VStack, Text, Icon, useColorModeValue, keyframes } from '@chakra-ui/react';
+import { Box, HStack, VStack, Text, Icon, useColorModeValue } from '@chakra-ui/react';
+import { keyframes } from '@emotion/react';
 import { FiCpu } from 'react-icons/fi';
 
 // Pulse animation for avatar
