@@ -15,12 +15,12 @@ import ProfileSubSidebar from '../subsidebars/ProfileSubSidebar';
 import SettingsSubSidebar from '../subsidebars/SettingsSubSidebar';
 
 const SubSidebarContainer = () => {
-  const { activeTab, borderColor, handleStartNewChat } = useAdvancedChat();
+  const { activeTab, borderColor, handleStartNewChat, isEditMode } = useAdvancedChat();
 
   const cv_gray_50_gray_950 = useColorModeValue('gray.50', 'gray.950');
   const cv_gray_100_rgba_212_175_55_0_08 = useColorModeValue('gray.100', 'rgba(212, 175, 55, 0.08)');
 
-  if (activeTab === 'closed') return null;
+  if (activeTab === 'closed' || isEditMode) return null;
 
   const renderContent = () => {
     switch (activeTab) {

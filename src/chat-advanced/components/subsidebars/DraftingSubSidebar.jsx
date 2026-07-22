@@ -6,7 +6,7 @@ import { FiFileText, FiZap, FiEdit, FiGlobe, FiMaximize2 } from 'react-icons/fi'
 import { useAdvancedChat } from '../../context/AdvancedChatContext';
 
 const DraftingSubSidebar = () => {
-  const { handleSuggestedActionClick } = useAdvancedChat();
+  const { handleSuggestedActionClick, handleBrowseTemplatesClick } = useAdvancedChat();
 
   const cv_gray_550_gray_400 = useColorModeValue('gray.550', 'gray.400');
   const cv_white_rgba_212_175_55_0_005 = useColorModeValue('white', 'rgba(212, 175, 55, 0.005)');
@@ -27,7 +27,7 @@ const DraftingSubSidebar = () => {
             title: 'Browse Templates',
             subtext: 'Select pre-drafted legal categories',
             icon: FiFileText,
-            onClick: () => handleSuggestedActionClick({ type: 'CREATE_DOCUMENT', text: 'Draft a dynamic template document' })
+            onClick: handleBrowseTemplatesClick
           },
           {
             id: 'precedence',

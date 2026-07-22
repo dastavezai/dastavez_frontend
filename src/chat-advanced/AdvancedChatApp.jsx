@@ -5,12 +5,13 @@ import {
   FormControl, FormLabel, InputGroup, InputRightElement, Show, Heading, Select, Icon, HStack
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
-import { FiGlobe, FiEdit } from 'react-icons/fi';
+import { FiGlobe, FiEdit, FiFileText } from 'react-icons/fi';
 import { MdDocumentScanner } from 'react-icons/md';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import ChatMessage from './components/ChatMessage';
 import ThinkingIndicator from './components/ThinkingIndicator';
+import DocumentViewer from './components/DocumentViewer';
 import { useAuth } from './AuthBridge';
 import { profileAPI } from '../lib/api';
 import fileService from './services/fileService';
@@ -235,6 +236,7 @@ const AdvancedChatApp = () => {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [lastGeneratedFile, setLastGeneratedFile] = useState(null);
   const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
+  const [templateContextModalOpen, setTemplateContextModalOpen] = useState(false);
   const [documentTypeModalOpen, setDocumentTypeModalOpen] = useState(false);
   const [guidanceModalOpen, setGuidanceModalOpen] = useState(false);
   const [complaintFormModalOpen, setComplaintFormModalOpen] = useState(false);
@@ -998,7 +1000,7 @@ const AdvancedChatApp = () => {
   };
 
   // Chat message sending logic
-  const handleSendMessage = async (textToSend = null) => {
+  const handleSendMessage = async (textToSend = null, customPayload = null) => {
     const text = textToSend || input;
     if (!text.trim() && !selectedFile) return;
 
@@ -1011,6 +1013,7 @@ const AdvancedChatApp = () => {
       const payload = {
         message: text,
         language: language || 'en',
+        ...customPayload
       };
       if (selectedFile?._id) payload.fileId = selectedFile._id;
       if (intentOverride) payload.intentOverride = intentOverride;
@@ -1021,12 +1024,33 @@ const AdvancedChatApp = () => {
       );
 
       if (response.data) {
-        setMessages(prev => [...prev, {
+        const assistantMsg = {
           role: 'assistant',
           content: response.data.response,
-          suggestedActions: response.data.suggestedActions || []
-        }]);
+          suggestedActions: response.data.suggestedActions || [],
+          rightPanelToggle: response.data.rightPanelToggle || null,
+          file: response.data.file || null
+        };
+        
+        setMessages(prev => [...prev, assistantMsg]);
         fetchSessions();
+
+        if (response.data.file) {
+          setSelectedFile(response.data.file);
+          
+          try {
+            const fileId = response.data.file.fileId || response.data.file._id || response.data.file.id;
+            if (fileId) {
+              const editResult = await fileService.startEditSession(fileId);
+              setEditSession(editResult.editSession || editResult);
+              setDocumentAnalysis(editResult.analysis || null);
+              setIsEditMode(true);
+              setEditSessionActive(true);
+            }
+          } catch (e) {
+            console.warn('Failed to start edit session for generated document:', e);
+          }
+        }
       }
     } catch (error) {
       console.error('Message error:', error);
@@ -1080,6 +1104,10 @@ const AdvancedChatApp = () => {
   const handleExitEditMode = () => {
     setIsEditMode(false);
     setEditSessionActive(false);
+  };
+
+  const handleBrowseTemplatesClick = () => {
+    setTemplateContextModalOpen(true);
   };
 
   const toggleListening = () => {
@@ -1159,6 +1187,10 @@ const AdvancedChatApp = () => {
     isCounterMakerPanelOpen, setIsCounterMakerPanelOpen,
     counterMakerFileId, setCounterMakerFileId,
 
+    isEditMode, setIsEditMode,
+    editSession, setEditSession,
+    documentAnalysis, setDocumentAnalysis,
+    handleBrowseTemplatesClick,
     handleSuggestedActionClick,
     handleClearChat,
     handleSmartScan,
@@ -1274,12 +1306,19 @@ const AdvancedChatApp = () => {
 
             {/* 4. Right Split Panel */}
             {isRightPanelOpen && (
-              <Box w="38%" minW="380px" maxW="550px" h="100%" borderLeft="1px solid" borderColor={borderColor} bg={cv_white_gray_900} overflow="hidden" display="flex" flexDirection="column" zIndex={5}>
+              <Box w={isEditMode ? "58%" : "38%"} minW={isEditMode ? "600px" : "380px"} maxW={isEditMode ? "950px" : "550px"} h="100%" borderLeft="1px solid" borderColor={borderColor} bg={cv_white_gray_900} overflow="hidden" display="flex" flexDirection="column" zIndex={5}>
                 {activeTab === 'chronology' && isTimelinePanelOpen && <TimelinePanel />}
                 {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
                 {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
                 {activeTab === 'research' && isReportPanelOpen && <ResearchPanel />}
                 {activeTab === 'review' && isBulkReviewPanelOpen && <BulkReviewPanel />}
+                {isEditMode && (
+                  <DocumentViewer 
+                    session={editSession} 
+                    analysis={documentAnalysis}
+                    onExpandClick={handleOpenEditor}
+                  />
+                )}
               </Box>
             )}
           </Flex>
@@ -1390,12 +1429,64 @@ const AdvancedChatApp = () => {
         onClose={() => setTemplateBrowserOpen(false)}
         onSelectTemplate={(tpl) => {
           setTemplateBrowserOpen(false);
-          handleSendMessage(`Selected template: ${tpl.name || tpl.title}`);
+          handleSendMessage(
+            `Selected template: ${tpl.displayTitle || tpl.name || tpl.title || 'template'}`,
+            { templatePath: tpl.relPath }
+          );
         }}
         language={language}
         token={token}
       />
-
+      {/* Choose Drafting Context Selection Modal */}
+      <Modal isOpen={templateContextModalOpen} onClose={() => setTemplateContextModalOpen(false)} isCentered>
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(8px)" />
+        <ModalContent bg={cv_white_gray_900} borderColor={borderColor} borderWidth={1} borderRadius="2xl" p={4}>
+          <ModalHeader>
+            <HStack spacing={3}>
+              <Icon as={FiFileText} color="judicial.gold" boxSize={6} />
+              <Text fontSize="lg" fontWeight="bold">Choose Drafting Context</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text fontSize="sm" color="gray.500" mb={4}>
+              Do you want to start a new chat session for this draft, or use the context of your existing chat?
+            </Text>
+          </ModalBody>
+          <ModalFooter gap={3}>
+            <Button
+              variant="outline"
+              borderColor="judicial.gold"
+              color={textColor}
+              _hover={{ bg: cv_gray_100_rgba_212_175_55_0_08 }}
+              onClick={() => {
+                setTemplateContextModalOpen(false);
+                setTemplateBrowserOpen(true);
+              }}
+              borderRadius="xl"
+              fontSize="sm"
+            >
+              Use Existing Chat
+            </Button>
+            <Button
+              bg="judicial.gold"
+              color="judicial.dark"
+              _hover={{ bg: 'judicial.lightGold' }}
+              onClick={() => {
+                setTemplateContextModalOpen(false);
+                handleStartNewChat();
+                setTimeout(() => {
+                  setTemplateBrowserOpen(true);
+                }, 100);
+              }}
+              borderRadius="xl"
+              fontSize="sm"
+            >
+              Start New Chat
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
       {/* Document Type Selector Modal */}
       <DocumentTypeSelector
         isOpen={documentTypeModalOpen}
