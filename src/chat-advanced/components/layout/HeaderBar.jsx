@@ -33,7 +33,7 @@ const HeaderBar = () => {
       bg={cv_white_gray_900}
     >
       <HStack spacing={4}>
-        <Heading size="md" color={textColor}>
+        <Heading size="md" color={textColor} whiteSpace="nowrap" isTruncated maxW={{ base: '200px', md: '350px' }}>
           {activeTab === 'dashboard' ? 'Workspace Dashboard' :
            activeTab === 'history' ? 'Conversation Explorer' :
            activeTab === 'research' ? 'Deep Research Assistant' :

@@ -38,8 +38,9 @@ const CounterMakerPanel = () => {
 
   return (
     <Box
-      w="420px"
-      minW="380px"
+      w="100%"
+      h="100%"
+      flex="1"
       bg={panelBg}
       borderLeft="1px solid"
       borderColor={panelBorder}

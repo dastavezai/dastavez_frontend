@@ -25,8 +25,9 @@ const PrecedencePanel = () => {
 
   return (
     <Box
-      w="380px"
-      minW="340px"
+      w="100%"
+      h="100%"
+      flex="1"
       bg={panelBg}
       borderLeft="1px solid"
       borderColor={panelBorder}

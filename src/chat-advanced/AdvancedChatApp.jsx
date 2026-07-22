@@ -1141,7 +1141,7 @@ const AdvancedChatApp = () => {
 
         {/* 4. Right Split Panel */}
         {isRightPanelOpen && (
-          <Box w="45%" minW="400px" maxW="600px" borderLeft="1px solid" borderColor={borderColor} bg={cv_white_gray_900} overflowY="auto" display="flex" flexDirection="column" zIndex={5}>
+          <Box w="38%" minW="380px" maxW="550px" h="100%" borderLeft="1px solid" borderColor={borderColor} bg={cv_white_gray_900} overflow="hidden" display="flex" flexDirection="column" zIndex={5} flex="1">
             {activeTab === 'chronology' && isTimelinePanelOpen && <TimelinePanel />}
             {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
             {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
