@@ -116,6 +116,7 @@ const ResearchPanel = () => {
       {/* Panel Body */}
       <Box
         flex="1"
+        minH={0}
         overflowY="auto"
         p={4}
         css={{

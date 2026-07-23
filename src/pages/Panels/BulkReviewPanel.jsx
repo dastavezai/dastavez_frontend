@@ -54,7 +54,7 @@ const BulkReviewPanel = () => {
   const docs = bulkReviewResults?.documents || [];
 
   return (
-    <Box h="full" w="full" bg={bg} borderLeft="1px solid" borderColor={borderColor} overflowY="auto">
+    <Box h="full" minH={0} w="full" bg={bg} borderLeft="1px solid" borderColor={borderColor} overflowY="auto">
       {/* Header */}
       <Box p={5} borderBottom="1px solid" borderColor={borderColor} bg={headerBg}>
         <HStack spacing={3} mb={1}>

@@ -1,19 +1,21 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Box, VStack, HStack, Icon, Text, Badge, IconButton, Button, Input, Menu, MenuButton, MenuList, MenuItem, Tooltip, useColorModeValue
 } from '@chakra-ui/react';
 import { AddIcon } from '@chakra-ui/icons';
 import { FaFile, FaTimes } from 'react-icons/fa';
-import { FiMic, FiMicOff } from 'react-icons/fi';
+import { FiMic, FiMicOff, FiPaperclip } from 'react-icons/fi';
 import { RiSendPlaneFill } from 'react-icons/ri';
 import { useAdvancedChat } from '../../context/AdvancedChatContext';
 
 const ChatInputBar = () => {
+  const chatFileInputRef = useRef(null);
   const {
     selectedFile, setSelectedFile, scanStatus, editSessionActive, handleExitEditMode, textColor,
     intentOverride, setIntentOverride, intentLabel, setIntentLabel,
     input, setInput, interimTranscript, isPendingUserChoice, isListening, isEditMode, isLoading, analyzingFile,
-    handleKeyPress, toggleListening, speechSupported, handleSendMessage, handleStartNewChat
+    handleKeyPress, toggleListening, speechSupported, handleSendMessage, handleStartNewChat,
+    handleChatFileUpload, uploading
   } = useAdvancedChat();
 
   const cv_blue_50_blue_900 = useColorModeValue('blue.50', 'blue.900');
@@ -131,7 +133,38 @@ const ChatInputBar = () => {
             flex={1}
             transition="all 0.2s ease"
           />
-          
+          <Tooltip label="Upload & Quick Scan Document" placement="top">
+            <IconButton
+              icon={<Icon as={FiPaperclip} />}
+              onClick={() => chatFileInputRef.current?.click()}
+              size="md"
+              h="40px"
+              w="40px"
+              borderRadius="lg"
+              bg="judicial.gold"
+              color="judicial.dark"
+              transition="all 0.2s ease"
+              _hover={{
+                bg: 'judicial.lightGold',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 14px rgba(212, 175, 55, 0.45)'
+              }}
+              _active={{
+                transform: 'translateY(0px)'
+              }}
+              isLoading={uploading}
+              isDisabled={isLoading}
+              aria-label="Upload document"
+            />
+          </Tooltip>
+          <input
+            type="file"
+            ref={chatFileInputRef}
+            onChange={handleChatFileUpload}
+            style={{ display: 'none' }}
+            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+          />
+
           <Tooltip label="Voice input" placement="top">
             <IconButton
               icon={isListening ? <FiMicOff /> : <FiMic />}

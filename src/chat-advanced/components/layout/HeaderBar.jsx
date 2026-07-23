@@ -3,7 +3,7 @@ import {
   Flex, HStack, Heading, Badge, Tooltip, Button, Spinner, Icon, Avatar, IconButton, useColorModeValue
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
-import { FiEdit } from 'react-icons/fi';
+import { FiEdit, FiSidebar, FiZap } from 'react-icons/fi';
 import { MdDocumentScanner } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 import { useAdvancedChat } from '../../context/AdvancedChatContext';
@@ -12,7 +12,8 @@ const HeaderBar = () => {
   const {
     activeTab, subscriptionStatus, remainingMessages, selectedFile,
     scanStatus, handleSmartScan, handleOpenEditor, user, language, toggleLanguage,
-    handleClearChat, handleStartNewChat, borderColor, textColor
+    handleClearChat, handleStartNewChat, borderColor, textColor,
+    isRightPanelOpen, toggleRightPanel
   } = useAdvancedChat();
 
   const cv_white_gray_900 = useColorModeValue('white', 'gray.900');
@@ -59,6 +60,20 @@ const HeaderBar = () => {
       </HStack>
 
       <HStack spacing={2}>
+        <Tooltip label={isRightPanelOpen ? "Close Workspace Panel" : "Open Workspace Panel"} placement="bottom">
+          <Button
+            size="sm"
+            variant={isRightPanelOpen ? "solid" : "outline"}
+            colorScheme={isRightPanelOpen ? "teal" : "gray"}
+            leftIcon={<Icon as={isRightPanelOpen ? FiSidebar : FiZap} />}
+            onClick={() => toggleRightPanel()}
+            fontSize="xs"
+            fontWeight="bold"
+            borderRadius="xl"
+          >
+            {isRightPanelOpen ? 'Close Panel ✕' : 'Workspace Panel ⚡'}
+          </Button>
+        </Tooltip>
         {selectedFile && (
           <>
             <Button

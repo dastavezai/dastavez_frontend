@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import {
   Box, Flex, VStack, Center, Spinner, Text, Input, Button, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalFooter, ModalCloseButton, useDisclosure, useToast, useColorMode, useColorModeValue,
-  FormControl, FormLabel, InputGroup, InputRightElement, Show, Heading, Select, Icon, HStack
+  FormControl, FormLabel, InputGroup, InputRightElement, Show, Heading, Select, Icon, HStack, Tooltip
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
-import { FiGlobe, FiEdit, FiFileText } from 'react-icons/fi';
+import { FiGlobe, FiEdit, FiFileText, FiZap } from 'react-icons/fi';
 import { MdDocumentScanner } from 'react-icons/md';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -73,21 +73,27 @@ const AdvancedChatApp = () => {
   const textColor = useColorModeValue('gray.800', 'gray.100');
   const inputBg = useColorModeValue('white', 'gray.800');
 
-  const { slug } = useParams();
   const navigate = useNavigate();
   const { colorMode, toggleColorMode } = useColorMode();
   const { token, logout, user, loading, checkUser } = useAuth();
   const toast = useToast();
 
+  const params = useParams();
+  const routeCompanySlug = params.companySlug;
+  const routeSlug = params.slug;
+
+  const currentCompanySlug = user?.companySlug || routeCompanySlug || 'default';
+  const slug = routeSlug || (routeCompanySlug && (routeCompanySlug.startsWith('c-') || routeCompanySlug.startsWith('session-')) ? routeCompanySlug : null);
+
   useEffect(() => {
     if (user && !loading) {
-      if (user.companySlug) {
-        if (!slug || slug !== user.companySlug) {
-          navigate(`/c/${user.companySlug}`, { replace: true });
-        }
+      if (!slug) {
+        const initialShortSlug = `c-${Math.random().toString(36).substring(2, 7)}`;
+        const comp = user.companySlug || routeCompanySlug || 'default';
+        navigate(`/${comp}/${initialShortSlug}`, { replace: true });
       }
     }
-  }, [slug, user, loading, navigate]);
+  }, [slug, user, loading, routeCompanySlug, navigate]);
 
   useEffect(() => {
     if (slug) {
@@ -237,9 +243,36 @@ const AdvancedChatApp = () => {
   const [lastGeneratedFile, setLastGeneratedFile] = useState(null);
   const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
   const [templateContextModalOpen, setTemplateContextModalOpen] = useState(false);
+  const [precedenceContextModalOpen, setPrecedenceContextModalOpen] = useState(false);
+  const [counterMakerContextModalOpen, setCounterMakerContextModalOpen] = useState(false);
   const [documentTypeModalOpen, setDocumentTypeModalOpen] = useState(false);
   const [guidanceModalOpen, setGuidanceModalOpen] = useState(false);
   const [complaintFormModalOpen, setComplaintFormModalOpen] = useState(false);
+
+  // Right panel resizable width state (50% default = half chat, half panel)
+  const [panelWidthPercent, setPanelWidthPercent] = useState(50);
+  const [isResizingPanel, setIsResizingPanel] = useState(false);
+
+  const startResizingPanel = (mouseDownEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizingPanel(true);
+
+    const onMouseMove = (mouseMoveEvent) => {
+      const windowWidth = window.innerWidth;
+      const newWidth = ((windowWidth - mouseMoveEvent.clientX) / windowWidth) * 100;
+      const clampedWidth = Math.min(Math.max(newWidth, 25), 75);
+      setPanelWidthPercent(clampedWidth);
+    };
+
+    const onMouseUp = () => {
+      setIsResizingPanel(false);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   // Language state
   const [language, setLanguage] = useState(() => localStorage.getItem('dastavez_language') || 'en');
@@ -431,6 +464,18 @@ const AdvancedChatApp = () => {
 
   // New Chat Session handler
   const handleStartNewChat = () => {
+    const newShortSlug = `c-${Math.random().toString(36).substring(2, 7)}`;
+    const targetComp = user?.companySlug || currentCompanySlug || 'default';
+
+    // Notify backend to abandon any active document session and clear pending states
+    if (token) {
+      axios.post(`${BASE_URL}/chat/exit-document-mode`, {}, {
+        headers: { Authorization: `Bearer ${token}`, 'x-chat-slug': slug || 'default' }
+      }).catch(err => {
+        console.warn('Exit document mode request failed:', err?.message);
+      });
+    }
+
     setMessages([]);
     setSelectedFile(null);
     setReviewFiles([]);
@@ -449,9 +494,15 @@ const AdvancedChatApp = () => {
     setBulkReviewResults(null);
     setBulkReviewSessionId(null);
     setIsBulkReviewPanelOpen(false);
+    setIsPrecedencePanelOpen(false);
+    setIsCounterMakerPanelOpen(false);
     localStorage.removeItem('deepResearchSessionId');
     localStorage.removeItem('chronologySessionId');
     localStorage.removeItem('bulkReviewSessionId');
+
+    // Navigate to /<companySlug>/c-9btx3 URL format!
+    navigate(`/${targetComp}/${newShortSlug}`);
+
     toast({
       title: language === 'hi' ? 'नया चैट सत्र शुरू हुआ' : 'New Chat Session Started',
       status: 'info',
@@ -1072,8 +1123,95 @@ const AdvancedChatApp = () => {
     }
   };
 
+  const handleChatFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      setUploadProgress(0);
+      const response = await fileService.uploadFile(file, (progress) => {
+        setUploadProgress(progress);
+      });
+      setSelectedFile(response.file);
+      setUploadProgress(100);
+      setTimeout(() => setUploadProgress(0), 1000);
+
+      toast({
+        title: language === 'hi' ? 'फ़ाइल अपलोड हो गई' : 'File uploaded & quick scanned',
+        status: 'info',
+        duration: 2500,
+        isClosable: true,
+      });
+
+      await handleSendMessage(
+        `Uploaded file: ${response.file.originalName || response.file.fileName}`,
+        { fileId: response.file._id || response.file.id, intentOverride: 'QUICK_SCAN_FILE' }
+      );
+    } catch (err) {
+      console.error('Chat file upload error:', err);
+      toast({
+        title: language === 'hi' ? 'अपलोड विफल' : 'Upload failed',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleBrowseTemplatesClick = () => {
+    setTemplateContextModalOpen(true);
+  };
+
+  const handlePrecedenceAnalysisClick = () => {
+    setPrecedenceContextModalOpen(true);
+  };
+
+  const handleCounterMakerClick = () => {
+    setCounterMakerContextModalOpen(true);
+  };
+
+  const toggleListening = () => {
+    setIsListening(prev => !prev);
+  };
+
   const handleSuggestedActionClick = (action) => {
+    if (action.action === 'START_PRECEDENCE' || action.type === 'PRECEDENCE_ANALYSIS') {
+      handlePrecedenceAnalysisClick();
+      return;
+    }
+    if (action.action === 'COUNTER_AFFIDAVIT' || action.action === 'START_COUNTER') {
+      handleCounterMakerClick();
+      return;
+    }
+    if (action.action === 'START_DEEP_RESEARCH') {
+      setActiveTab('research');
+      setIsReportPanelOpen(true);
+      if (selectedFile) handleStartDeepResearch(selectedFile);
+      return;
+    }
+    if (action.action === 'START_CHRONOLOGY') {
+      setActiveTab('chronology');
+      setIsTimelinePanelOpen(true);
+      if (selectedFile) handleStartChronology(selectedFile);
+      return;
+    }
+    if (action.action === 'ASK_FILE_QUESTIONS') {
+      const fileName = selectedFile?.originalName || selectedFile?.fileName || 'uploaded document';
+      setInput(`What are the key legal points and obligations in ${fileName}?`);
+      return;
+    }
     if (action.type === 'toggle_right_panel') {
+      if (action.panelKey === 'isPrecedencePanelOpen') {
+        handlePrecedenceAnalysisClick();
+        return;
+      }
+      if (action.panelKey === 'isCounterMakerPanelOpen') {
+        handleCounterMakerClick();
+        return;
+      }
       setActiveTab(action.tab);
       setIsTimelinePanelOpen(action.panelKey === 'isTimelinePanelOpen');
       setIsPrecedencePanelOpen(action.panelKey === 'isPrecedencePanelOpen');
@@ -1106,12 +1244,38 @@ const AdvancedChatApp = () => {
     setEditSessionActive(false);
   };
 
-  const handleBrowseTemplatesClick = () => {
-    setTemplateContextModalOpen(true);
-  };
+  const isRightPanelOpen = 
+    (activeTab === 'chronology' && isTimelinePanelOpen) ||
+    (activeTab === 'drafting' && isPrecedencePanelOpen) ||
+    (activeTab === 'drafting' && isCounterMakerPanelOpen) ||
+    (activeTab === 'research' && isReportPanelOpen) ||
+    (activeTab === 'review' && isBulkReviewPanelOpen) ||
+    isEditMode;
 
-  const toggleListening = () => {
-    setIsListening(prev => !prev);
+  const toggleRightPanel = (forceState = null) => {
+    const nextState = forceState !== null ? forceState : !isRightPanelOpen;
+    if (!nextState) {
+      setIsPrecedencePanelOpen(false);
+      setIsCounterMakerPanelOpen(false);
+      setIsTimelinePanelOpen(false);
+      setIsReportPanelOpen(false);
+      setIsBulkReviewPanelOpen(false);
+      setIsEditMode(false);
+    } else {
+      if (activeTab === 'drafting') {
+        setIsPrecedencePanelOpen(true);
+        setIsCounterMakerPanelOpen(true);
+      } else if (activeTab === 'chronology') {
+        setIsTimelinePanelOpen(true);
+      } else if (activeTab === 'research') {
+        setIsReportPanelOpen(true);
+      } else if (activeTab === 'review') {
+        setIsBulkReviewPanelOpen(true);
+      } else {
+        setActiveTab('drafting');
+        setIsPrecedencePanelOpen(true);
+      }
+    }
   };
 
   const contextValue = {
@@ -1190,7 +1354,10 @@ const AdvancedChatApp = () => {
     isEditMode, setIsEditMode,
     editSession, setEditSession,
     documentAnalysis, setDocumentAnalysis,
+    handleChatFileUpload,
     handleBrowseTemplatesClick,
+    handlePrecedenceAnalysisClick,
+    handleCounterMakerClick,
     handleSuggestedActionClick,
     handleClearChat,
     handleSmartScan,
@@ -1204,16 +1371,9 @@ const AdvancedChatApp = () => {
     scanStatus, scanResults, smartSuggestions, formatMetadata,
     onboardCompanyName, setOnboardCompanyName,
     onboardSector, setOnboardSector,
-    handleOnboardSubmit, isOnboardingSubmitLoading
+    handleOnboardSubmit, isOnboardingSubmitLoading,
+    isRightPanelOpen, toggleRightPanel
   };
-
-  const isRightPanelOpen = 
-    (activeTab === 'chronology' && isTimelinePanelOpen) ||
-    (activeTab === 'drafting' && isPrecedencePanelOpen) ||
-    (activeTab === 'drafting' && isCounterMakerPanelOpen) ||
-    (activeTab === 'research' && isReportPanelOpen) ||
-    (activeTab === 'review' && isBulkReviewPanelOpen) ||
-    isEditMode;
 
   return (
     <AdvancedChatProvider value={contextValue}>
@@ -1304,9 +1464,38 @@ const AdvancedChatApp = () => {
               <ChatInputBar />
             </Flex>
 
-            {/* 4. Right Split Panel */}
+            {/* 4. Resizable Right Split Panel */}
             {isRightPanelOpen && (
-              <Box w={isEditMode ? "58%" : "38%"} minW={isEditMode ? "600px" : "380px"} maxW={isEditMode ? "950px" : "550px"} h="100%" borderLeft="1px solid" borderColor={borderColor} bg={cv_white_gray_900} overflow="hidden" display="flex" flexDirection="column" zIndex={5}>
+              <Flex
+                w={`${panelWidthPercent}%`}
+                minW="320px"
+                maxW="80%"
+                h="100%"
+                minH={0}
+                position="relative"
+                borderLeft="1px solid"
+                borderColor={borderColor}
+                bg={cv_white_gray_900}
+                overflow="hidden"
+                direction="column"
+                zIndex={5}
+                userSelect={isResizingPanel ? 'none' : 'auto'}
+              >
+                {/* Drag Resize Border Handle */}
+                <Box
+                  position="absolute"
+                  left="0"
+                  top="0"
+                  bottom="0"
+                  w="5px"
+                  cursor="col-resize"
+                  zIndex={20}
+                  bg={isResizingPanel ? "teal.400" : "transparent"}
+                  _hover={{ bg: "teal.400" }}
+                  onMouseDown={startResizingPanel}
+                  transition="background 0.2s"
+                />
+
                 {activeTab === 'chronology' && isTimelinePanelOpen && <TimelinePanel />}
                 {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
                 {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
@@ -1319,7 +1508,7 @@ const AdvancedChatApp = () => {
                     onExpandClick={handleOpenEditor}
                   />
                 )}
-              </Box>
+              </Flex>
             )}
           </Flex>
         </Flex>
@@ -1483,6 +1672,113 @@ const AdvancedChatApp = () => {
               fontSize="sm"
             >
               Start New Chat
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Choose Precedence Analysis Context Selection Modal */}
+      <Modal isOpen={precedenceContextModalOpen} onClose={() => setPrecedenceContextModalOpen(false)} isCentered>
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(8px)" />
+        <ModalContent bg={cv_white_gray_900} borderColor={borderColor} borderWidth={1} borderRadius="2xl" p={4}>
+          <ModalHeader>
+            <HStack spacing={3}>
+              <Icon as={FiZap} color="teal.400" boxSize={6} />
+              <Text fontSize="lg" fontWeight="bold">Precedence Analysis Options</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text fontSize="sm" color="gray.500" mb={4}>
+              Do you want to run Precedence Analysis on your current chat context & file, or start a new chat session to upload a new document?
+            </Text>
+          </ModalBody>
+          <ModalFooter gap={3}>
+            <Button
+              variant="outline"
+              borderColor="teal.400"
+              color={textColor}
+              _hover={{ bg: cv_gray_100_rgba_212_175_55_0_08 }}
+              onClick={() => {
+                setPrecedenceContextModalOpen(false);
+                setActiveTab('drafting');
+                setIsPrecedencePanelOpen(true);
+                if (selectedFile && precedenceStatus === 'idle') {
+                  handleSendMessage("Run Precedence Analysis on this document");
+                }
+              }}
+              borderRadius="xl"
+              fontSize="sm"
+            >
+              Use Current Chat & File
+            </Button>
+            <Button
+              colorScheme="teal"
+              onClick={() => {
+                setPrecedenceContextModalOpen(false);
+                handleStartNewChat();
+                setActiveTab('drafting');
+                setIsPrecedencePanelOpen(true);
+                setTimeout(() => {
+                  document.getElementById('file-upload')?.click();
+                }, 200);
+              }}
+              borderRadius="xl"
+              fontSize="sm"
+            >
+              Upload New File / New Chat
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Choose Counter Maker Context Selection Modal */}
+      <Modal isOpen={counterMakerContextModalOpen} onClose={() => setCounterMakerContextModalOpen(false)} isCentered>
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(8px)" />
+        <ModalContent bg={cv_white_gray_900} borderColor={borderColor} borderWidth={1} borderRadius="2xl" p={4}>
+          <ModalHeader>
+            <HStack spacing={3}>
+              <Icon as={FiEdit} color="orange.500" boxSize={6} />
+              <Text fontSize="lg" fontWeight="bold">Counter Affidavit Options</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text fontSize="sm" color="gray.500" mb={4}>
+              Do you want to generate a Counter Affidavit for your current chat context & file, or start a new chat session to upload a new petition file?
+            </Text>
+          </ModalBody>
+          <ModalFooter gap={3}>
+            <Button
+              variant="outline"
+              borderColor="orange.400"
+              color={textColor}
+              _hover={{ bg: cv_gray_100_rgba_212_175_55_0_08 }}
+              onClick={() => {
+                setCounterMakerContextModalOpen(false);
+                setActiveTab('drafting');
+                setIsCounterMakerPanelOpen(true);
+              }}
+              borderRadius="xl"
+              fontSize="sm"
+            >
+              Use Current Chat & File
+            </Button>
+            <Button
+              colorScheme="orange"
+              onClick={() => {
+                setCounterMakerContextModalOpen(false);
+                handleStartNewChat();
+                setActiveTab('drafting');
+                setIsCounterMakerPanelOpen(true);
+                setTimeout(() => {
+                  document.getElementById('file-upload')?.click();
+                }, 200);
+              }}
+              borderRadius="xl"
+              fontSize="sm"
+            >
+              Upload New File / New Chat
             </Button>
           </ModalFooter>
         </ModalContent>

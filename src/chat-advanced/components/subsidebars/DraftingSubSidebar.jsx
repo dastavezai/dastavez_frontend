@@ -6,7 +6,7 @@ import { FiFileText, FiZap, FiEdit, FiGlobe, FiMaximize2 } from 'react-icons/fi'
 import { useAdvancedChat } from '../../context/AdvancedChatContext';
 
 const DraftingSubSidebar = () => {
-  const { handleSuggestedActionClick, handleBrowseTemplatesClick } = useAdvancedChat();
+  const { handleSuggestedActionClick, handleBrowseTemplatesClick, handlePrecedenceAnalysisClick, handleCounterMakerClick } = useAdvancedChat();
 
   const cv_gray_550_gray_400 = useColorModeValue('gray.550', 'gray.400');
   const cv_white_rgba_212_175_55_0_005 = useColorModeValue('white', 'rgba(212, 175, 55, 0.005)');
@@ -23,9 +23,9 @@ const DraftingSubSidebar = () => {
       <VStack spacing={3} align="stretch" w="full">
         {[
           {
-            id: 'browse',
+            id: 'templates',
             title: 'Browse Templates',
-            subtext: 'Select pre-drafted legal categories',
+            subtext: 'Pre-designed legal documents & forms',
             icon: FiFileText,
             onClick: handleBrowseTemplatesClick
           },
@@ -34,14 +34,14 @@ const DraftingSubSidebar = () => {
             title: 'Precedence Analysis',
             subtext: 'Analyze relevant court precedents',
             icon: FiZap,
-            onClick: () => handleSuggestedActionClick({ type: 'PRECEDENCE_ANALYSIS', text: 'Analyze court precedents' })
+            onClick: handlePrecedenceAnalysisClick
           },
           {
             id: 'counter',
             title: 'Counter Maker',
             subtext: 'Create counter affidavit responses',
             icon: FiEdit,
-            onClick: () => handleSuggestedActionClick({ type: 'COUNTER_AFFIDAVIT', text: 'Create a counter affidavit response' })
+            onClick: handleCounterMakerClick
           },
           {
             id: 'translate',

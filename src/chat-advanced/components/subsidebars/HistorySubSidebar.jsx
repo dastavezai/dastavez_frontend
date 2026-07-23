@@ -14,7 +14,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5173/api
 
 const HistorySubSidebar = () => {
   const {
-    sessionsList, setSessionsList, sessionsListLoading, slug, navigate, handleStartNewChat, textColor, token
+    sessionsList, setSessionsList, sessionsListLoading, slug, navigate, handleStartNewChat, textColor, token, user
   } = useAdvancedChat();
 
   const toast = useToast();
@@ -190,7 +190,10 @@ const HistorySubSidebar = () => {
                 border="1px solid"
                 borderColor={isActive ? 'judicial.gold' : cv_gray_100_transparent}
                 cursor="pointer"
-                onClick={() => navigate(`/c/${session.slug}`)}
+                onClick={() => {
+                  const comp = user?.companySlug || 'legal';
+                  navigate(`/${comp}/${session.slug}`);
+                }}
                 transition="all 0.25s cubic-bezier(.08,.52,.52,1)"
                 boxShadow={isActive ? '0 4px 15px rgba(212, 175, 55, 0.1)' : 'none'}
                 position="relative"

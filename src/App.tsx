@@ -139,7 +139,12 @@ const AppContent = () => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  const showNavbar = !["/auth", "/forgot-password", "/verify-reset-otp", "/reset-password", "/chat", "/c/", "/department", "/admin", "/admin-dashboard", "/profile"].some(path => location.pathname.startsWith(path));
+  const isChatRoute = location.pathname.startsWith('/chat') || 
+                      location.pathname.startsWith('/c/') || 
+                      /\/[^/]+\/c-/.test(location.pathname) ||
+                      /\/[^/]+\/session-/.test(location.pathname);
+
+  const showNavbar = !isChatRoute && !["/auth", "/forgot-password", "/verify-reset-otp", "/reset-password", "/department", "/admin", "/admin-dashboard", "/profile"].some(path => location.pathname.startsWith(path));
 
   return (
     <>
@@ -165,6 +170,14 @@ const AppContent = () => {
         />
         <Route
           path="/c/:slug"
+          element={
+            <RequireAuth>
+              <Chat />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/:companySlug/:slug"
           element={
             <RequireAuth>
               <Chat />
