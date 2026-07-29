@@ -843,10 +843,10 @@ fileService.updatePreferences = async (prefs) => {
   return response.data;
 };
 
-export default fileService; 
- e x p o r t   c o n s t   c h a t E d i t C o u n t e r A f f i d a v i t   =   a s y n c   ( c o u n t e r D a t a ,   p r o m p t )   = >   { 
-     c o n s t   r e s p o n s e   =   a w a i t   a p i . p o s t ( ' / d r a f t / c o u n t e r - a f f i d a v i t / c h a t - e d i t ' ,   {   c o u n t e r D a t a ,   p r o m p t   } ) ; 
-     r e t u r n   r e s p o n s e . d a t a ; 
- } ; 
- 
- 
+
+export const chatEditCounterAffidavit = async (counterData, prompt) => {
+  const response = await api.post('/draft/counter-affidavit/chat-edit', { counterData, prompt });
+  return response.data;
+};
+
+export default fileService;

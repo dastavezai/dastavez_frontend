@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Box, Flex, VStack, HStack, Text, Input, IconButton, Avatar, Spinner,
-  useColorModeValue, keyframes, Tooltip, Icon
+  useColorModeValue, Tooltip, Icon
 } from '@chakra-ui/react';
+import { keyframes } from '@emotion/react';
 import { FiSend, FiZap, FiCheckCircle } from 'react-icons/fi';
 import { MdAutoAwesome } from 'react-icons/md';
 import { chatEditCounterAffidavit } from '../services/fileService';

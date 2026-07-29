@@ -494,12 +494,10 @@ const CounterEditorPage = ({ isEmbedded = false, embeddedFileId = null }) => {
       {/* ═══ HEADER ═══════════════════════════════════════════ */}
       <Box
         borderBottomWidth="1px"
-        borderColor={borderColor}
         bg={headerBg}
         px={4}
         py={0}
         position="sticky"
-        top={0}
         top={0}
         zIndex={20}
         boxShadow={isEmbedded ? "none" : "0 1px 3px rgba(0,0,0,0.06)"}

@@ -72,6 +72,7 @@ import { API_BASE_URL as BASE_URL } from '../chat-advanced/constants';
 import JusticeIcon from '../components/JusticeIcon';
 import TimelinePanel from './Panels/TimelinePanel';
 import PrecedencePanel from './Panels/PrecedencePanel';
+import TranslatorPanel from './Panels/TranslatorPanel';
 import CounterMakerPanel from './Panels/CounterMakerPanel';
 import ResearchPanel from './Panels/ResearchPanel';
 import BulkReviewPanel from './Panels/BulkReviewPanel';
@@ -213,6 +214,7 @@ const ChatPage = () => {
   const [bulkReviewElapsed, setBulkReviewElapsed] = useState(0);
   const [bulkReviewEta, setBulkReviewEta] = useState(60);
   const [isBulkReviewPanelOpen, setIsBulkReviewPanelOpen] = useState(false);
+  const [isTranslatorPanelOpen, setIsTranslatorPanelOpen] = useState(false);
   const bulkReviewPollRef = useRef(null);
   const bulkReviewTimerRef = useRef(null);
 
@@ -1155,6 +1157,76 @@ const ChatPage = () => {
           role: 'assistant',
           content: 'I can help you draft a Counter Affidavit. Please upload the original complaint or petition file here in the chat so I can analyze it.'
         }]);
+        break;
+
+      case 'TRANSLATE_DOCUMENT':
+        console.log('🌐 TRANSLATE_DOCUMENT action triggered');
+        setActiveTab('drafting');
+        setIsTranslatorPanelOpen(true);
+        break;
+
+      case 'DEEP_RESEARCH_CURRENT':
+        handleStartDeepResearch(suggestion.file, true);
+        break;
+      case 'DEEP_RESEARCH_NEW':
+        handleStartDeepResearch(suggestion.file, false);
+        break;
+
+      case 'CHRONOLOGY_CURRENT':
+        setChronologyFiles(prev => {
+            const exists = prev.find(f => f.file._id === suggestion.file._id);
+            if (exists) {
+                handleStartChronology(prev);
+                return prev;
+            }
+            const newFiles = [...prev, { file: suggestion.file }];
+            handleStartChronology(newFiles);
+            return newFiles;
+        });
+        setMessages(prev => [...prev, { role: 'assistant', content: `Added **${suggestion.file.originalName || suggestion.file.fileName || 'file'}** to chronology context.` }]);
+        break;
+      case 'CHRONOLOGY_NEW':
+        setChronologyFiles([{ file: suggestion.file }]);
+        setTimelineSessionId(null);
+        setTimelineStatus('none');
+        setTimelineEvents([]);
+        handleStartChronology([{ file: suggestion.file }]);
+        break;
+
+      case 'REVIEW_CURRENT':
+        toast({ title: 'Preparing file...', status: 'info' });
+        fileService.startEditSession(suggestion.file._id).then(editResult => {
+            const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
+            setReviewFiles(prev => {
+                const exists = prev.find(f => f.file._id === suggestion.file._id);
+                if (exists) {
+                    handleStartBulkReview(prev);
+                    return prev;
+                }
+                const newFiles = [...prev, { file: suggestion.file, editSessionId }];
+                handleStartBulkReview(newFiles);
+                return newFiles;
+            });
+            setMessages(prev => [...prev, { role: 'assistant', content: `Added **${suggestion.file.originalName || suggestion.file.fileName || 'file'}** to parallel review context.` }]);
+        }).catch(err => {
+            console.error(err);
+            toast({ title: 'Error adding to review', status: 'error' });
+        });
+        break;
+      case 'REVIEW_NEW':
+        toast({ title: 'Starting new review...', status: 'info' });
+        fileService.startEditSession(suggestion.file._id).then(editResult => {
+            const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
+            const newFiles = [{ file: suggestion.file, editSessionId }];
+            setReviewFiles(newFiles);
+            setBulkReviewSessionId(null);
+            setBulkReviewStatus('none');
+            handleStartBulkReview(newFiles);
+            setMessages(prev => [...prev, { role: 'assistant', content: `Started new parallel review with **${suggestion.file.originalName || suggestion.file.fileName || 'file'}**.` }]);
+        }).catch(err => {
+            console.error(err);
+            toast({ title: 'Error starting review', status: 'error' });
+        });
         break;
       case 'RESUME_FORM': {
         // User wants to resume partially filled form
@@ -2940,14 +3012,12 @@ const ChatPage = () => {
       setChronologyElapsed(0);
       setChronologyAgentStage('Preparing files...');
       setIsTimelinePanelOpen(true);
-      setChronologyEta(40 + chronologyFiles.length * 20);
+      setChronologyEta(40 + filesToProcess.length * 20);
 
-      const fileLabel = chronologyFiles.length === 1
-        ? chronologyFiles[0].file?.name || 'file'
-        : `${chronologyFiles.length} files`;
+      const fileLabel = filesToProcess.length === 1 ? filesToProcess[0].file?.name || 'file' : `${filesToProcess.length} files`;
       setMessages(prev => [...prev, { role: 'user', content: `Build a chronology timeline from: ${fileLabel}` }]);
 
-      const editSessionIds = chronologyFiles.map(f => f.editSessionId);
+      const editSessionIds = filesToProcess.map(f => f.editSessionId);
       const result = await chronologyService.startChronology(editSessionIds);
       const newSessionId = result.sessionId;
 
@@ -3041,7 +3111,7 @@ const ChatPage = () => {
 
     setReviewStatus('starting');
     setBulkReviewElapsed(0);
-    setBulkReviewEta(40 + reviewFiles.length * 30);
+    setBulkReviewEta(40 + filesToProcess.length * 30);
     setBulkReviewResults(null);
     setIsBulkReviewPanelOpen(true);
 
@@ -3051,7 +3121,7 @@ const ChatPage = () => {
     }, 1000);
 
     try {
-      const editSessionIds = reviewFiles.map(f => f.editSessionId);
+      const editSessionIds = filesToProcess.map(f => f.editSessionId);
       const res = await bulkReviewService.startBulkReview(editSessionIds);
       const newSessionId = res.sessionId;
       setBulkReviewSessionId(newSessionId);
@@ -3394,13 +3464,40 @@ const ChatPage = () => {
       const newFileSessionId = crypto.randomUUID();
       setFileSessionId(newFileSessionId);
 
-      // Auto-trigger drafting tools or deep research if active
-      if (activeDraftingTool === 'precedence') {
-        startPrecedenceAnalysis(response.file._id);
-      } else if (activeDraftingTool === 'counter_maker') {
-        extractCounterFacts(response.file._id);
-      } else if (activeTab === 'research') {
-        handleStartDeepResearch(response.file);
+      // Auto-trigger drafting tools or ask for context if in advanced tabs
+      if (activeTab === 'research') {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `Do you want deep analysis of **${response.file.originalName || response.file.fileName || 'this file'}** within the current context or start a new chat?`,
+          suggestedActions: [
+            { label: 'Current Context', action: 'DEEP_RESEARCH_CURRENT', file: response.file },
+            { label: 'New Chat', action: 'DEEP_RESEARCH_NEW', file: response.file }
+          ]
+        }]);
+      } else if (activeTab === 'chronology') {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `Do you want timeline chronology of **${response.file.originalName || response.file.fileName || 'this file'}** within the current context or start a new chat?`,
+          suggestedActions: [
+            { label: 'Current Context', action: 'CHRONOLOGY_CURRENT', file: response.file },
+            { label: 'New Chat', action: 'CHRONOLOGY_NEW', file: response.file }
+          ]
+        }]);
+      } else if (activeTab === 'review') {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `Do you want parallel review of **${response.file.originalName || response.file.fileName || 'this file'}** within the current context or start a new chat?`,
+          suggestedActions: [
+            { label: 'Current Context', action: 'REVIEW_CURRENT', file: response.file },
+            { label: 'New Chat', action: 'REVIEW_NEW', file: response.file }
+          ]
+        }]);
+      } else {
+        if (activeDraftingTool === 'precedence') {
+          startPrecedenceAnalysis(response.file._id);
+        } else if (activeDraftingTool === 'counter_maker') {
+          extractCounterFacts(response.file._id);
+        }
       }
 
       // Update remaining messages count and subscription status
@@ -5256,6 +5353,7 @@ const ChatPage = () => {
     bulkReviewElapsed, setBulkReviewElapsed,
     bulkReviewEta, setBulkReviewEta,
     isBulkReviewPanelOpen, setIsBulkReviewPanelOpen,
+    isTranslatorPanelOpen, setIsTranslatorPanelOpen,
     handleStartBulkReview,
     
     precedenceSessionId, setPrecedenceSessionId,
@@ -5286,6 +5384,7 @@ const ChatPage = () => {
     (activeTab === 'chronology' && isTimelinePanelOpen) ||
     (activeTab === 'drafting' && isPrecedencePanelOpen) ||
     (activeTab === 'drafting' && isCounterMakerPanelOpen) ||
+    (activeTab === 'drafting' && isTranslatorPanelOpen) ||
     (activeTab === 'research' && isReportPanelOpen) ||
     (activeTab === 'review' && isBulkReviewPanelOpen) ||
     isEditMode;
@@ -5604,6 +5703,7 @@ const ChatPage = () => {
           {activeTab === 'chronology' && isTimelinePanelOpen && <TimelinePanel />}
           {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
           {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
+          {activeTab === 'drafting' && isTranslatorPanelOpen && <TranslatorPanel />}
           {activeTab === 'research' && isReportPanelOpen && <ResearchPanel />}
           {activeTab === 'review' && isBulkReviewPanelOpen && <BulkReviewPanel />}
         </Box>
