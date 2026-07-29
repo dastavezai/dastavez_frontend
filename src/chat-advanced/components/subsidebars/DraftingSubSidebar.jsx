@@ -6,7 +6,7 @@ import { FiFileText, FiZap, FiEdit, FiGlobe, FiMaximize2 } from 'react-icons/fi'
 import { useAdvancedChat } from '../../context/AdvancedChatContext';
 
 const DraftingSubSidebar = () => {
-  const { handleSuggestedActionClick, handleBrowseTemplatesClick, handlePrecedenceAnalysisClick, handleCounterMakerClick } = useAdvancedChat();
+  const { handleBrowseTemplatesClick, handlePrecedenceAnalysisClick, handleCounterMakerClick, handleTranslatorClick } = useAdvancedChat();
 
   const cv_gray_550_gray_400 = useColorModeValue('gray.550', 'gray.400');
   const cv_white_rgba_212_175_55_0_005 = useColorModeValue('white', 'rgba(212, 175, 55, 0.005)');
@@ -48,7 +48,7 @@ const DraftingSubSidebar = () => {
             title: 'Document Translator',
             subtext: 'Translate templates and drafts',
             icon: FiGlobe,
-            onClick: () => handleSuggestedActionClick({ type: 'TRANSLATE_DOCUMENT', text: 'Translate a document file' })
+            onClick: handleTranslatorClick
           }
         ].map(action => (
           <HStack

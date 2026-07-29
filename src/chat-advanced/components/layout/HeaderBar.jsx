@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Flex, HStack, Heading, Badge, Tooltip, Button, Spinner, Icon, Avatar, IconButton, useColorModeValue
 } from '@chakra-ui/react';
-import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
+import { DeleteIcon } from '@chakra-ui/icons';
 import { FiEdit, FiSidebar, FiZap } from 'react-icons/fi';
 import { MdDocumentScanner } from 'react-icons/md';
 import { Link } from 'react-router-dom';
@@ -132,25 +132,6 @@ const HeaderBar = () => {
         >
           {language === 'en' ? 'EN' : 'हिं'}
         </Button>
-        <Tooltip label="New Chat Session" placement="bottom">
-          <IconButton
-            icon={<AddIcon />}
-            onClick={handleStartNewChat}
-            variant="ghost"
-            size="sm"
-            aria-label="New chat session"
-            color={cv_gray_600_gray_400}
-            transition="all 0.2s ease"
-            _hover={{
-              color: 'judicial.gold',
-              bg: cv_gray_100_rgba_212_175_55_0_08,
-              transform: 'scale(1.05)'
-            }}
-            _active={{
-              bg: 'transparent'
-            }}
-          />
-        </Tooltip>
         <IconButton
           icon={<DeleteIcon />}
           onClick={handleClearChat}

@@ -162,7 +162,7 @@ const TimelinePanel = () => {
               )}
 
               <Text fontSize="xs" color="gray.400" textAlign="center" mt={2}>
-                You can navigate away Ã¢â‚¬â€ your timeline will continue building in the background.
+                You can navigate away — your timeline will continue building in the background.
               </Text>
             </VStack>
           )}
@@ -170,7 +170,7 @@ const TimelinePanel = () => {
           {/* FAILED STATE */}
           {chronologyStatus === 'failed' && (
             <VStack spacing={4} align="center" py={8}>
-              <Text fontSize="3xl">Ã¢ÂÅ’</Text>
+              <Icon as={FaTimes} color="red.500" w={8} h={8} />
               <Text fontWeight="bold" color="red.500">Timeline Failed</Text>
               <Text fontSize="sm" color="gray.500" textAlign="center">
                 Something went wrong during timeline analysis.
@@ -181,13 +181,13 @@ const TimelinePanel = () => {
             </VStack>
           )}
 
-          {/* COMPLETED STATE Ã¢â‚¬â€ Timeline */}
+          {/* COMPLETED STATE - Timeline */}
           {(chronologyStatus === 'completed' || chronologyStatus === 'completed_with_errors') && chronologyResults && (
             <VStack spacing={4} align="stretch">
               {chronologyStatus === 'completed_with_errors' && (
                 <Box p={3} bg="orange.50" _dark={{ bg: 'orange.900' }} borderRadius="md" borderLeft="3px solid" borderLeftColor="orange.400">
                   <Text fontSize="xs" color="orange.600" fontWeight="bold">
-                    Ã¢Å¡Â  Some files had extraction errors. Partial timeline shown.
+                    ⚠️ Some files had extraction errors. Partial timeline shown.
                   </Text>
                 </Box>
               )}
@@ -196,7 +196,7 @@ const TimelinePanel = () => {
               {chronologyResults.summary && (
                 <Box p={3} bg={sectionBg} borderRadius="lg" borderLeft="3px solid" borderLeftColor="green.400">
                   <Text fontSize="xs" fontWeight="bold" color="green.600" textTransform="uppercase" mb={2}>
-                    Ã°Å¸â€œâ€¹ Timeline Summary
+                    Timeline Summary
                   </Text>
                   <Text fontSize="sm" color={headingColor} whiteSpace="pre-wrap">
                     {chronologyResults.summary}
@@ -208,7 +208,7 @@ const TimelinePanel = () => {
               {chronologyResults.files && chronologyResults.files.length > 1 && (
                 <Box p={3} bg={sectionBg} borderRadius="lg">
                   <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase" mb={2}>
-                    Ã°Å¸â€œâ€š Source Files
+                    Source Files
                   </Text>
                   <HStack spacing={2} flexWrap="wrap">
                     {chronologyResults.files.map((f, i) => (
@@ -224,7 +224,7 @@ const TimelinePanel = () => {
               {chronologyResults.events && chronologyResults.events.length > 0 ? (
                 <VStack spacing={2} align="stretch" position="relative">
                   <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase">
-                    Ã°Å¸â€œâ€¦ Events ({chronologyResults.events.length})
+                    Events ({chronologyResults.events.length})
                   </Text>
                   {/* Timeline line */}
                   <Box position="relative" pl={4} borderLeft="2px solid" borderLeftColor={lineBorderColor}>

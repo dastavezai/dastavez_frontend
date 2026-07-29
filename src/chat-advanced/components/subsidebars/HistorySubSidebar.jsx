@@ -154,7 +154,7 @@ const HistorySubSidebar = () => {
         <Center py={8}>
           <Spinner size="md" color="judicial.gold" />
         </Center>
-      ) : sessionsList.length === 0 ? (
+      ) : sessionsList.filter(s => s.preview && s.preview !== 'New conversation').length === 0 ? (
         <VStack spacing={4} py={10} px={2} align="center" justify="center">
           <Center 
             w={12} 
@@ -177,7 +177,7 @@ const HistorySubSidebar = () => {
         </VStack>
       ) : (
         <VStack spacing={3} align="stretch">
-          {sessionsList.map(session => {
+          {sessionsList.filter(s => s.preview && s.preview !== 'New conversation').map(session => {
             const isActive = slug === session.slug;
             const isEditing = editingSlug === session.slug;
 

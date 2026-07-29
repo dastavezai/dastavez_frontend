@@ -493,14 +493,38 @@ const ChatPage = () => {
           }
         });
 
-        if (response.data && response.data.length === 0) {
+        if (response.data && response.data.messages && response.data.messages.length === 0) {
           // Add welcome message if no history
           setMessages([{
             role: 'assistant',
             content: getWelcomeMessage()
           }]);
+        } else if (response.data && response.data.messages) {
+          setMessages(response.data.messages);
         } else {
-          setMessages(response.data);
+          // Fallback if it's an array directly
+          setMessages(Array.isArray(response.data) ? response.data : []);
+        }
+        
+        // Restore session IDs from DB
+        if (response.data) {
+          if (response.data.researchSessionId) {
+            setResearchSessionId(response.data.researchSessionId);
+            // Optionally check status for this restored session
+            researchService.getResearchResults(response.data.researchSessionId).then(res => {
+              if (['completed', 'completed_with_errors'].includes(res.status)) {
+                setResearchStatus(res.status);
+              }
+            }).catch(() => {});
+          }
+          if (response.data.chronologySessionId) {
+            setChronologySessionId(response.data.chronologySessionId);
+            chronologyService.getChronologyResults(response.data.chronologySessionId).then(res => {
+              if (['completed', 'completed_with_errors'].includes(res.status)) {
+                setChronologyStatus(res.status);
+              }
+            }).catch(() => {});
+          }
         }
       } catch (error) {
         console.error('Error loading chat:', error);
@@ -2700,18 +2724,26 @@ const ChatPage = () => {
           setResearchAgentStage(result.status === 'failed' ? 'Research failed' : 'Report ready!');
 
           if (result.status === 'completed' || result.status === 'completed_with_errors') {
-            const followUpQuestions = [
-              "Can you explain the key points in simpler terms?",
-              "What are the most critical dates or deadlines mentioned in this document?",
-              "What are the immediate actionable steps I should take based on this?"
-            ];
-            setMessages(prev => [
-              ...prev,
-              {
-                role: 'assistant',
-                content: `I have completed the deep research on your document! You can view the full report in the right panel.\n\nHere are some follow-up questions you can ask me:\n1. ${followUpQuestions[0]}\n2. ${followUpQuestions[1]}\n3. ${followUpQuestions[2]}`
-              }
-            ]);
+            // Only append the completion message if we actually just finished it during this active poll (not on initial page load restore)
+            // But to prevent cross-chat bleeding, we check if the current chat session's researchSessionId matches the polled one.
+            setMessages(prev => {
+              // If the message is already there, don't add it again
+              const hasCompletionMessage = prev.some(m => m.content && m.content.includes('I have completed the deep research'));
+              if (hasCompletionMessage) return prev;
+              
+              const followUpQuestions = [
+                "Can you explain the key points in simpler terms?",
+                "What are the most critical dates or deadlines mentioned in this document?",
+                "What are the immediate actionable steps I should take based on this?"
+              ];
+              return [
+                ...prev,
+                {
+                  role: 'assistant',
+                  content: `I have completed the deep research on your document! You can view the full report in the right panel.\n\nHere are some follow-up questions you can ask me:\n1. ${followUpQuestions[0]}\n2. ${followUpQuestions[1]}\n3. ${followUpQuestions[2]}`
+                }
+              ];
+            });
           }
 
           if (result.status !== 'failed') {
@@ -2862,10 +2894,14 @@ const ChatPage = () => {
               : `📅 Chronology complete! I've built a timeline from ${fileNames}.\n\n**Timeline Summary:**${summaryText}`;
 
             isMergingChronologyRef.current = false;
-            setMessages(prev => [
-              ...prev,
-              { role: 'assistant', content: introLine, isChronologySummary: true }
-            ]);
+            setMessages(prev => {
+              const hasCompletion = prev.some(m => m.isChronologySummary && m.content.includes('Chronology complete'));
+              if (hasCompletion && !ismerge) return prev;
+              return [
+                ...prev,
+                { role: 'assistant', content: introLine, isChronologySummary: true }
+              ];
+            });
           }
 
           if (result.status !== 'failed') {
@@ -4937,6 +4973,36 @@ const ChatPage = () => {
               ))}
             </Flex>
           )}
+
+          {/* Render Persistent Report Cards at the bottom of the chat */}
+          {researchSessionId && (researchStatus === 'completed' || researchStatus === 'completed_with_errors') && (
+            <Box mt={4} p={4} bg={cv_blue_50_blue_900} borderRadius="lg" border="1px solid" borderColor="blue.200">
+              <HStack justify="space-between">
+                <VStack align="start" spacing={1}>
+                  <Text fontWeight="bold" color="blue.600" fontSize="sm">Deep Research Report Available</Text>
+                  <Text fontSize="xs" color="gray.500">This chat session has a completed deep research report attached.</Text>
+                </VStack>
+                <Button size="sm" colorScheme="blue" onClick={() => setIsReportPanelOpen(true)}>
+                  View Report
+                </Button>
+              </HStack>
+            </Box>
+          )}
+
+          {chronologySessionId && (chronologyStatus === 'completed' || chronologyStatus === 'completed_with_errors') && (
+            <Box mt={4} p={4} bg={useColorModeValue('green.50', 'green.900')} borderRadius="lg" border="1px solid" borderColor="green.200">
+              <HStack justify="space-between">
+                <VStack align="start" spacing={1}>
+                  <Text fontWeight="bold" color="green.600" fontSize="sm">Timeline Report Available</Text>
+                  <Text fontSize="xs" color="gray.500">This chat session has a completed timeline chronology attached.</Text>
+                </VStack>
+                <Button size="sm" colorScheme="green" onClick={() => setIsTimelinePanelOpen(true)}>
+                  View Timeline
+                </Button>
+              </HStack>
+            </Box>
+          )}
+
           <div ref={messagesEndRef} />
         </Box>
 

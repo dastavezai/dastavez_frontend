@@ -139,12 +139,12 @@ const AppContent = () => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  const isChatRoute = location.pathname.startsWith('/chat') || 
-                      location.pathname.startsWith('/c/') || 
-                      /\/[^/]+\/c-/.test(location.pathname) ||
-                      /\/[^/]+\/session-/.test(location.pathname);
+  const publicLandingPaths = [
+    '/', '/features', '/use-cases', '/case-studies', '/secure-platform',
+    '/smart-analysis', '/about', '/blog', '/contact'
+  ];
 
-  const showNavbar = !isChatRoute && !["/auth", "/forgot-password", "/verify-reset-otp", "/reset-password", "/department", "/admin", "/admin-dashboard", "/profile"].some(path => location.pathname.startsWith(path));
+  const showNavbar = publicLandingPaths.some(p => location.pathname === p || (p !== '/' && location.pathname.startsWith(p + '/')));
 
   return (
     <>

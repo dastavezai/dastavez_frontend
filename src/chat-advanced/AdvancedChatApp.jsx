@@ -26,6 +26,7 @@ import { API_BASE_URL as BASE_URL } from './constants';
 import TimelinePanel from '../pages/Panels/TimelinePanel';
 import PrecedencePanel from '../pages/Panels/PrecedencePanel';
 import CounterMakerPanel from '../pages/Panels/CounterMakerPanel';
+import TranslatorPanel from '../pages/Panels/TranslatorPanel';
 import ResearchPanel from '../pages/Panels/ResearchPanel';
 import BulkReviewPanel from '../pages/Panels/BulkReviewPanel';
 
@@ -180,6 +181,7 @@ const AdvancedChatApp = () => {
   const [counterMakerResults, setCounterMakerResults] = useState(null);
   const [counterMakerFacts, setCounterMakerFacts] = useState('');
   const [isCounterMakerPanelOpen, setIsCounterMakerPanelOpen] = useState(false);
+  const [isTranslatorPanelOpen, setIsTranslatorPanelOpen] = useState(false);
   const [counterMakerFileId, setCounterMakerFileId] = useState(null);
   const counterMakerPollRef = useRef(null);
 
@@ -1031,8 +1033,28 @@ const AdvancedChatApp = () => {
       setSmartSuggestions([]);
       setHtmlContent('');
 
+      const uploadedFileObj = response.file;
+      const rawText = uploadedFileObj.text || uploadedFileObj.extractedText || uploadedFileObj.content || '';
+      const cleanLines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 15);
+      const summarySnippet = cleanLines.length > 0
+        ? cleanLines.slice(0, 2).join(' ').substring(0, 200) + '...'
+        : 'Legal document uploaded and indexed.';
+
+      const fileAssistantMsg = {
+        role: 'assistant',
+        content: `📁 **Uploaded File**: \`${uploadedFileObj.originalName || uploadedFileObj.fileName}\`\n\n📄 **Page 1 Quick Summary**:\n> "${summarySnippet}"\n\n🎯 **What would you like to do with this document?** Choose an option below to open the workspace:`,
+        suggestedActions: [
+          { label: '⚡ Precedence Analysis', action: 'START_PRECEDENCE' },
+          { label: '📝 Counter Affidavit Studio', action: 'COUNTER_AFFIDAVIT' },
+          { label: '🌐 Document Translator', action: 'TRANSLATE_DOCUMENT' },
+          { label: '⏱️ Timeline Chronology', action: 'START_CHRONOLOGY' },
+          { label: '🔬 Deep Research', action: 'START_DEEP_RESEARCH' }
+        ]
+      };
+      setMessages(prev => [...prev, fileAssistantMsg]);
+
       toast({
-        title: language === 'hi' ? 'फ़ाइल अपलोड हो गई' : 'File uploaded',
+        title: language === 'hi' ? 'फ़ाइल अपलोड हो गई' : 'File uploaded & scanned',
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -1144,10 +1166,25 @@ const AdvancedChatApp = () => {
         isClosable: true,
       });
 
-      await handleSendMessage(
-        `Uploaded file: ${response.file.originalName || response.file.fileName}`,
-        { fileId: response.file._id || response.file.id, intentOverride: 'QUICK_SCAN_FILE' }
-      );
+      const uploadedFileObj = response.file;
+      const rawText = uploadedFileObj.text || uploadedFileObj.extractedText || uploadedFileObj.content || '';
+      const cleanLines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 15);
+      const summarySnippet = cleanLines.length > 0
+        ? cleanLines.slice(0, 2).join(' ').substring(0, 200) + '...'
+        : 'Legal document uploaded and indexed.';
+
+      const fileAssistantMsg = {
+        role: 'assistant',
+        content: `📁 **Uploaded File**: \`${uploadedFileObj.originalName || uploadedFileObj.fileName}\`\n\n📄 **Page 1 Quick Summary**:\n> "${summarySnippet}"\n\n🎯 **What would you like to do with this document?** Choose an option below to open the workspace:`,
+        suggestedActions: [
+          { label: '⚡ Precedence Analysis', action: 'START_PRECEDENCE' },
+          { label: '📝 Counter Affidavit Studio', action: 'COUNTER_AFFIDAVIT' },
+          { label: '🌐 Document Translator', action: 'TRANSLATE_DOCUMENT' },
+          { label: '⏱️ Timeline Chronology', action: 'START_CHRONOLOGY' },
+          { label: '🔬 Deep Research', action: 'START_DEEP_RESEARCH' }
+        ]
+      };
+      setMessages(prev => [...prev, fileAssistantMsg]);
     } catch (err) {
       console.error('Chat file upload error:', err);
       toast({
@@ -1173,6 +1210,11 @@ const AdvancedChatApp = () => {
     setCounterMakerContextModalOpen(true);
   };
 
+  const handleTranslatorClick = () => {
+    setActiveTab('drafting');
+    setIsTranslatorPanelOpen(true);
+  };
+
   const toggleListening = () => {
     setIsListening(prev => !prev);
   };
@@ -1184,6 +1226,10 @@ const AdvancedChatApp = () => {
     }
     if (action.action === 'COUNTER_AFFIDAVIT' || action.action === 'START_COUNTER') {
       handleCounterMakerClick();
+      return;
+    }
+    if (action.action === 'TRANSLATE_DOCUMENT' || action.type === 'TRANSLATE') {
+      handleTranslatorClick();
       return;
     }
     if (action.action === 'START_DEEP_RESEARCH') {
@@ -1210,6 +1256,10 @@ const AdvancedChatApp = () => {
       }
       if (action.panelKey === 'isCounterMakerPanelOpen') {
         handleCounterMakerClick();
+        return;
+      }
+      if (action.panelKey === 'isTranslatorPanelOpen') {
+        handleTranslatorClick();
         return;
       }
       setActiveTab(action.tab);
@@ -1248,6 +1298,7 @@ const AdvancedChatApp = () => {
     (activeTab === 'chronology' && isTimelinePanelOpen) ||
     (activeTab === 'drafting' && isPrecedencePanelOpen) ||
     (activeTab === 'drafting' && isCounterMakerPanelOpen) ||
+    (activeTab === 'drafting' && isTranslatorPanelOpen) ||
     (activeTab === 'research' && isReportPanelOpen) ||
     (activeTab === 'review' && isBulkReviewPanelOpen) ||
     isEditMode;
@@ -1257,6 +1308,7 @@ const AdvancedChatApp = () => {
     if (!nextState) {
       setIsPrecedencePanelOpen(false);
       setIsCounterMakerPanelOpen(false);
+      setIsTranslatorPanelOpen(false);
       setIsTimelinePanelOpen(false);
       setIsReportPanelOpen(false);
       setIsBulkReviewPanelOpen(false);
@@ -1351,6 +1403,8 @@ const AdvancedChatApp = () => {
     isCounterMakerPanelOpen, setIsCounterMakerPanelOpen,
     counterMakerFileId, setCounterMakerFileId,
 
+    isTranslatorPanelOpen, setIsTranslatorPanelOpen,
+
     isEditMode, setIsEditMode,
     editSession, setEditSession,
     documentAnalysis, setDocumentAnalysis,
@@ -1358,6 +1412,7 @@ const AdvancedChatApp = () => {
     handleBrowseTemplatesClick,
     handlePrecedenceAnalysisClick,
     handleCounterMakerClick,
+    handleTranslatorClick,
     handleSuggestedActionClick,
     handleClearChat,
     handleSmartScan,
@@ -1499,6 +1554,7 @@ const AdvancedChatApp = () => {
                 {activeTab === 'chronology' && isTimelinePanelOpen && <TimelinePanel />}
                 {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
                 {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
+                {activeTab === 'drafting' && isTranslatorPanelOpen && <TranslatorPanel />}
                 {activeTab === 'research' && isReportPanelOpen && <ResearchPanel />}
                 {activeTab === 'review' && isBulkReviewPanelOpen && <BulkReviewPanel />}
                 {isEditMode && (
