@@ -54,8 +54,12 @@ export function addRefreshInterceptors(apiInstance) {
             localStorage.setItem('csrfToken', newCsrf);
             axios.defaults.headers.common['x-csrf-token'] = newCsrf;
 
-            tokenRetryQueue.forEach(cb => cb());
+            tokenRetryQueue.forEach(cb => cb(newToken));
             tokenRetryQueue = [];
+            
+            originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+            originalRequest.headers['x-csrf-token'] = newCsrf;
+            return apiInstance(originalRequest);
           } catch (refreshErr) {
             tokenRetryQueue = [];
             return Promise.reject(refreshErr);
@@ -63,21 +67,37 @@ export function addRefreshInterceptors(apiInstance) {
             isRefreshingToken = false;
           }
         } else {
-          await new Promise(resolve => tokenRetryQueue.push(resolve));
+          return new Promise((resolve) => {
+            tokenRetryQueue.push((newToken) => {
+              originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+              resolve(apiInstance(originalRequest));
+            });
+          });
         }
-
-        originalRequest.headers['Authorization'] = `Bearer ${localStorage.getItem('token')}`;
-        originalRequest.headers['x-csrf-token'] = localStorage.getItem('csrfToken');
-        return apiInstance(originalRequest);
+      } else if (isJwtExpired && originalRequest._tokenRetried) {
+        // If we already retried and it still fails with 403, clear tokens and let UI handle it
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('jwt');
+        return Promise.reject(error);
+      } else if (isJwtExpired) {
+        // Token is expired but refresh is already in progress, queue the request
+        return new Promise((resolve) => {
+          tokenRetryQueue.push((newToken) => {
+            originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+            resolve(apiInstance(originalRequest));
+          });
+        });
       }
 
+      // Handle CSRF refresh if 403 Invalid CSRF token
       if (isCsrfError && !originalRequest._csrfRetried) {
         originalRequest._csrfRetried = true;
-
+        
         if (!isRefreshingCsrf) {
           isRefreshingCsrf = true;
           try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token') || localStorage.getItem('jwt');
             const resp = await axios.post(
               `${BASE_URL}/api/auth/refresh-csrf`,
               {},

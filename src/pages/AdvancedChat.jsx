@@ -5003,6 +5003,20 @@ const ChatPage = () => {
             </Box>
           )}
 
+          {counterMakerResults && (
+            <Box mt={4} p={4} bg={useColorModeValue('purple.50', 'purple.900')} borderRadius="lg" border="1px solid" borderColor="purple.200">
+              <HStack justify="space-between">
+                <VStack align="start" spacing={1}>
+                  <Text fontWeight="bold" color="purple.600" fontSize="sm">Counter Affidavit Studio</Text>
+                  <Text fontSize="xs" color="gray.500">This chat session has an active counter affidavit draft.</Text>
+                </VStack>
+                <Button size="sm" colorScheme="purple" onClick={() => setIsCounterMakerPanelOpen(true)}>
+                  Open Studio
+                </Button>
+              </HStack>
+            </Box>
+          )}
+
           <div ref={messagesEndRef} />
         </Box>
 

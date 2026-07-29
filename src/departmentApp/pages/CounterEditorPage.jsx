@@ -32,6 +32,7 @@ import {
   Tag,
   TagLabel,
   useColorMode,
+  Tabs, TabList, TabPanels, Tab, TabPanel
 } from '@chakra-ui/react';
 import { FaArrowLeft, FaFileAlt, FaBalanceScale } from 'react-icons/fa';
 import {
@@ -52,6 +53,7 @@ import {
 import fileService from '../services/fileService';
 import { formatDepartmentApiError } from '../services/apiBase';
 import CounterFillBlanksPanel from '../components/CounterFillBlanksPanel';
+import CounterChatbotPanel from './CounterChatbotPanel';
 import { countBlanksInResult, isPlaceholderValue } from '../utils/counterStudioBlanks';
 import { normalizeIndexState } from '../utils/counterStudioIndex';
 
@@ -74,12 +76,12 @@ const suggestDesignIdFromScan = (scan) => {
 };
 
 /* ─── main component ──────────────────────────────────── */
-const CounterEditorPage = () => {
+const CounterEditorPage = ({ isEmbedded = false, embeddedFileId = null }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
   const { colorMode, toggleColorMode } = useColorMode();
-  const fileId = String(searchParams.get('fileId') || '').trim();
+  const fileId = String(embeddedFileId || searchParams.get('fileId') || '').trim();
 
   const [scanData, setScanData] = useState(null);
   const [scanLoading, setScanLoading] = useState(!!fileId);
@@ -498,11 +500,15 @@ const CounterEditorPage = () => {
         py={0}
         position="sticky"
         top={0}
+        top={0}
         zIndex={20}
-        boxShadow="0 1px 3px rgba(0,0,0,0.06)"
+        boxShadow={isEmbedded ? "none" : "0 1px 3px rgba(0,0,0,0.06)"}
+        borderBottom={isEmbedded ? "1px solid" : "none"}
+        borderColor={borderColor}
       >
-        <HStack h="56px" justify="space-between">
+        <HStack h={isEmbedded ? "40px" : "56px"} justify="space-between" px={isEmbedded ? 4 : undefined}>
           {/* Left: Back + Title */}
+          {!isEmbedded && (
           <HStack spacing={3} minW={0}>
             <Tooltip label="Back to editor" placement="bottom">
               <Button size="sm" leftIcon={<FaArrowLeft />} variant="ghost" onClick={() => navigate(-1)} color={muted} _hover={{ color: 'purple.500', bg: 'purple.50' }}>
@@ -527,6 +533,7 @@ const CounterEditorPage = () => {
               </VStack>
             </HStack>
           </HStack>
+          )}
 
           {/* Center: completion bar (only when result exists) */}
           {hasResult && (
@@ -703,8 +710,8 @@ const CounterEditorPage = () => {
           <Text color={muted} fontSize="sm">Loading document context…</Text>
         </VStack>
       ) : (
-        <Box px={5} pt={4} pb={8}>
-          <Grid templateColumns={{ base: '1fr', lg: '6fr 4fr' }} gap={5} alignItems="start">
+        <Box px={isEmbedded ? 2 : 5} pt={isEmbedded ? 2 : 4} pb={isEmbedded ? 2 : 8}>
+          <Grid templateColumns={{ base: '1fr', lg: isEmbedded ? '1fr' : '6fr 4fr' }} gap={5} alignItems="start">
 
             {/* ── LEFT: Preview ─────────────────────────────── */}
             <GridItem minW={0}>
@@ -872,16 +879,38 @@ const CounterEditorPage = () => {
                     '&::-webkit-scrollbar-thumb': { background: 'rgba(128,90,213,0.3)', borderRadius: '2px' },
                   }}
                 >
-                  <CounterFillBlanksPanel
-                    result={mergedResult}
-                    blankCount={blankCount}
-                    onPatch={patchResult}
-                    onPatchCounterDraft={patchCounterDraft}
-                    onAnnexureChange={refreshTemplatePreview}
-                    activeEditTarget={activeEditTarget}
-                    scanData={scanData}
-                    fileId={fileId}
-                  />
+                  <Tabs variant="soft-rounded" colorScheme="purple" h="full" display="flex" flexDirection="column">
+                    <TabList px={2} pt={2} pb={2} bg={useColorModeValue('white', 'gray.800')} borderTopRadius="xl" position="sticky" top={0} zIndex={10}>
+                      <Tab fontSize="sm" fontWeight="600">📝 Form Editor</Tab>
+                      <Tab fontSize="sm" fontWeight="600">🤖 AI Assistant</Tab>
+                    </TabList>
+                    <TabPanels flex={1} overflowY="auto">
+                      <TabPanel p={0} h="full">
+                        <CounterFillBlanksPanel
+                          result={mergedResult}
+                          blankCount={blankCount}
+                          onPatch={patchResult}
+                          onPatchCounterDraft={patchCounterDraft}
+                          onAnnexureChange={refreshTemplatePreview}
+                          activeEditTarget={activeEditTarget}
+                          scanData={scanData}
+                          fileId={fileId}
+                        />
+                      </TabPanel>
+                      <TabPanel p={0} h="full">
+                        <CounterChatbotPanel 
+                          result={mergedResult} 
+                          onPatch={(updatedData) => {
+                            patchResult(updatedData);
+                            // Also patch the draft so it saves immediately
+                            if (updatedData) {
+                              patchCounterDraft(updatedData, true);
+                            }
+                          }} 
+                        />
+                      </TabPanel>
+                    </TabPanels>
+                  </Tabs>
                 </Box>
               ) : (
                 /* empty state for right panel */
