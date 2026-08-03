@@ -23,6 +23,7 @@ const IconSidebar = () => {
     { id: 'review', label: 'Parallel Review', icon: FiLayers },
     { id: 'chronology', label: 'Time Chronology', icon: FiClock },
     { id: 'drafting', label: 'Drafting', icon: FiFileText },
+    { id: 'translation', label: 'Translation', icon: FiFileText },
     { id: 'profile', label: 'Company Profile', icon: FiGlobe },
     { id: 'settings', label: 'Settings', icon: FiSettings }
   ];
@@ -39,7 +40,7 @@ const IconSidebar = () => {
       zIndex={10}
       boxShadow="sm"
     >
-      <Box w="full">
+      <Box w="full" flex="1" overflowY="auto" css={{ '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' }}>
         {/* Header logo alignment box */}
         <Box 
           h="60px" 
@@ -48,6 +49,10 @@ const IconSidebar = () => {
           display="flex"
           alignItems="center"
           justifyContent="center"
+          position="sticky"
+          top={0}
+          bg={cv_white_gray_900}
+          zIndex={5}
         >
           <Box 
             cursor="pointer" 
@@ -58,7 +63,7 @@ const IconSidebar = () => {
           </Box>
         </Box>
         
-        <VStack spacing={2.5} w="full" pt={5} align="center">
+        <VStack spacing={2.5} w="full" pt={5} pb={5} align="center">
           {tabs.map(tab => {
             const isActive = activeTab === tab.id;
             return (
@@ -99,23 +104,7 @@ const IconSidebar = () => {
         </VStack>
       </Box>
 
-      <VStack spacing={4} align="center" pb={4}>
-        <IconButton
-          icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
-          onClick={toggleColorMode}
-          variant="ghost"
-          size="sm"
-          aria-label="Toggle color mode"
-        />
-        <IconButton
-          icon={<Icon as={FiRefreshCw} />}
-          onClick={logout}
-          variant="ghost"
-          colorScheme="red"
-          size="sm"
-          aria-label="Logout"
-        />
-      </VStack>
+
     </Flex>
   );
 };

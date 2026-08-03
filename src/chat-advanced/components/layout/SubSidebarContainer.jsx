@@ -11,6 +11,7 @@ import ResearchSubSidebar from '../subsidebars/ResearchSubSidebar';
 import ReviewSubSidebar from '../subsidebars/ReviewSubSidebar';
 import ChronologySubSidebar from '../subsidebars/ChronologySubSidebar';
 import DraftingSubSidebar from '../subsidebars/DraftingSubSidebar';
+import TranslationSubSidebar from '../subsidebars/TranslationSubSidebar';
 import ProfileSubSidebar from '../subsidebars/ProfileSubSidebar';
 import SettingsSubSidebar from '../subsidebars/SettingsSubSidebar';
 
@@ -36,6 +37,8 @@ const SubSidebarContainer = () => {
         return <ChronologySubSidebar />;
       case 'drafting':
         return <DraftingSubSidebar />;
+      case 'translation':
+        return <TranslationSubSidebar />;
       case 'profile':
         return <ProfileSubSidebar />;
       case 'settings':
