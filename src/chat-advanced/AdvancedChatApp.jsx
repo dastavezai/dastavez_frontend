@@ -184,8 +184,9 @@ const AdvancedChatApp = () => {
   const [isCounterMakerPanelOpen, setIsCounterMakerPanelOpen] = useState(false);
   const [isTranslatorPanelOpen, setIsTranslatorPanelOpen] = useState(false);
   
-  // Translation Viewer State
+  // Translation State
   const [translationViewState, setTranslationViewState] = useState(null);
+  const [translationSessionId, setTranslationSessionId] = useState(() => localStorage.getItem('translationSessionId') || null);
   
   const [counterMakerFileId, setCounterMakerFileId] = useState(null);
   const counterMakerPollRef = useRef(null);
@@ -354,7 +355,7 @@ const AdvancedChatApp = () => {
         if (res.data) {
           // Restore messages
           const msgs = res.data.messages || [];
-          setMessages(msgs.map(m => ({
+          setMessages(msgs.filter(m => !m.hidden).map(m => ({
             role: m.role,
             content: m.content,
             suggestedActions: m.suggestedActions || [],
@@ -364,7 +365,8 @@ const AdvancedChatApp = () => {
             fileName: m.fileName || null,
             scannedResult: m.scannedResult || null,
             rightPanelToggle: m.rightPanelToggle || null,
-            timestamp: m.createdAt || null
+            timestamp: m.createdAt || null,
+            hidden: false
           })));
 
           // Get user files to restore file object mappings
@@ -1051,7 +1053,6 @@ const AdvancedChatApp = () => {
         suggestedActions: [
           { label: '⚡ Precedence Analysis', action: 'START_PRECEDENCE' },
           { label: '📝 Counter Affidavit Studio', action: 'COUNTER_AFFIDAVIT' },
-          { label: '🌐 Document Translator', action: 'TRANSLATE_DOCUMENT' },
           { label: '⏱️ Timeline Chronology', action: 'START_CHRONOLOGY' },
           { label: '🔬 Deep Research', action: 'START_DEEP_RESEARCH' }
         ]
@@ -1191,7 +1192,6 @@ const AdvancedChatApp = () => {
         suggestedActions: [
           { label: '⚡ Precedence Analysis', action: 'START_PRECEDENCE' },
           { label: '📝 Counter Affidavit Studio', action: 'COUNTER_AFFIDAVIT' },
-          { label: '🌐 Document Translator', action: 'TRANSLATE_DOCUMENT' },
           { label: '⏱️ Timeline Chronology', action: 'START_CHRONOLOGY' },
           { label: '🔬 Deep Research', action: 'START_DEEP_RESEARCH' }
         ]
@@ -1430,6 +1430,7 @@ const AdvancedChatApp = () => {
     isTranslatorPanelOpen, setIsTranslatorPanelOpen,
     
     translationViewState, setTranslationViewState,
+    translationSessionId, setTranslationSessionId,
 
     isEditMode, setIsEditMode,
     editSession, setEditSession,

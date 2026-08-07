@@ -42,13 +42,6 @@ const DraftingSubSidebar = () => {
             subtext: 'Create counter affidavit responses',
             icon: FiEdit,
             onClick: handleCounterMakerClick
-          },
-          {
-            id: 'translate',
-            title: 'Document Translator',
-            subtext: 'Translate templates and drafts',
-            icon: FiGlobe,
-            onClick: handleTranslatorClick
           }
         ].map(action => (
           <HStack
