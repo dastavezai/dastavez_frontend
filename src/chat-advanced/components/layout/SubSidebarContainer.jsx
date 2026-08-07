@@ -38,6 +38,7 @@ const SubSidebarContainer = () => {
       case 'drafting':
         return <DraftingSubSidebar />;
       case 'translation':
+      case 'translation-viewer':
         return <TranslationSubSidebar />;
       case 'profile':
         return <ProfileSubSidebar />;

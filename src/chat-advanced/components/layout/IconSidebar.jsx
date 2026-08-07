@@ -65,7 +65,7 @@ const IconSidebar = () => {
         
         <VStack spacing={2.5} w="full" pt={5} pb={5} align="center">
           {tabs.map(tab => {
-            const isActive = activeTab === tab.id;
+            const isActive = activeTab === tab.id || (tab.id === 'translation' && activeTab === 'translation-viewer');
             return (
               <Tooltip key={tab.id} label={tab.label} placement="right">
                 <VStack

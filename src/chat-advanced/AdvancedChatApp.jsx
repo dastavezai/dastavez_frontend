@@ -27,6 +27,7 @@ import TimelinePanel from '../pages/Panels/TimelinePanel';
 import PrecedencePanel from '../pages/Panels/PrecedencePanel';
 import CounterMakerPanel from '../pages/Panels/CounterMakerPanel';
 import TranslatorPanel from '../pages/Panels/TranslatorPanel';
+import TranslationViewerPanel from '../pages/Panels/TranslationViewerPanel';
 import ResearchPanel from '../pages/Panels/ResearchPanel';
 import BulkReviewPanel from '../pages/Panels/BulkReviewPanel';
 
@@ -182,6 +183,10 @@ const AdvancedChatApp = () => {
   const [counterMakerFacts, setCounterMakerFacts] = useState('');
   const [isCounterMakerPanelOpen, setIsCounterMakerPanelOpen] = useState(false);
   const [isTranslatorPanelOpen, setIsTranslatorPanelOpen] = useState(false);
+  
+  // Translation Viewer State
+  const [translationViewState, setTranslationViewState] = useState(null);
+  
   const [counterMakerFileId, setCounterMakerFileId] = useState(null);
   const counterMakerPollRef = useRef(null);
 
@@ -1053,6 +1058,11 @@ const AdvancedChatApp = () => {
       };
       setMessages(prev => [...prev, fileAssistantMsg]);
 
+      // Automatically trigger the AI to extract details silently
+      setTimeout(() => {
+        handleSendMessage("Generate a structured overview for this document. Please extract and format clearly:\n- Document Type\n- Parties Involved\n- Property / Subject Matter Description\n- Stamp Value (if any)\n- Important Dates and Witnesses\n- Brief Summary in English\n\nProvide only the requested details in a clean, professional format. Do not include any conversational filler.", { hidden: true, intentOverride: 'CONVERSATIONAL' });
+      }, 1000);
+
       toast({
         title: language === 'hi' ? 'फ़ाइल अपलोड हो गई' : 'File uploaded & scanned',
         status: 'success',
@@ -1077,8 +1087,10 @@ const AdvancedChatApp = () => {
     const text = textToSend || input;
     if (!text.trim() && !selectedFile) return;
 
-    const userMessage = { role: 'user', content: text };
-    setMessages(prev => [...prev, userMessage]);
+    if (!customPayload?.hidden) {
+      const userMessage = { role: 'user', content: text };
+      setMessages(prev => [...prev, userMessage]);
+    }
     if (!textToSend) setInput('');
     setIsLoading(true);
 
@@ -1185,6 +1197,11 @@ const AdvancedChatApp = () => {
         ]
       };
       setMessages(prev => [...prev, fileAssistantMsg]);
+
+      // Automatically trigger the AI to extract details silently
+      setTimeout(() => {
+        handleSendMessage("Generate a structured overview for this document. Please extract and format clearly:\n- Document Type\n- Parties Involved\n- Property / Subject Matter Description\n- Stamp Value (if any)\n- Important Dates and Witnesses\n- Brief Summary in English\n\nProvide only the requested details in a clean, professional format. Do not include any conversational filler.", { hidden: true, intentOverride: 'CONVERSATIONAL' });
+      }, 1000);
     } catch (err) {
       console.error('Chat file upload error:', err);
       toast({
@@ -1301,6 +1318,7 @@ const AdvancedChatApp = () => {
     (activeTab === 'drafting' && isTranslatorPanelOpen) ||
     (activeTab === 'research' && isReportPanelOpen) ||
     (activeTab === 'review' && isBulkReviewPanelOpen) ||
+    (activeTab === 'translation-viewer') ||
     isEditMode;
 
   const toggleRightPanel = (forceState = null) => {
@@ -1313,6 +1331,10 @@ const AdvancedChatApp = () => {
       setIsReportPanelOpen(false);
       setIsBulkReviewPanelOpen(false);
       setIsEditMode(false);
+      if (activeTab === 'translation-viewer') {
+        setActiveTab('drafting');
+        setTranslationViewState(null);
+      }
     } else {
       if (activeTab === 'drafting') {
         setIsPrecedencePanelOpen(true);
@@ -1323,6 +1345,8 @@ const AdvancedChatApp = () => {
         setIsReportPanelOpen(true);
       } else if (activeTab === 'review') {
         setIsBulkReviewPanelOpen(true);
+      } else if (activeTab === 'translation-viewer') {
+        // Just rely on activeTab for translation-viewer
       } else {
         setActiveTab('drafting');
         setIsPrecedencePanelOpen(true);
@@ -1404,6 +1428,8 @@ const AdvancedChatApp = () => {
     counterMakerFileId, setCounterMakerFileId,
 
     isTranslatorPanelOpen, setIsTranslatorPanelOpen,
+    
+    translationViewState, setTranslationViewState,
 
     isEditMode, setIsEditMode,
     editSession, setEditSession,
@@ -1555,6 +1581,7 @@ const AdvancedChatApp = () => {
                 {activeTab === 'drafting' && isPrecedencePanelOpen && <PrecedencePanel />}
                 {activeTab === 'drafting' && isCounterMakerPanelOpen && <CounterMakerPanel />}
                 {activeTab === 'drafting' && isTranslatorPanelOpen && <TranslatorPanel />}
+                {activeTab === 'translation-viewer' && <TranslationViewerPanel />}
                 {activeTab === 'research' && isReportPanelOpen && <ResearchPanel />}
                 {activeTab === 'review' && isBulkReviewPanelOpen && <BulkReviewPanel />}
                 {isEditMode && (
