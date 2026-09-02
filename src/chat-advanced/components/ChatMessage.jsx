@@ -121,7 +121,8 @@ const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = '
     <HStack
       alignSelf={isUser ? 'flex-end' : 'flex-start'}
       spacing={2.5}
-      maxW="72%"
+      maxW={isUser ? { base: '88%', md: '80%' } : { base: '98%', md: '94%', lg: '92%' }}
+      w={!isUser ? 'full' : 'auto'}
       align="start"
     >
 
@@ -146,7 +147,7 @@ const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = '
 
       <Box
         bg={bgColor}
-        p={3}
+        p={3.5}
         borderRadius="xl"
         borderWidth="1px"
         borderLeft={isUser ? '1px solid' : '2.5px solid'}
@@ -158,6 +159,7 @@ const ChatMessage = ({ message, onSuggestedActionClick, onDownload, language = '
         fontFamily="'Inter', 'Plus Jakarta Sans', sans-serif"
         letterSpacing="0.01em"
         transition="all 0.2s ease"
+        flex={1}
       >
         <VStack align="start" spacing={3}>
           <Box color={textColor} whiteSpace="pre-wrap" w="100%">

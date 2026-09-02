@@ -64,7 +64,7 @@ const ThinkingIndicator = ({ userMessage = "", hasActiveFile = false }) => {
   );
 
   return (
-    <HStack alignSelf="flex-start" spacing={2.5} maxW="72%" align="start" mt={2}>
+    <HStack alignSelf="flex-start" spacing={2.5} maxW={{ base: '98%', md: '94%', lg: '92%' }} align="start" mt={2}>
       {/* Animated CPU Avatar */}
       <Box
         p={2.5}

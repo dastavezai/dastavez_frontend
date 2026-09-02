@@ -563,27 +563,44 @@ const AdvancedChatApp = () => {
 
   // Deep Research functions
   const stopResearchPolling = () => {
-    if (researchPollRef.current) clearInterval(researchPollRef.current);
-    if (researchTimerRef.current) clearInterval(researchTimerRef.current);
+    if (researchPollRef.current) {
+      clearInterval(researchPollRef.current);
+      researchPollRef.current = null;
+    }
+    if (researchTimerRef.current) {
+      clearInterval(researchTimerRef.current);
+      researchTimerRef.current = null;
+    }
   };
 
-  const pollResearchStatus = (sessionId) => {
-    stopResearchPolling();
-    const stages = [
-      { label: 'Extracting document context...', at: 0 },
-      { label: 'Identifying key points & dates...', at: 15 },
-      { label: 'Analyzing actionable steps...', at: 45 },
-      { label: 'Generating comprehensive summary...', at: 65 },
-      { label: 'Finalizing report...', at: 80 },
-    ];
-    researchTimerRef.current = setInterval(() => {
-      setResearchElapsed(prev => {
-        const next = prev + 1;
-        const currentStage = [...stages].reverse().find(s => next >= s.at);
-        if (currentStage) setResearchAgentStage(currentStage.label);
-        return next;
-      });
-    }, 1000);
+  const pollResearchStatus = (sessionId, restartTimer = true) => {
+    if (researchPollRef.current) {
+      clearInterval(researchPollRef.current);
+      researchPollRef.current = null;
+    }
+
+    if (restartTimer) {
+      if (researchTimerRef.current) {
+        clearInterval(researchTimerRef.current);
+        researchTimerRef.current = null;
+      }
+      const stages = [
+        { label: 'Extracting document context...', at: 0 },
+        { label: 'Analyzing structure & OCR...', at: 10 },
+        { label: 'Identifying key points & dates...', at: 20 },
+        { label: 'Analyzing actionable steps...', at: 45 },
+        { label: 'Generating comprehensive summary...', at: 65 },
+        { label: 'Finalizing report...', at: 80 },
+      ];
+      researchTimerRef.current = setInterval(() => {
+        setResearchElapsed(prev => {
+          const next = prev + 1;
+          const currentStage = [...stages].reverse().find(s => next >= s.at);
+          if (currentStage) setResearchAgentStage(currentStage.label);
+          return next;
+        });
+      }, 1000);
+    }
 
     researchPollRef.current = setInterval(async () => {
       try {
@@ -628,7 +645,7 @@ const AdvancedChatApp = () => {
       } catch (err) {
         console.error('Research poll error:', err);
       }
-    }, 5000);
+    }, 4000);
   };
 
   const handleStartDeepResearch = async (autoFile = null) => {
@@ -656,32 +673,48 @@ const AdvancedChatApp = () => {
       }
     ]);
 
+    // Immediately show report panel and start scanning animation without static delay
+    setIsReportPanelOpen(true);
+    setResearchStatus('processing');
+    setResearchResults(null);
+    setResearchElapsed(0);
+    setResearchStartTime(Date.now());
+    setResearchAgentStage('Extracting document context...');
+
+    stopResearchPolling();
+    const stages = [
+      { label: 'Extracting document context...', at: 0 },
+      { label: 'Analyzing structure & OCR...', at: 10 },
+      { label: 'Identifying key points & dates...', at: 20 },
+      { label: 'Analyzing actionable steps...', at: 45 },
+      { label: 'Generating comprehensive summary...', at: 65 },
+      { label: 'Finalizing report...', at: 80 },
+    ];
+    researchTimerRef.current = setInterval(() => {
+      setResearchElapsed(prev => {
+        const next = prev + 1;
+        const currentStage = [...stages].reverse().find(s => next >= s.at);
+        if (currentStage) setResearchAgentStage(currentStage.label);
+        return next;
+      });
+    }, 1000);
+
     try {
-      setResearchStatus('starting');
-      setResearchResults(null);
-      setResearchElapsed(0);
-      setResearchAgentStage('Preparing document...');
-      setIsReportPanelOpen(true);
-
-      const editResult = await fileService.startEditSession(targetFile._id);
-      const editSessionId = editResult.sessionId || editResult._id || editResult.editSession?._id;
-      if (!editSessionId) throw new Error('Failed to create edit session.');
-
-      const researchResult = await researchService.startResearch([editSessionId]);
+      // Start research directly with fileId so it returns immediately (~50ms)
+      const researchResult = await researchService.startResearch({ fileIds: [targetFile._id] });
       const newSessionId = researchResult.sessionId;
 
       setResearchSessionId(newSessionId);
       localStorage.setItem('deepResearchSessionId', newSessionId);
-      setResearchStatus('processing');
-      setResearchStartTime(Date.now());
-      pollResearchStatus(newSessionId);
+      pollResearchStatus(newSessionId, false);
     } catch (err) {
+      stopResearchPolling();
       console.error('Deep research error:', err);
       setResearchStatus('failed');
       setResearchAgentStage('Failed to start research');
       toast({
         title: 'Research Failed',
-        description: err?.response?.data?.error || err.message,
+        description: err?.response?.data?.error || err.message || 'Failed to start deep research',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -1023,11 +1056,8 @@ const AdvancedChatApp = () => {
       setUploadProgress(100);
       setTimeout(() => setUploadProgress(0), 1000);
 
-      setFileSessionId(crypto.randomUUID());
-
-      if (activeTab === 'research') {
-        handleStartDeepResearch(response.file);
-      }
+      // Reset input so same file can be chosen again if needed
+      if (e.target) e.target.value = '';
 
       if (response.remainingMessages !== null) {
         setRemainingMessages(response.remainingMessages);
@@ -1039,6 +1069,12 @@ const AdvancedChatApp = () => {
       setFormatMetadata(null);
       setSmartSuggestions([]);
       setHtmlContent('');
+
+      // If user is in Deep Research tab, start research immediately and skip chat quick summary
+      if (activeTab === 'research') {
+        handleStartDeepResearch(response.file);
+        return;
+      }
 
       const uploadedFileObj = response.file;
       const rawText = uploadedFileObj.text || uploadedFileObj.extractedText || uploadedFileObj.content || '';

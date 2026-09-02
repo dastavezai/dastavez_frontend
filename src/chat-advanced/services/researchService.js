@@ -32,13 +32,14 @@ api.interceptors.request.use(
 const researchService = {
   /**
    * Start a deep research session.
-   * @param {string[]} editSessionIds - Array of edit session IDs to analyze.
+   * @param {string[]|{ editSessionIds?: string[], fileIds?: string[] }} payload - Edit session IDs or payload with fileIds.
    * @returns {Promise<{ message: string, sessionId: string }>}
    */
-  startResearch: async (editSessionIds) => {
+  startResearch: async (payload) => {
     try {
-      console.log('🔬 Starting deep research with sessions:', editSessionIds);
-      const response = await api.post(`${API_URL}/start`, { editSessionIds });
+      const body = Array.isArray(payload) ? { editSessionIds: payload } : (payload || {});
+      console.log('🔬 Starting deep research with:', body);
+      const response = await api.post(`${API_URL}/start`, body);
       console.log('✅ Research started:', response.data);
       return response.data;
     } catch (error) {
