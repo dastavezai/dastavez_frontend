@@ -29,7 +29,7 @@ export function addRefreshInterceptors(apiInstance) {
         msg = data.message || data.error || '';
       }
 
-      const isJwtExpired = status === 403 && (msg === 'Invalid token' || msg.includes('Invalid token'));
+      const isJwtExpired = (status === 401 || status === 403) && (msg === 'Invalid token' || msg.includes('Invalid token') || msg.includes('Token expired') || msg.includes('jwt expired'));
       const isCsrfError = status === 403 && (msg === 'Invalid CSRF token' || msg.includes('Invalid CSRF token'));
 
       if (isJwtExpired && !originalRequest._tokenRetried) {
@@ -43,6 +43,7 @@ export function addRefreshInterceptors(apiInstance) {
             const refreshResp = await axios.post(`${BASE_URL}/api/auth/refresh`, { refreshToken });
             const newToken = refreshResp.data.accessToken;
             localStorage.setItem('token', newToken);
+            localStorage.setItem('jwt', newToken);
             axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
 
             const csrfResp = await axios.post(

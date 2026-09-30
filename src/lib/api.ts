@@ -367,9 +367,14 @@ export async function apiFetch(url: string, options: RequestInit = {}, retried =
       headers
     });
 
+    if (response.ok) {
+      return await response.json();
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+
     // On 403 CSRF error, refresh token and retry once
     if (response.status === 403 && !retried && token) {
-      const errorData = await response.json().catch(() => ({}));
       const isCsrfError =
         errorData?.message === 'Invalid CSRF token' || errorData?.error === 'Invalid CSRF token';
       if (isCsrfError) {
@@ -389,12 +394,33 @@ export async function apiFetch(url: string, options: RequestInit = {}, retried =
       }
     }
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    // On 401 or 403 token error, refresh access token and retry once
+    const isTokenError =
+      response.status === 401 ||
+      (response.status === 403 && (errorData?.message === 'Invalid token' || errorData?.message?.includes('token')));
+
+    if (isTokenError && !retried && !url.includes('/auth/login') && !url.includes('/auth/refresh')) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          const refreshResp = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken })
+          });
+          const refreshData = await refreshResp.json();
+          if (refreshData?.accessToken) {
+            localStorage.setItem('jwt', refreshData.accessToken);
+            localStorage.setItem('token', refreshData.accessToken);
+            return apiFetch(url, options, true);
+          }
+        } catch {
+          // fall through
+        }
+      }
     }
 
-    return await response.json();
+    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
   } catch (err) {
     console.error(`Network/API error for ${url}:`, err);
     throw err;

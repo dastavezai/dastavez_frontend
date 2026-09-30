@@ -18,8 +18,90 @@ export const AuthProvider = ({ children }) => {
     return null;
   });
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(() => localStorage.getItem('token') || localStorage.getItem('jwt'));
   const [csrfToken, setCsrfToken] = useState(localStorage.getItem('csrfToken'));
+
+  // Global Axios Interceptor for Silent JWT Refresh
+  useEffect(() => {
+    let isRefreshing = false;
+    let failedQueue = [];
+
+    const processQueue = (error, newToken = null) => {
+      failedQueue.forEach((prom) => {
+        if (error) {
+          prom.reject(error);
+        } else {
+          prom.resolve(newToken);
+        }
+      });
+      failedQueue = [];
+    };
+
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+        const status = error.response?.status;
+        const errorMsg = error.response?.data?.message || '';
+
+        const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') ||
+          originalRequest?.url?.includes('/auth/signup') ||
+          originalRequest?.url?.includes('/auth/refresh');
+
+        const isTokenExpired =
+          (status === 401 || status === 403) &&
+          (errorMsg === 'Invalid token' ||
+            errorMsg.includes('Invalid token') ||
+            errorMsg.includes('Token expired') ||
+            errorMsg.includes('jwt expired'));
+
+        if (isTokenExpired && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
+          originalRequest._retry = true;
+          const refreshToken = localStorage.getItem('refreshToken');
+          if (!refreshToken) {
+            return Promise.reject(error);
+          }
+
+          if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+              failedQueue.push({ resolve, reject });
+            })
+              .then((newToken) => {
+                originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+                return axios(originalRequest);
+              })
+              .catch((err) => Promise.reject(err));
+          }
+
+          isRefreshing = true;
+          try {
+            const refreshResp = await axios.post('/api/auth/refresh', { refreshToken });
+            const newToken = refreshResp.data?.accessToken;
+            if (newToken) {
+              setToken(newToken);
+              localStorage.setItem('token', newToken);
+              localStorage.setItem('jwt', newToken);
+              axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+              originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+              processQueue(null, newToken);
+              return axios(originalRequest);
+            }
+          } catch (refreshErr) {
+            processQueue(refreshErr, null);
+            return Promise.reject(refreshErr);
+          } finally {
+            isRefreshing = false;
+          }
+        }
+
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, []);
 
   // Set up axios defaults and check user on mount
   useEffect(() => {
@@ -45,22 +127,40 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     } catch (error) {
       console.error('Error checking user:', error);
-      
-      // Persist session if login was less than 24 hours ago
-      const loginTime = localStorage.getItem('login_timestamp');
-      const cachedUser = localStorage.getItem('user');
-      if (loginTime && cachedUser && (Date.now() - Number(loginTime)) < 24 * 60 * 60 * 1000) {
+
+      // Attempt silent refresh before logging the user out
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
         try {
-          setUser(JSON.parse(cachedUser));
-          setLoading(false);
-          return;
-        } catch (e) {}
+          const refreshResp = await axios.post('/api/auth/refresh', { refreshToken });
+          const newToken = refreshResp.data?.accessToken;
+          if (newToken) {
+            setToken(newToken);
+            localStorage.setItem('token', newToken);
+            localStorage.setItem('jwt', newToken);
+            axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+
+            const retryResp = await axios.get('/api/auth/user', {
+              headers: { Authorization: `Bearer ${newToken}` }
+            });
+            const userData = retryResp.data;
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('login_timestamp', Date.now().toString());
+            setLoading(false);
+            return;
+          }
+        } catch (refreshErr) {
+          console.error('Auto token refresh failed during checkUser:', refreshErr);
+        }
       }
 
       setUser(null);
       setToken(null);
       localStorage.removeItem('token');
+      localStorage.removeItem('jwt');
       localStorage.removeItem('user');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('login_timestamp');
       setLoading(false);
     }
@@ -80,6 +180,7 @@ export const AuthProvider = ({ children }) => {
     setUser(user);
     setCsrfToken(csrfToken || null);
     localStorage.setItem('token', token);
+    localStorage.setItem('jwt', token);
     localStorage.setItem('login_timestamp', Date.now().toString());
     if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     if (csrfToken) localStorage.setItem('csrfToken', csrfToken);
@@ -97,6 +198,7 @@ export const AuthProvider = ({ children }) => {
         token = emailOrToken;
         setToken(token);
         localStorage.setItem('token', token);
+        localStorage.setItem('jwt', token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         await checkUser(); // This will set the user data
       } else {
@@ -116,6 +218,7 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
         setCsrfToken(csrfToken || null);
         localStorage.setItem('token', token);
+        localStorage.setItem('jwt', token);
         if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
         if (csrfToken) localStorage.setItem('csrfToken', csrfToken);
         localStorage.setItem('user', JSON.stringify(userData));
@@ -140,6 +243,7 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
       setCsrfToken(csrfToken || null);
       localStorage.setItem('token', token);
+      localStorage.setItem('jwt', token);
       if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       if (csrfToken) localStorage.setItem('csrfToken', csrfToken);
       localStorage.setItem('user', JSON.stringify(user));
@@ -164,9 +268,11 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
       setCsrfToken(null);
       localStorage.removeItem('token');
+      localStorage.removeItem('jwt');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('csrfToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('login_timestamp');
       delete axios.defaults.headers.common['Authorization'];
       delete axios.defaults.headers.common['x-csrf-token'];
     }

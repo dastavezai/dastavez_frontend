@@ -7,7 +7,7 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(() => localStorage.getItem('token') || localStorage.getItem('jwt'));
   const [csrfToken, setCsrfToken] = useState(localStorage.getItem('csrfToken'));
 
   
@@ -33,9 +33,38 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     } catch (error) {
       console.error('Error checking user:', error);
+
+      // Attempt silent refresh before wiping user session
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          const refreshResp = await axios.post('/api/auth/refresh', { refreshToken });
+          const newToken = refreshResp.data?.accessToken;
+          if (newToken) {
+            setToken(newToken);
+            localStorage.setItem('token', newToken);
+            localStorage.setItem('jwt', newToken);
+            axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+
+            const retryResp = await axios.get('/api/auth/user', {
+              headers: { Authorization: `Bearer ${newToken}` }
+            });
+            const userData = retryResp.data;
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+            setLoading(false);
+            return;
+          }
+        } catch (refreshErr) {
+          console.error('Auto refresh failed during checkUser:', refreshErr);
+        }
+      }
+
       setUser(null);
       setToken(null);
       localStorage.removeItem('token');
+      localStorage.removeItem('jwt');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       setLoading(false);
     }
@@ -55,6 +84,7 @@ export const AuthProvider = ({ children }) => {
     setUser(user);
     setCsrfToken(csrfToken || null);
     localStorage.setItem('token', token);
+    localStorage.setItem('jwt', token);
     if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     if (csrfToken) localStorage.setItem('csrfToken', csrfToken);
     localStorage.setItem('user', JSON.stringify(user));
@@ -71,6 +101,7 @@ export const AuthProvider = ({ children }) => {
         token = emailOrToken;
         setToken(token);
         localStorage.setItem('token', token);
+        localStorage.setItem('jwt', token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         await checkUser();
       } else {
@@ -90,6 +121,7 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
         setCsrfToken(csrfToken || null);
         localStorage.setItem('token', token);
+        localStorage.setItem('jwt', token);
         if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
         if (csrfToken) localStorage.setItem('csrfToken', csrfToken);
         localStorage.setItem('user', JSON.stringify(userData));
@@ -114,6 +146,7 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
       setCsrfToken(csrfToken || null);
       localStorage.setItem('token', token);
+      localStorage.setItem('jwt', token);
       if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       if (csrfToken) localStorage.setItem('csrfToken', csrfToken);
       localStorage.setItem('user', JSON.stringify(user));
@@ -138,6 +171,7 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
       setCsrfToken(null);
       localStorage.removeItem('token');
+      localStorage.removeItem('jwt');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('csrfToken');
       localStorage.removeItem('user');
